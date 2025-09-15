@@ -108,40 +108,58 @@ jobs:
           commit_message: Bump version ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}
 
       - name: Report to Telegram
-        env:
-          TG_TOKEN: ${{ secrets.TG_TOKEN }}
-        if: env.TG_TOKEN != null
-        run: |
-          cd build || { echo "build folder not found"; exit 1; }
+  env:
+    TG_TOKEN: ${{ secrets.TG_TOKEN }}
+    TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+  if: env.TG_TOKEN != null && env.TG_CHAT_ID != null
+  continue-on-error: true
+  run: |
+    set -euo pipefail
+    cd build || { echo "build folder not found"; exit 1; }
 
-          TG_CHAT="@rvc_magisk"
-          NL=$'\n'
-          APKS=""
-          MODULES=""
-          for OUTPUT in *; do
-            DL_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}/${OUTPUT}"
-            if [[ $OUTPUT = *.apk ]]; then
-              APKS+="${NL}📦[${OUTPUT}](${DL_URL})"
-            elif [[ $OUTPUT = *.zip ]]; then
-              MODULES+="${NL}📦[${OUTPUT}](${DL_URL})"
-            fi
-          done
-          MODULES=${MODULES#"$NL"}
-          APKS=${APKS#"$NL"}
+    NL=$'\n'
+    APKS=""
+    MODULES=""
+    BASE_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}"
 
-          BODY="$(sed 's/^\* \*\*/↪ \*\*/g; s/^\* `/↪ \*\*/g; s/`/\*/g; s/^\* /\↪/g; s/\*\*/\*/g; s/###//g; s/^- /↪ /g; /^==/d;' ../build.md)"
-          MSG="*New build!*
+    # Monta lista de links
+    for OUTPUT in *; do
+      DL_URL="$BASE_URL/$OUTPUT"
+      if [[ "$OUTPUT" = *.apk ]]; then
+        APKS+="${NL}📲 [${OUTPUT}](${DL_URL})"
+      elif [[ "$OUTPUT" = *.zip ]]; then
+        MODULES+="${NL}📦 [${OUTPUT}](${DL_URL})"
+      fi
+    done
 
-          ${BODY}
+    MODULES=${MODULES#"$NL"}
+    APKS=${APKS#"$NL"}
 
-          *▼ Download Links:*
-          Modules:
-          ${MODULES}
+    # Formata changelog
+    BODY="$(sed 's/^\* \*\*/↪ \*\*/g; s/^\* `/↪ \*\*/g; s/`/\*/g; s/^\* /\↪/g; s/\*\*/\*/g; s/###//g; s/^- /↪ /g; /^==/d;' ../build.md)"
 
-          APKs:
-          ${APKS}
-          "
-          echo "'$MSG'"
-          MSG=${MSG:0:9450}
-          POST="https://api.telegram.org/bot${TG_TOKEN}/sendMessage"
-          curl -X POST --data-urlencode "parse_mode=Markdown" --data-urlencode "disable_web_page_preview=true" --data-urlencode "text=${MSG}" --data-urlencode "chat_id=${TG_CHAT}" "$POST"
+    # Monta mensagem final
+    MSG="*🚀 Novo Build Disponível!* \
+    \n*Versão:* _${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}_ \
+    \n\n🔖 *Changelog:* \
+    \n${BODY} \
+    \n\n⬇️ *Download:* \
+    \n*Modules:* \
+    ${MODULES:-_Nenhum módulo gerado_} \
+    \n\n*APKs:* \
+    ${APKS:-_Nenhum APK gerado_}"
+
+    # Limite seguro do Telegram: 4096 chars
+    MAX_LEN=4000
+    if [ ${#MSG} -gt $MAX_LEN ]; then
+      MSG="${MSG:0:$MAX_LEN}\n\n... *(mensagem truncada — veja release completa no GitHub)*"
+    fi
+
+    # Envia mensagem
+    curl -X POST \
+      --data-urlencode "parse_mode=Markdown" \
+      --data-urlencode "disable_web_page_preview=true" \
+      --data-urlencode "text=${MSG}" \
+      --data-urlencode "chat_id=${TG_CHAT_ID}" \
+      "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+      -o /dev/null -s -w "Telegram response: %{http_code}\n"
