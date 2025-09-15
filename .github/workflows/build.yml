@@ -1,10 +1,9 @@
 name: Auto Build YouTube & Music
 on:
   schedule:
-    - cron: '0 10 * * *'  # Todos os dias às 10:00 UTC
+    - cron: '0 10 * * *'
   workflow_dispatch:
 
-# ADICIONE ESTAS PERMISSÕES
 permissions:
   contents: write
   actions: read
@@ -27,6 +26,28 @@ jobs:
           distribution: "zulu"
           java-version: "17"
       
+      - name: Save previous release info (before build)
+        id: previous
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Salva informações da release anterior ANTES de buildar
+          LAST_RELEASE=$(gh release list --limit 1 --json tagName,createdAt -q '.[0].tagName' || echo "")
+          echo "last_release=$LAST_RELEASE" >> $GITHUB_OUTPUT
+          
+          if [ -n "$LAST_RELEASE" ]; then
+            echo "📦 Release anterior encontrada: $LAST_RELEASE"
+            
+            # Baixa o ID da mensagem do Telegram da release anterior
+            gh release download "$LAST_RELEASE" -p "telegram_msg_id.txt" 2>/dev/null || true
+            
+            if [ -f "telegram_msg_id.txt" ]; then
+              LAST_MSG_ID=$(cat telegram_msg_id.txt)
+              echo "last_msg_id=$LAST_MSG_ID" >> $GITHUB_OUTPUT
+              echo "💬 Message ID anterior: $LAST_MSG_ID"
+            fi
+          fi
+      
       - name: Configure build
         run: |
           cat > config.toml << 'EOF'
@@ -35,48 +56,38 @@ jobs:
           
           [YouTube]
           enabled = true
-          build-mode = "apk"
+          build-mode = "both"
           arch = "arm64-v8a"
           version = "auto"
           apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"
           
           [Music]
           enabled = true
-          build-mode = "apk"
+          build-mode = "both"
           arch = "arm64-v8a"
           version = "auto"
           apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"
           EOF
       
-      - name: Build APKs
+      - name: Build APKs and Modules
+        id: build
         run: |
           chmod +x build.sh
           export JAVA_OPTS="-Xmx2g"
           ./build.sh config.toml
+          
+          # Verifica se o build teve sucesso
+          if [ -d "build" ] && [ "$(ls -A build/*.apk 2>/dev/null)" ]; then
+            echo "build_success=true" >> $GITHUB_OUTPUT
+            echo "✅ Build concluído com sucesso!"
+          else
+            echo "build_success=false" >> $GITHUB_OUTPUT
+            echo "❌ Build falhou!"
+            exit 1
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NEXT_VER_CODE: ${{ github.run_number }}
-      
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: v${{ github.run_number }}
-          name: Build #${{ github.run_number }} - $(date +'%d/%m/%Y')
-          files: build/*.apk
-          draft: false
-          prerelease: false
-          generate_release_notes: false
-          body: |
-            ## Build Automático #${{ github.run_number }}
-            
-            📅 Data: ${{ steps.date.outputs.date }}
-            🕐 Hora: ${{ steps.date.outputs.time }}
-            
-            ### 📦 Downloads
-            - YouTube ReVanced (ARM64)
-            - YouTube Music ReVanced (ARM64)
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Get date
         id: date
@@ -84,45 +95,148 @@ jobs:
           echo "date=$(date +'%d/%m/%Y')" >> $GITHUB_OUTPUT
           echo "time=$(TZ=America/Sao_Paulo date +'%H:%M')" >> $GITHUB_OUTPUT
       
-      - name: Telegram Notification
-        if: always()
+      - name: Send Telegram notification
+        id: telegram
+        if: steps.build.outputs.build_success == 'true'
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
-        continue-on-error: true
         run: |
-          if [ "${{ job.status }}" == "success" ]; then
-            TAG="v${{ github.run_number }}"
+          TAG="v${{ github.run_number }}"
+          BASE_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/${TAG}"
+          
+          # Organiza arquivos
+          APK_FILES=""
+          MAGISK_FILES=""
+          
+          for file in build/*; do
+            [ -f "$file" ] || continue
+            filename=$(basename "$file")
+            url="${BASE_URL}/${filename}"
             
-            # Lista arquivos gerados
-            FILES=""
-            for apk in build/*.apk; do
-              [ -f "$apk" ] || continue
-              filename=$(basename "$apk")
-              url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/${TAG}/${filename}"
-              
+            if [[ $filename == *.apk ]]; then
               if [[ $filename == *"youtube"* ]] && [[ $filename != *"music"* ]]; then
-                FILES+="📱 [YouTube]($url)"$'\n'
+                APK_FILES+="📱 [YouTube APK]($url)"$'\n'
               elif [[ $filename == *"music"* ]]; then
-                FILES+="🎵 [YouTube Music]($url)"$'\n'
+                APK_FILES+="🎵 [Music APK]($url)"$'\n'
               fi
-            done
-            
-            MSG="#rvcbot"$'\n\n'
-            MSG+="✅ *Build #${{ github.run_number }} Concluído*"$'\n\n'
-            MSG+="📅 $(date +'%d/%m/%Y - %H:%M')"$'\n\n'
-            MSG+="📥 *Downloads:*"$'\n'
-            MSG+="$FILES"$'\n'
-            MSG+="🔗 [Ver Release](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${TAG})"$'\n\n'
-            MSG+="#rvcbot"
-          else
-            MSG="#rvcbot"$'\n\n'
-            MSG+="❌ *Falha no Build*"$'\n\n'
-            MSG+="🔍 [Ver logs](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${{ github.run_id }})"$'\n\n'
-            MSG+="#rvcbot"
+            elif [[ $filename == *.zip ]]; then
+              if [[ $filename == *"youtube"* ]] && [[ $filename != *"music"* ]]; then
+                MAGISK_FILES+="📦 [YouTube Magisk]($url)"$'\n'
+              elif [[ $filename == *"music"* ]]; then
+                MAGISK_FILES+="📦 [Music Magisk]($url)"$'\n'
+              fi
+            fi
+          done
+          
+          MSG="#rvcbot"$'\n\n'
+          MSG+="✅ *Build #${{ github.run_number }}*"$'\n\n'
+          MSG+="📅 ${{ steps.date.outputs.date }} - ${{ steps.date.outputs.time }}"$'\n\n'
+          
+          if [ -n "$APK_FILES" ]; then
+            MSG+="📥 *APKs:*"$'\n'
+            MSG+="$APK_FILES"$'\n'
           fi
           
-          curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+          if [ -n "$MAGISK_FILES" ]; then
+            MSG+="📥 *Magisk:*"$'\n'
+            MSG+="$MAGISK_FILES"$'\n'
+          fi
+          
+          MSG+="🔗 [Release](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${TAG})"$'\n\n'
+          MSG+="#rvcbot"
+          
+          # Envia mensagem
+          RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
             -d "chat_id=${TG_CHAT_ID}" \
             -d "text=${MSG}" \
-            -d "parse_mode=Markdown"
+            -d "parse_mode=Markdown" \
+            -d "disable_web_page_preview=false")
+          
+          # Salva o message_id
+          MSG_ID=$(echo "$RESPONSE" | grep -oP '"message_id":\K[0-9]+' || echo "")
+          
+          if [ -n "$MSG_ID" ]; then
+            echo "✅ Mensagem enviada: ID $MSG_ID"
+            echo "$MSG_ID" > telegram_msg_id.txt
+            echo "message_sent=true" >> $GITHUB_OUTPUT
+            echo "message_id=$MSG_ID" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Erro ao enviar mensagem"
+            echo "message_sent=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Create new release
+        if: steps.build.outputs.build_success == 'true'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ github.run_number }}
+          name: Build #${{ github.run_number }}
+          files: |
+            build/*.apk
+            build/*.zip
+            telegram_msg_id.txt
+          draft: false
+          prerelease: false
+          body: |
+            📅 ${{ steps.date.outputs.date }} - ${{ steps.date.outputs.time }}
+            💬 Telegram: ${{ steps.telegram.outputs.message_id }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Delete previous release and Telegram message
+        if: steps.build.outputs.build_success == 'true' && steps.telegram.outputs.message_sent == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TG_TOKEN: ${{ secrets.TG_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          echo "🧹 Limpando dados anteriores..."
+          
+          # 1. Deleta mensagem anterior do Telegram
+          if [ -n "${{ steps.previous.outputs.last_msg_id }}" ]; then
+            echo "🗑️ Deletando mensagem Telegram anterior: ${{ steps.previous.outputs.last_msg_id }}"
+            
+            curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/deleteMessage" \
+              -d "chat_id=${TG_CHAT_ID}" \
+              -d "message_id=${{ steps.previous.outputs.last_msg_id }}" || echo "Não foi possível deletar mensagem"
+          fi
+          
+          # 2. Deleta TODAS as releases anteriores (mantém apenas a atual)
+          echo "🗑️ Deletando releases anteriores..."
+          
+          CURRENT_TAG="v${{ github.run_number }}"
+          
+          # Lista todas as releases EXCETO a atual
+          gh release list --limit 100 | while read -r line; do
+            TAG=$(echo "$line" | cut -f3)
+            
+            if [ "$TAG" != "$CURRENT_TAG" ]; then
+              echo "Deletando release: $TAG"
+              gh release delete "$TAG" -y --cleanup-tag || true
+            fi
+          done
+          
+          # 3. Limpa tags antigas órfãs (se houver)
+          git fetch --tags
+          for tag in $(git tag); do
+            if [ "$tag" != "$CURRENT_TAG" ]; then
+              echo "Deletando tag: $tag"
+              git push --delete origin "$tag" 2>/dev/null || true
+            fi
+          done
+          
+          echo "✅ Limpeza concluída! Apenas Build #${{ github.run_number }} está disponível."
+      
+      - name: Final cleanup verification
+        if: steps.build.outputs.build_success == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "📊 Status final:"
+          echo "Releases disponíveis:"
+          gh release list || echo "Nenhuma release"
+          
+          echo ""
+          echo "Tags disponíveis:"
+          git tag || echo "Nenhuma tag"
