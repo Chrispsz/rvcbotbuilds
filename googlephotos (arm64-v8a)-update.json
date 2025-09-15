@@ -1,6 +1,6 @@
 {
   "version": "v7.45.0.804174563 (patches 5.37.0)",
-  "versionCode": 2,
-  "zipUrl": "https://github.com/Chrispsz/rvcbotbuilds/releases/download/2/googlephotos-revanced-magisk-v7.45.0.804174563-arm64-v8a.zip",
+  "versionCode": 1,
+  "zipUrl": "https://github.com/Chrispsz/rvcbotbuilds/releases/download/1/googlephotos-revanced-magisk-v7.45.0.804174563-arm64-v8a.zip",
   "changelog": "https://raw.githubusercontent.com/Chrispsz/rvcbotbuilds/update/build.md"
 }
