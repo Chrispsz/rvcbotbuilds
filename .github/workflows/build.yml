@@ -1,201 +1,133 @@
-name: Build Modules
+name: Auto Build YouTube & Music
 on:
-  workflow_call:
-    inputs:
-      from_ci:
-        type: boolean
-        required: false
-        default: true
-
-  workflow_dispatch:
+  schedule:
+  - cron: '0 10 * * *'  # Todos os dias às 10:00 UTC
+    
+  workflow_dispatch: # Permite rodar manualmente se necessário
 
 jobs:
-  run:
-    permissions: write-all
+  build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
     steps:
-      - uses: actions/setup-java@v4
-        with:
-          distribution: "zulu"
-          java-version: "17"
-
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
           submodules: true
-
-      - name: Update config
-        if: ${{ inputs.from_ci }}
+          fetch-depth: 0
+      
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "zulu"
+          java-version: "17"
+          cache: 'gradle'
+      
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            revanced-cache
+          key: gradle-${{ hashFiles('**/*.toml') }}
+          restore-keys: gradle-
+      
+      - name: Configure build
         run: |
-          if git checkout origin/update build.md; then
-            UPDATE_CFG=$(./build.sh config.toml --config-update)
-            if [ "$UPDATE_CFG" ]; then
-              echo "$UPDATE_CFG" > config.json
-            fi
-          fi
-
-      - name: Get next version code
-        id: next_ver_code
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Configuração otimizada para YouTube e Music apenas
+          cat > config.toml << 'EOF'
+          enable-magisk-update = true
+          parallel-jobs = 1
+          
+          [YouTube]
+          enabled = true
+          build-mode = "apk"
+          arch = "arm64-v8a"
+          version = "auto"
+          apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"
+          
+          [Music]
+          enabled = true
+          build-mode = "apk"
+          arch = "arm64-v8a"
+          version = "auto"
+          apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"
+          EOF
+      
+      - name: Build APKs
         run: |
-          TAG=$(gh release list -L 1 | awk -F '\t' '{print $3}')
-          if [ -z "$TAG" ]; then TAG=0; fi
-          echo "NEXT_VER_CODE=$((TAG + 1))" >> $GITHUB_OUTPUT
-
-      - name: Build modules/APKs
-        run: if [ -f "config.json" ]; then ./build.sh config.json; else ./build.sh config.toml; fi
+          export JAVA_OPTS="-Xmx2g"
+          export GRADLE_OPTS="-Dorg.gradle.daemon=false"
+          ./build.sh config.toml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPOSITORY: $GITHUB_REPOSITORY
-          NEXT_VER_CODE: ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}
-
-      - name: Get output
-        id: get_output
+          NEXT_VER_CODE: ${{ github.run_number }}
+      
+      - name: Create Release
         run: |
-          DELIM="$(openssl rand -hex 8)"
-          echo "BUILD_LOG<<${DELIM}" >> "$GITHUB_OUTPUT"
-          cat build.md >> "$GITHUB_OUTPUT"
-          echo "${DELIM}" >> "$GITHUB_OUTPUT"
-          cp -f build.md build.tmp
-
-      - name: Upload modules to release
-        uses: svenstaro/upload-release-action@v2
-        with:
-          body: ${{ steps.get_output.outputs.BUILD_LOG }}
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ./build/*
-          release_name: ReVanced
-          tag: ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}
-          file_glob: true
-          overwrite: true
-
-      - name: Update changelog and Magisk update json
-        id: update_config
-        run: |
-          git checkout -f update || git switch --discard-changes --orphan update
-          cp -f build.tmp build.md
-          get_update_json() {
-            echo "{
-            \"version\": \"$1\",
-            \"versionCode\": ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }},
-            \"zipUrl\": \"$2\",
-            \"changelog\": \"https://raw.githubusercontent.com/$GITHUB_REPOSITORY/update/build.md\"
-          }"
-          }
-
-          cd build || { echo "build folder not found"; exit 1; }
-          for OUTPUT in *magisk*.zip; do
-            [ "$OUTPUT" = "*magisk*.zip" ] && continue
-            ZIP_S=$(unzip -p "$OUTPUT" module.prop)
-            if ! UPDATE_JSON=$(echo "$ZIP_S" | grep updateJson); then continue; fi
-            UPDATE_JSON="${UPDATE_JSON##*/}"
-            VER=$(echo "$ZIP_S" | grep version=)
-            VER="${VER##*=}"
-            DLURL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}/${OUTPUT}"
-            get_update_json "$VER" "$DLURL" >"../$UPDATE_JSON"
+          TAG="v$(date +%Y%m%d)-${{ github.run_number }}"
+          TITLE="YouTube & Music - $(date +'%d/%m/%Y')"
+          
+          # Cria release com os APKs
+          gh release create "$TAG" ./build/*.apk \
+            --title "$TITLE" \
+            --notes "Build automático #${{ github.run_number }}" \
+            --latest
+          
+          # Limpa releases antigas (mantém apenas 10)
+          gh release list --limit 100 | tail -n +11 | cut -f3 | \
+          while read -r old_tag; do
+            gh release delete "$old_tag" -y || true
           done
-          cd ..
-
-          find . -name "*-update.json" | grep . || : >dummy-update.json
-
-      - uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          branch: update
-          skip_checkout: true
-          file_pattern: build.md *-update.json
-          commit_message: Bump version ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}
-
-      - name: Report to Telegram
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Telegram Notification
+        if: always()
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
-          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}  # Adicione -1001342268782 como secret
-        if: env.TG_TOKEN != null
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+        continue-on-error: true
         run: |
-          cd build || { echo "build folder not found"; exit 1; }
-
-          # Configurações
-          TG_CHAT="${TG_CHAT_ID:-@rvc_magisk}"  # Usa o ID do secret ou fallback
-          NL=$'\n'
-          TAG="#rvcbot"  # Tag para fácil identificação
-          
-          # Prepara links de download
-          APKS=""
-          MODULES=""
-          for OUTPUT in *; do
-            DL_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}/${OUTPUT}"
-            OUTPUT_NAME="${OUTPUT%.*}"  # Remove extensão para nome mais limpo
+          if [ "${{ job.status }}" == "success" ]; then
+            # Prepara links dos APKs
+            TAG="v$(date +%Y%m%d)-${{ github.run_number }}"
+            BASE_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/${TAG}"
             
-            if [[ $OUTPUT = *.apk ]]; then
-              APKS+="${NL}📱 [${OUTPUT_NAME}](${DL_URL})"
-            elif [[ $OUTPUT = *.zip ]]; then
-              MODULES+="${NL}📦 [${OUTPUT_NAME}](${DL_URL})"
-            fi
-          done
-          
-          # Remove linha vazia inicial
-          MODULES=${MODULES#"$NL"}
-          APKS=${APKS#"$NL"}
-
-          # Formata o changelog
-          BODY="$(sed 's/^\* \*\*/↪ \*\*/g; s/^\* `/↪ \*\*/g; s/`/\*/g; s/^\* /\↪/g; s/\*\*/\*/g; s/###//g; s/^- /↪ /g; /^==/d;' ../build.md | head -20)"
-          
-          # Adiciona informações do build
-          BUILD_INFO="*Build #${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}*"
-          BUILD_TIME="🕐 $(date +'%d/%m/%Y %H:%M UTC')"
-          COMMIT_SHA="🔧 Commit: \`${GITHUB_SHA:0:7}\`"
-          
-          # Monta mensagem completa
-          MSG="${TAG}
-          
-          🎉 *Nova Compilação ReVanced!*
-          
-          ${BUILD_INFO}
-          ${BUILD_TIME}
-          ${COMMIT_SHA}
-          
-          📋 *Changelog:*
-          ${BODY}
-          
-          ⬇️ *Downloads:*"
-          
-          # Adiciona links se existirem
-          if [ -n "$MODULES" ]; then
-            MSG+="${NL}${NL}*Módulos Magisk:*${NL}${MODULES}"
-          fi
-          
-          if [ -n "$APKS" ]; then
-            MSG+="${NL}${NL}*APKs:*${NL}${APKS}"
-          fi
-          
-          # Adiciona link para release completa
-          MSG+="${NL}${NL}🔗 [Ver Release Completa](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${{ steps.next_ver_code.outputs.NEXT_VER_CODE }})"
-          
-          # Adiciona rodapé
-          MSG+="${NL}${NL}${TAG} | @${GITHUB_REPOSITORY##*/}"
-          
-          # Limita tamanho da mensagem (Telegram tem limite de 4096 chars)
-          if [ ${#MSG} -gt 4000 ]; then
-            MSG="${MSG:0:3900}...${NL}${NL}📎 [Ver mais na release](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${{ steps.next_ver_code.outputs.NEXT_VER_CODE }})"
+            # Monta mensagem de sucesso
+            MSG="#rvcbot"$'\n\n'
+            MSG+="✅ *Build Automático Concluído*"$'\n\n'
+            MSG+="📅 Data: $(date +'%d/%m/%Y')"$'\n'
+            MSG+="🕐 Hora: $(TZ=America/Sao_Paulo date +'%H:%M')"$'\n'
+            MSG+="🔢 Build: #${{ github.run_number }}"$'\n\n'
+            MSG+="📥 *Downloads:*"$'\n'
+            
+            # Adiciona links dos arquivos
+            for file in build/*.apk; do
+              filename=$(basename "$file")
+              if [[ $filename == *"youtube"* ]] && [[ $filename != *"music"* ]]; then
+                MSG+="📱 [YouTube]($BASE_URL/$filename)"$'\n'
+              elif [[ $filename == *"music"* ]]; then
+                MSG+="🎵 [YouTube Music]($BASE_URL/$filename)"$'\n'
+              fi
+            done
+            
+            MSG+=$'\n'"🔗 [Release Completa](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${TAG})"$'\n\n'
+            MSG+="#rvcbot"
+          else
+            # Mensagem de erro
+            MSG="#rvcbot"$'\n\n'
+            MSG+="❌ *Falha no Build*"$'\n\n'
+            MSG+="📅 $(date +'%d/%m/%Y %H:%M')"$'\n'
+            MSG+="🔍 [Ver logs](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${{ github.run_id }})"$'\n\n'
+            MSG+="#rvcbot"
           fi
           
           # Envia mensagem
-          echo "Enviando mensagem para o Telegram (${#MSG} caracteres)..."
-          
-          POST="https://api.telegram.org/bot${TG_TOKEN}/sendMessage"
-          RESPONSE=$(curl -s -X POST \
-            --data-urlencode "chat_id=${TG_CHAT}" \
-            --data-urlencode "text=${MSG}" \
-            --data-urlencode "parse_mode=Markdown" \
-            --data-urlencode "disable_web_page_preview=false" \
-            "$POST")
-          
-          # Verifica se enviou com sucesso
-          if echo "$RESPONSE" | grep -q '"ok":true'; then
-            echo "✅ Mensagem enviada com sucesso!"
-          else
-            echo "❌ Erro ao enviar mensagem:"
-            echo "$RESPONSE"
-            exit 1
-          fi
+          curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            -d "chat_id=${TG_CHAT_ID}" \
+            -d "text=${MSG}" \
+            -d "parse_mode=Markdown" \
+            -d "disable_web_page_preview=false" || echo "Erro ao enviar para Telegram"
