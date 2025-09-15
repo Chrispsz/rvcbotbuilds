@@ -108,58 +108,94 @@ jobs:
           commit_message: Bump version ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}
 
       - name: Report to Telegram
-  env:
-    TG_TOKEN: ${{ secrets.TG_TOKEN }}
-    TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
-  if: env.TG_TOKEN != null && env.TG_CHAT_ID != null
-  continue-on-error: true
-  run: |
-    set -euo pipefail
-    cd build || { echo "build folder not found"; exit 1; }
+        env:
+          TG_TOKEN: ${{ secrets.TG_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}  # Adicione -1001342268782 como secret
+        if: env.TG_TOKEN != null
+        run: |
+          cd build || { echo "build folder not found"; exit 1; }
 
-    NL=$'\n'
-    APKS=""
-    MODULES=""
-    BASE_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}"
+          # Configurações
+          TG_CHAT="${TG_CHAT_ID:-@rvc_magisk}"  # Usa o ID do secret ou fallback
+          NL=$'\n'
+          TAG="#rvcbot"  # Tag para fácil identificação
+          
+          # Prepara links de download
+          APKS=""
+          MODULES=""
+          for OUTPUT in *; do
+            DL_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}/${OUTPUT}"
+            OUTPUT_NAME="${OUTPUT%.*}"  # Remove extensão para nome mais limpo
+            
+            if [[ $OUTPUT = *.apk ]]; then
+              APKS+="${NL}📱 [${OUTPUT_NAME}](${DL_URL})"
+            elif [[ $OUTPUT = *.zip ]]; then
+              MODULES+="${NL}📦 [${OUTPUT_NAME}](${DL_URL})"
+            fi
+          done
+          
+          # Remove linha vazia inicial
+          MODULES=${MODULES#"$NL"}
+          APKS=${APKS#"$NL"}
 
-    # Monta lista de links
-    for OUTPUT in *; do
-      DL_URL="$BASE_URL/$OUTPUT"
-      if [[ "$OUTPUT" = *.apk ]]; then
-        APKS+="${NL}📲 [${OUTPUT}](${DL_URL})"
-      elif [[ "$OUTPUT" = *.zip ]]; then
-        MODULES+="${NL}📦 [${OUTPUT}](${DL_URL})"
-      fi
-    done
-
-    MODULES=${MODULES#"$NL"}
-    APKS=${APKS#"$NL"}
-
-    # Formata changelog
-    BODY="$(sed 's/^\* \*\*/↪ \*\*/g; s/^\* `/↪ \*\*/g; s/`/\*/g; s/^\* /\↪/g; s/\*\*/\*/g; s/###//g; s/^- /↪ /g; /^==/d;' ../build.md)"
-
-    # Monta mensagem final
-    MSG="*🚀 Novo Build Disponível!* \
-    \n*Versão:* _${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}_ \
-    \n\n🔖 *Changelog:* \
-    \n${BODY} \
-    \n\n⬇️ *Download:* \
-    \n*Modules:* \
-    ${MODULES:-_Nenhum módulo gerado_} \
-    \n\n*APKs:* \
-    ${APKS:-_Nenhum APK gerado_}"
-
-    # Limite seguro do Telegram: 4096 chars
-    MAX_LEN=4000
-    if [ ${#MSG} -gt $MAX_LEN ]; then
-      MSG="${MSG:0:$MAX_LEN}\n\n... *(mensagem truncada — veja release completa no GitHub)*"
-    fi
-
-    # Envia mensagem
-    curl -X POST \
-      --data-urlencode "parse_mode=Markdown" \
-      --data-urlencode "disable_web_page_preview=true" \
-      --data-urlencode "text=${MSG}" \
-      --data-urlencode "chat_id=${TG_CHAT_ID}" \
-      "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
-      -o /dev/null -s -w "Telegram response: %{http_code}\n"
+          # Formata o changelog
+          BODY="$(sed 's/^\* \*\*/↪ \*\*/g; s/^\* `/↪ \*\*/g; s/`/\*/g; s/^\* /\↪/g; s/\*\*/\*/g; s/###//g; s/^- /↪ /g; /^==/d;' ../build.md | head -20)"
+          
+          # Adiciona informações do build
+          BUILD_INFO="*Build #${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}*"
+          BUILD_TIME="🕐 $(date +'%d/%m/%Y %H:%M UTC')"
+          COMMIT_SHA="🔧 Commit: \`${GITHUB_SHA:0:7}\`"
+          
+          # Monta mensagem completa
+          MSG="${TAG}
+          
+          🎉 *Nova Compilação ReVanced!*
+          
+          ${BUILD_INFO}
+          ${BUILD_TIME}
+          ${COMMIT_SHA}
+          
+          📋 *Changelog:*
+          ${BODY}
+          
+          ⬇️ *Downloads:*"
+          
+          # Adiciona links se existirem
+          if [ -n "$MODULES" ]; then
+            MSG+="${NL}${NL}*Módulos Magisk:*${NL}${MODULES}"
+          fi
+          
+          if [ -n "$APKS" ]; then
+            MSG+="${NL}${NL}*APKs:*${NL}${APKS}"
+          fi
+          
+          # Adiciona link para release completa
+          MSG+="${NL}${NL}🔗 [Ver Release Completa](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${{ steps.next_ver_code.outputs.NEXT_VER_CODE }})"
+          
+          # Adiciona rodapé
+          MSG+="${NL}${NL}${TAG} | @${GITHUB_REPOSITORY##*/}"
+          
+          # Limita tamanho da mensagem (Telegram tem limite de 4096 chars)
+          if [ ${#MSG} -gt 4000 ]; then
+            MSG="${MSG:0:3900}...${NL}${NL}📎 [Ver mais na release](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${{ steps.next_ver_code.outputs.NEXT_VER_CODE }})"
+          fi
+          
+          # Envia mensagem
+          echo "Enviando mensagem para o Telegram (${#MSG} caracteres)..."
+          
+          POST="https://api.telegram.org/bot${TG_TOKEN}/sendMessage"
+          RESPONSE=$(curl -s -X POST \
+            --data-urlencode "chat_id=${TG_CHAT}" \
+            --data-urlencode "text=${MSG}" \
+            --data-urlencode "parse_mode=Markdown" \
+            --data-urlencode "disable_web_page_preview=false" \
+            "$POST")
+          
+          # Verifica se enviou com sucesso
+          if echo "$RESPONSE" | grep -q '"ok":true'; then
+            echo "✅ Mensagem enviada com sucesso!"
+          else
+            echo "❌ Erro ao enviar mensagem:"
+            echo "$RESPONSE"
+            exit 1
+          fi
