@@ -37,36 +37,28 @@ jobs:
             gh release download "$LAST_RELEASE" -p "versions.txt" 2>/dev/null || true
           fi
           
-          # Obtém versões atuais do ReVanced Patches
-          PATCHES_INFO=$(curl -s "https://api.github.com/repos/revanced/revanced-patches/releases/latest")
+          # Para verificação, usa um hash das configs ao invés de versões específicas
+          CURRENT_HASH=$(sha256sum config.toml | cut -d' ' -f1)
           
-          YT_VERSION=$(echo "$PATCHES_INFO" | grep -oP '"body".*?"YouTube.*?([0-9]+\.[0-9]+\.[0-9]+)' | grep -oP '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-          MUSIC_VERSION=$(echo "$PATCHES_INFO" | grep -oP '"body".*?"Music.*?([0-9]+\.[0-9]+\.[0-9]+)' | grep -oP '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-          
-          [ -z "$YT_VERSION" ] && YT_VERSION="19.16.39"
-          [ -z "$MUSIC_VERSION" ] && MUSIC_VERSION="7.27.52"
-          
-          CURRENT_VERSIONS="YouTube:$YT_VERSION
-          Music:$MUSIC_VERSION"
-          
-          # Compara versões
           SHOULD_BUILD=false
           
           if [ ! -f "versions.txt" ]; then
             SHOULD_BUILD=true
-          elif [ "$CURRENT_VERSIONS" != "$(cat versions.txt)" ]; then
+          elif [ "${{ github.event.inputs.force_build }}" = "true" ]; then
             SHOULD_BUILD=true
+          else
+            # Verifica se passou tempo suficiente (ex: 24h) desde último build
+            LAST_BUILD_TIME=$(cat versions.txt | grep "timestamp:" | cut -d':' -f2 || echo "0")
+            CURRENT_TIME=$(date +%s)
+            TIME_DIFF=$((CURRENT_TIME - LAST_BUILD_TIME))
+            
+            # Build se passou mais de 24 horas
+            if [ $TIME_DIFF -gt 86400 ]; then
+              SHOULD_BUILD=true
+            fi
           fi
-          
-          if [ "${{ github.event.inputs.force_build }}" = "true" ]; then
-            SHOULD_BUILD=true
-          fi
-          
-          echo "$CURRENT_VERSIONS" > versions.txt
           
           echo "should_build=$SHOULD_BUILD" >> $GITHUB_OUTPUT
-          echo "youtube_version=$YT_VERSION" >> $GITHUB_OUTPUT
-          echo "music_version=$MUSIC_VERSION" >> $GITHUB_OUTPUT
           echo "last_release=$LAST_RELEASE" >> $GITHUB_OUTPUT
       
       - name: Exit if no updates
@@ -126,6 +118,18 @@ jobs:
           
           if [ -d "build" ] && [ "$(ls -A build/*.apk 2>/dev/null)" ]; then
             echo "build_success=true" >> $GITHUB_OUTPUT
+            
+            # Extrai versões REAIS dos arquivos gerados
+            YT_VERSION=$(ls build/youtube-revanced-v*.apk | grep -oP 'v\K[0-9.]+' | head -1)
+            MUSIC_VERSION=$(ls build/music-revanced-v*.apk | grep -oP 'v\K[0-9.]+' | head -1)
+            
+            echo "youtube_version=$YT_VERSION" >> $GITHUB_OUTPUT
+            echo "music_version=$MUSIC_VERSION" >> $GITHUB_OUTPUT
+            
+            # Salva versões com timestamp
+            echo "YouTube:$YT_VERSION" > versions.txt
+            echo "Music:$MUSIC_VERSION" >> versions.txt
+            echo "timestamp:$(date +%s)" >> versions.txt
           else
             exit 1
           fi
@@ -150,54 +154,20 @@ jobs:
           TAG="v${{ github.run_number }}"
           BASE_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/${TAG}"
           
-          APK_FILES=""
-          MAGISK_FILES=""
-          
-          for file in build/*; do
-            [ -f "$file" ] || continue
-            filename=$(basename "$file")
-            url="${BASE_URL}/${filename}"
-            
-            if [[ $filename == *.apk ]]; then
-              if [[ $filename == *"youtube"* ]] && [[ $filename != *"music"* ]]; then
-                APK_FILES+="📱 [YouTube APK]($url)"$'\n'
-              elif [[ $filename == *"music"* ]]; then
-                APK_FILES+="🎵 [Music APK]($url)"$'\n'
-              fi
-            elif [[ $filename == *.zip ]]; then
-              if [[ $filename == *"youtube"* ]] && [[ $filename != *"music"* ]]; then
-                MAGISK_FILES+="📦 [YouTube Magisk]($url)"$'\n'
-              elif [[ $filename == *"music"* ]]; then
-                MAGISK_FILES+="📦 [Music Magisk]($url)"$'\n'
-              fi
-            fi
-          done
-          
-          MSG="#rvcbot"$'\n\n'
-          MSG+="✅ *Build #${{ github.run_number }}*"$'\n\n'
-          MSG+="📅 ${{ steps.date.outputs.date }} - ${{ steps.date.outputs.time }}"$'\n\n'
-          MSG+="📋 *Versões:*"$'\n'
-          MSG+="YouTube: \`${{ steps.check.outputs.youtube_version }}\`"$'\n'
-          MSG+="Music: \`${{ steps.check.outputs.music_version }}\`"$'\n\n'
-          
-          if [ -n "$APK_FILES" ]; then
-            MSG+="📥 *APKs:*"$'\n'
-            MSG+="$APK_FILES"$'\n'
-          fi
-          
-          if [ -n "$MAGISK_FILES" ]; then
-            MSG+="📥 *Magisk:*"$'\n'
-            MSG+="$MAGISK_FILES"$'\n'
-          fi
-          
-          MSG+="🔗 [Release](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${TAG})"$'\n\n'
-          MSG+="#rvcbot"
+          # Mensagem limpa e precisa
+          MSG="*ReVanced Build #${{ github.run_number }}*"$'\n\n'
+          MSG+="YouTube \`${{ steps.build.outputs.youtube_version }}\`"$'\n'
+          MSG+="[APK]($BASE_URL/youtube-revanced-v${{ steps.build.outputs.youtube_version }}-arm64-v8a.apk) • "
+          MSG+="[Magisk]($BASE_URL/youtube-revanced-magisk-v${{ steps.build.outputs.youtube_version }}-arm64-v8a.zip)"$'\n\n'
+          MSG+="Music \`${{ steps.build.outputs.music_version }}\`"$'\n'
+          MSG+="[APK]($BASE_URL/music-revanced-v${{ steps.build.outputs.music_version }}-arm64-v8a.apk) • "
+          MSG+="[Magisk]($BASE_URL/music-revanced-magisk-v${{ steps.build.outputs.music_version }}-arm64-v8a.zip)"
           
           RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
             -d "chat_id=${TG_CHAT_ID}" \
             -d "text=${MSG}" \
             -d "parse_mode=Markdown" \
-            -d "disable_web_page_preview=false")
+            -d "disable_web_page_preview=true")
           
           MSG_ID=$(echo "$RESPONSE" | grep -oP '"message_id":\K[0-9]+' || echo "")
           
@@ -211,7 +181,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ github.run_number }}
-          name: Build #${{ github.run_number }}
+          name: Build Latest
           files: |
             build/*.apk
             build/*.zip
@@ -219,12 +189,13 @@ jobs:
             versions.txt
           draft: false
           prerelease: false
+          generate_release_notes: false  # Desabilita source code
           body: |
-            📅 ${{ steps.date.outputs.date }} - ${{ steps.date.outputs.time }}
+            **Build #${{ github.run_number }}**
+            `${{ steps.date.outputs.date }} - ${{ steps.date.outputs.time }}`
             
-            **Versões:**
-            - YouTube: `${{ steps.check.outputs.youtube_version }}`
-            - Music: `${{ steps.check.outputs.music_version }}`
+            **YouTube** `${{ steps.build.outputs.youtube_version }}`
+            **Music** `${{ steps.build.outputs.music_version }}`
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
