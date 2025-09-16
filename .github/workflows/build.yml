@@ -17,89 +17,80 @@ jobs:
   check-and-build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: true
           fetch-depth: 0
-      
+
       - name: Check for version updates
         id: check
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Baixa versões da última release
+          set -e
+
+          # Obtém tag da última release
           LAST_RELEASE=$(gh release list --limit 1 --json tagName -q '.[0].tagName' || echo "")
-          
+          echo "last_release=$LAST_RELEASE" >> $GITHUB_OUTPUT
+
+          LAST_BUILD_TIME=0
+          LAST_MSG_ID=
           if [ -n "$LAST_RELEASE" ]; then
-            gh release download "$LAST_RELEASE" -p "versions.txt" 2>/dev/null || true
+            BODY=$(gh release view "$LAST_RELEASE" --json body -q '.body' || echo "")
+            # Extrai TIMESTAMP e TG_MSG_ID do body, se existirem
+            LAST_BUILD_TIME=$(echo "$BODY" | sed -n 's/^TIMESTAMP: KATEX_INLINE_OPEN[0-9]\+KATEX_INLINE_CLOSE$/\1/p' | head -1 || echo 0)
+            LAST_MSG_ID=$(echo "$BODY" | sed -n 's/^TG_MSG_ID: KATEX_INLINE_OPEN[0-9]\+KATEX_INLINE_CLOSE$/\1/p' | head -1 || true)
           fi
-          
-          # Para verificação, usa um hash das configs ao invés de versões específicas
-          CURRENT_HASH=$(sha256sum config.toml | cut -d' ' -f1)
-          
+
+          echo "last_msg_id=$LAST_MSG_ID" >> $GITHUB_OUTPUT
+
           SHOULD_BUILD=false
-          
-          if [ ! -f "versions.txt" ]; then
-            SHOULD_BUILD=true
-          elif [ "${{ github.event.inputs.force_build }}" = "true" ]; then
+
+          # Permite forçar build
+          if [ "${{ github.event.inputs.force_build }}" = "true" ]; then
             SHOULD_BUILD=true
           else
-            # Verifica se passou tempo suficiente (ex: 24h) desde último build
-            LAST_BUILD_TIME=$(cat versions.txt | grep "timestamp:" | cut -d':' -f2 || echo "0")
-            CURRENT_TIME=$(date +%s)
-            TIME_DIFF=$((CURRENT_TIME - LAST_BUILD_TIME))
-            
-            # Build se passou mais de 24 horas
-            if [ $TIME_DIFF -gt 86400 ]; then
+            # Se não houver release anterior, builda
+            if [ -z "$LAST_RELEASE" ]; then
               SHOULD_BUILD=true
+            else
+              # Build se passou mais de 24h desde o último (TIMESTAMP no body)
+              CURRENT_TIME=$(date +%s)
+              TIME_DIFF=$((CURRENT_TIME - LAST_BUILD_TIME))
+              if [ "$TIME_DIFF" -gt 86400 ]; then
+                SHOULD_BUILD=true
+              fi
             fi
           fi
-          
+
           echo "should_build=$SHOULD_BUILD" >> $GITHUB_OUTPUT
-          echo "last_release=$LAST_RELEASE" >> $GITHUB_OUTPUT
-      
+
       - name: Exit if no updates
         if: steps.check.outputs.should_build != 'true'
         run: exit 0
-      
+
       - name: Setup Java
-        if: steps.check.outputs.should_build == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: "zulu"
           java-version: "17"
-      
-      - name: Get previous message ID
-        if: steps.check.outputs.should_build == 'true'
-        id: previous
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if [ -n "${{ steps.check.outputs.last_release }}" ]; then
-            gh release download "${{ steps.check.outputs.last_release }}" -p "telegram_msg_id.txt" 2>/dev/null || true
-            
-            if [ -f "telegram_msg_id.txt" ]; then
-              echo "last_msg_id=$(cat telegram_msg_id.txt)" >> $GITHUB_OUTPUT
-            fi
-          fi
-      
+
       - name: Configure build
-        if: steps.check.outputs.should_build == 'true'
         run: |
           cat > config.toml << 'EOF'
           enable-magisk-update = true
           parallel-jobs = 1
-          
+
           [YouTube]
           enabled = true
           build-mode = "both"
           arch = "arm64-v8a"
           version = "auto"
           apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"
-          
+
           [Music]
           enabled = true
           build-mode = "both"
@@ -107,43 +98,41 @@ jobs:
           version = "auto"
           apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"
           EOF
-      
+
       - name: Build APKs and Modules
-        if: steps.check.outputs.should_build == 'true'
         id: build
         run: |
+          set -e
           chmod +x build.sh
           export JAVA_OPTS="-Xmx2g"
           ./build.sh config.toml
-          
-          if [ -d "build" ] && [ "$(ls -A build/*.apk 2>/dev/null)" ]; then
+
+          if [ -d "build" ] && ls build/*.apk >/dev/null 2>&1; then
             echo "build_success=true" >> $GITHUB_OUTPUT
-            
+
             # Extrai versões REAIS dos arquivos gerados
-            YT_VERSION=$(ls build/youtube-revanced-v*.apk | grep -oP 'v\K[0-9.]+' | head -1)
-            MUSIC_VERSION=$(ls build/music-revanced-v*.apk | grep -oP 'v\K[0-9.]+' | head -1)
-            
+            YT_VERSION=$(ls build/youtube-revanced-v*.apk | grep -oP 'v\K[0-9.]+' | head -1 || echo "")
+            MUSIC_VERSION=$(ls build/music-revanced-v*.apk | grep -oP 'v\K[0-9.]+' | head -1 || echo "")
+
             echo "youtube_version=$YT_VERSION" >> $GITHUB_OUTPUT
             echo "music_version=$MUSIC_VERSION" >> $GITHUB_OUTPUT
-            
-            # Salva versões com timestamp
-            echo "YouTube:$YT_VERSION" > versions.txt
-            echo "Music:$MUSIC_VERSION" >> versions.txt
-            echo "timestamp:$(date +%s)" >> versions.txt
+
+            # Timestamp atual
+            echo "timestamp=$(date +%s)" >> $GITHUB_OUTPUT
           else
             exit 1
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NEXT_VER_CODE: ${{ github.run_number }}
-      
+
       - name: Get date
         if: steps.build.outputs.build_success == 'true'
         id: date
         run: |
           echo "date=$(date +'%d/%m/%Y')" >> $GITHUB_OUTPUT
           echo "time=$(TZ=America/Sao_Paulo date +'%H:%M')" >> $GITHUB_OUTPUT
-      
+
       - name: Send Telegram notification
         if: steps.build.outputs.build_success == 'true'
         id: telegram
@@ -151,32 +140,31 @@ jobs:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         run: |
+          set -e
           TAG="v${{ github.run_number }}"
           BASE_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/${TAG}"
-          
+
           # Mensagem limpa e precisa
           MSG="*ReVanced Build #${{ github.run_number }}*"$'\n\n'
           MSG+="YouTube \`${{ steps.build.outputs.youtube_version }}\`"$'\n'
-          MSG+="[APK]($BASE_URL/youtube-revanced-v${{ steps.build.outputs.youtube_version }}-arm64-v8a.apk) • "
-          MSG+="[Magisk]($BASE_URL/youtube-revanced-magisk-v${{ steps.build.outputs.youtube_version }}-arm64-v8a.zip)"$'\n\n'
+          MSG+="[APK](${BASE_URL}/youtube-revanced-v${{ steps.build.outputs.youtube_version }}-arm64-v8a.apk) • "
+          MSG+="[Magisk](${BASE_URL}/youtube-revanced-magisk-v${{ steps.build.outputs.youtube_version }}-arm64-v8a.zip)"$'\n\n'
           MSG+="Music \`${{ steps.build.outputs.music_version }}\`"$'\n'
-          MSG+="[APK]($BASE_URL/music-revanced-v${{ steps.build.outputs.music_version }}-arm64-v8a.apk) • "
-          MSG+="[Magisk]($BASE_URL/music-revanced-magisk-v${{ steps.build.outputs.music_version }}-arm64-v8a.zip)"
+          MSG+="[APK](${BASE_URL}/music-revanced-v${{ steps.build.outputs.music_version }}-arm64-v8a.apk) • "
+          MSG+="[Magisk](${BASE_URL}/music-revanced-magisk-v${{ steps.build.outputs.music_version }}-arm64-v8a.zip)"$'\n\n'
           MSG+="#rvcbot"
-          
+
           RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
             -d "chat_id=${TG_CHAT_ID}" \
             -d "text=${MSG}" \
             -d "parse_mode=Markdown" \
             -d "disable_web_page_preview=true")
-          
-          MSG_ID=$(echo "$RESPONSE" | grep -oP '"message_id":\K[0-9]+' || echo "")
-          
+
+          MSG_ID=$(echo "$RESPONSE" | grep -oP '"message_id":\K[0-9]+' || true)
           if [ -n "$MSG_ID" ]; then
-            echo "$MSG_ID" > telegram_msg_id.txt
-            echo "message_sent=true" >> $GITHUB_OUTPUT
+            echo "msg_id=$MSG_ID" >> $GITHUB_OUTPUT
           fi
-      
+
       - name: Create new release
         if: steps.build.outputs.build_success == 'true'
         uses: softprops/action-gh-release@v1
@@ -186,20 +174,25 @@ jobs:
           files: |
             build/*.apk
             build/*.zip
-            telegram_msg_id.txt
-            versions.txt
           draft: false
           prerelease: false
-          generate_release_notes: false  # Desabilita source code
+          generate_release_notes: false
           body: |
-            **Build #${{ github.run_number }}**
-            `${{ steps.date.outputs.date }} - ${{ steps.date.outputs.time }}`
-            
-            **YouTube** `${{ steps.build.outputs.youtube_version }}`
-            **Music** `${{ steps.build.outputs.music_version }}`
+            Build #${{ github.run_number }}
+            ${{
+              steps.date.outputs.date
+            }} - ${{
+              steps.date.outputs.time
+            }}
+
+            YouTube: ${{ steps.build.outputs.youtube_version }}
+            Music: ${{ steps.build.outputs.music_version }}
+
+            TG_MSG_ID: ${{ steps.telegram.outputs.msg_id }}
+            TIMESTAMP: ${{ steps.build.outputs.timestamp }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Clean previous data
         if: steps.build.outputs.build_success == 'true'
         env:
@@ -207,18 +200,20 @@ jobs:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         run: |
-          # Deleta mensagem anterior
-          if [ -n "${{ steps.previous.outputs.last_msg_id }}" ]; then
+          set -e
+          # Deleta mensagem anterior (obtida do body da última release)
+          LAST_MSG_ID="${{ steps.check.outputs.last_msg_id }}"
+          if [ -n "$LAST_MSG_ID" ]; then
             curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/deleteMessage" \
               -d "chat_id=${TG_CHAT_ID}" \
-              -d "message_id=${{ steps.previous.outputs.last_msg_id }}"
+              -d "message_id=${LAST_MSG_ID}" >/dev/null 2>&1 || true
           fi
-          
-          # Deleta releases anteriores
+
+          # Remove releases anteriores, mantendo apenas a atual
           CURRENT_TAG="v${{ github.run_number }}"
           gh release list --limit 100 | while read -r line; do
             TAG=$(echo "$line" | cut -f3)
             if [ "$TAG" != "$CURRENT_TAG" ]; then
-              gh release delete "$TAG" -y --cleanup-tag 2>/dev/null
+              gh release delete "$TAG" -y --cleanup-tag >/dev/null 2>&1 || true
             fi
           done
