@@ -1,7 +1,7 @@
 name: Daily Auto Build (YouTube & Music)
 on:
   schedule:
-    # Roda todo dia às 10:00 UTC (07:00 no horário de Brasília)
+    # Roda todo dia às 10:00 UTC
     - cron: '0 10 * * *'
   workflow_dispatch:
     inputs:
@@ -57,21 +57,11 @@ jobs:
 
           SHOULD_BUILD_YT=false
           SHOULD_BUILD_MUSIC=false
-
-          if [ "${{ github.event.inputs.force_build }}" = "true" ]; then
-            SHOULD_BUILD_YT=true
-            SHOULD_BUILD_MUSIC=true
-          else
-            [ "$LATEST_YT_REC" != "$LAST_BUILT_YT" ] && SHOULD_BUILD_YT=true
-            [ "$LATEST_MUSIC_REC" != "$LAST_BUILT_MUSIC" ] && SHOULD_BUILD_MUSIC=true
-          fi
-
-          if [ "$SHOULD_BUILD_YT" = "false" ] && [ "$SHOULD_BUILD_MUSIC" = "false" ]; then
-            echo "should_build_any=false" >> $GITHUB_OUTPUT
-          else
-            echo "should_build_any=true" >> $GITHUB_OUTPUT
-          fi
-
+          if [ "${{ github.event.inputs.force_build }}" = "true" ]; then SHOULD_BUILD_YT=true; SHOULD_BUILD_MUSIC=true; fi
+          if [ "$LATEST_YT_REC" != "$LAST_BUILT_YT" ]; then SHOULD_BUILD_YT=true; fi
+          if [ "$LATEST_MUSIC_REC" != "$LAST_BUILT_MUSIC" ]; then SHOULD_BUILD_MUSIC=true; fi
+          
+          if [ "$SHOULD_BUILD_YT" = "false" ] && [ "$SHOULD_BUILD_MUSIC" = "false" ]; then echo "should_build_any=false" >> $GITHUB_OUTPUT; else echo "should_build_any=true" >> $GITHUB_OUTPUT; fi
           echo "should_build_yt=$SHOULD_BUILD_YT" >> $GITHUB_OUTPUT
           echo "should_build_music=$SHOULD_BUILD_MUSIC" >> $GITHUB_OUTPUT
 
@@ -86,17 +76,6 @@ jobs:
           distribution: "zulu"
           java-version: "17"
 
-      - name: Cache Gradle dependencies
-        if: steps.check.outputs.should_build_any == 'true'
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('config.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
-
       - name: Configure and Build Selectively
         if: steps.check.outputs.should_build_any == 'true'
         id: build
@@ -104,39 +83,30 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          
-          # Gera um config.toml dinâmico, habilitando apenas o que precisa de build
-          cat > config.toml << EOF
-          enable-magisk-update = true
-          parallel-jobs = 1
+          {
+            echo 'enable-magisk-update = true'
+            echo 'parallel-jobs = 1'
+            if [ "${{ steps.check.outputs.should_build_yt }}" = "true" ]; then
+              echo '[YouTube]'
+              echo 'enabled = true'
+              echo 'build-mode = "both"'
+              echo 'arch = "arm64-v8a"'
+              echo 'version = "auto"'
+              echo 'apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"'
+            fi
+            if [ "${{ steps.check.outputs.should_build_music }}" = "true" ]; then
+              echo '[Music]'
+              echo 'enabled = true'
+              echo 'build-mode = "both"'
+              echo 'arch = "arm64-v8a"'
+              echo 'version = "auto"'
+              echo 'apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"'
+            fi
+          } > config.toml
 
-          [YouTube]
-          # Define 'enabled' baseado na necessidade de build
-          enabled = ${{ steps.check.outputs.should_build_yt }}
-          build-mode = "both"
-          arch = "arm64-v8a"
-          version = "auto"
-          # Adiciona a URL de download para satisfazer o script
-          apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"
-
-          [Music]
-          # Define 'enabled' baseado na necessidade de build
-          enabled = ${{ steps.check.outputs.should_build_music }}
-          build-mode = "both"
-          arch = "arm64-v8a"
-          version = "auto"
-          # Adiciona a URL de download para satisfazer o script
-          apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"
-          EOF
-          
-          echo "Configuração de build gerada:"
-          cat config.toml
-          
-          # Executa o build
           chmod +x build.sh
           ./build.sh config.toml
-          
-          # Extrai versões reais (se app foi pulado, usa última conhecida)
+
           YT_VERSION=$(ls build/youtube-revanced-v*.apk 2>/dev/null | grep -oP 'v\K[0-9.]+' | head -1 || echo "${{ steps.check.outputs.last_built_yt }}")
           MUSIC_VERSION=$(ls build/music-revanced-v*.apk 2>/dev/null | grep -oP 'v\K[0-9.]+' | head -1 || echo "${{ steps.check.outputs.last_built_music }}")
 
@@ -153,29 +123,36 @@ jobs:
           set -e
           TAG="v${{ github.run_number }}"
           BASE_URL="${{ github.server_url }}/${{ github.repository }}/releases/download/${TAG}"
+          NL=$'\n' # Variável para nova linha
           
-          MSG="✅ *Novo(s) Build(s) #${{ github.run_number }}*\n\n"
+          # Constrói a mensagem linha por linha para garantir a formatação
+          MSG="✅ *Novo(s) Build(s) #${{ github.run_number }}*${NL}${NL}"
+          
           if [ "${{ steps.check.outputs.should_build_yt }}" = "true" ]; then
-            MSG+="YouTube \`${{ steps.build.outputs.youtube_version }}\` (✨ NOVO)\n"
-            MSG+="[APK](${BASE_URL}/youtube-revanced-v${{ steps.build.outputs.youtube_version }}-arm64-v8a.apk) • "
-            MSG+="[Magisk](${BASE_URL}/youtube-revanced-magisk-v${{ steps.build.outputs.youtube_version }}-arm64-v8a.zip)\n\n"
+            YT_VERSION="${{ steps.build.outputs.youtube_version }}"
+            MSG+="*YouTube* \`${YT_VERSION}\` (✨ NOVO)${NL}"
+            MSG+="[APK](${BASE_URL}/youtube-revanced-v${YT_VERSION}-arm6g4-v8a.apk) • [Magisk](${BASE_URL}/youtube-revanced-magisk-v${YT_VERSION}-arm64-v8a.zip)${NL}${NL}"
           fi
+          
           if [ "${{ steps.check.outputs.should_build_music }}" = "true" ]; then
-            MSG+="Music \`${{ steps.build.outputs.music_version }}\` (✨ NOVO)\n"
-            MSG+="[APK](${BASE_URL}/music-revanced-v${{ steps.build.outputs.music_version }}-arm64-v8a.apk) • "
-            MSG+="[Magisk](${BASE_URL}/music-revanced-magisk-v${{ steps.build.outputs.music_version }}-arm64-v8a.zip)\n\n"
+            MUSIC_VERSION="${{ steps.build.outputs.music_version }}"
+            MSG+="*Music* \`${MUSIC_VERSION}\` (✨ NOVO)${NL}"
+            MSG+="[APK](${BASE_URL}/music-revanced-v${MUSIC_VERSION}-arm64-v8a.apk) • [Magisk](${BASE_URL}/music-revanced-magisk-v${MUSIC_VERSION}-arm64-v8a.zip)${NL}${NL}"
           fi
+          
           MSG+="#rvcbot"
 
+          # Envia a mensagem e captura o ID
           RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
-              -d "chat_id=${TG_CHAT_ID}" \
-              -d "text=${MSG}" \
-              -d "parse_mode=Markdown" \
-              -d "disable_web_page_preview=true")
+            --data-urlencode "chat_id=${TG_CHAT_ID}" \
+            --data-urlencode "text=${MSG}" \
+            --data-urlencode "parse_mode=Markdown" \
+            --data-urlencode "disable_web_page_preview=true")
+            
           MSG_ID=$(echo "$RESPONSE" | grep -oP '"message_id":\K[0-9]+' || true)
           [ -n "$MSG_ID" ] && echo "msg_id=$MSG_ID" >> $GITHUB_OUTPUT
 
-          # Apaga mensagem anterior
+          # Apaga a mensagem anterior
           LAST_MSG_ID="${{ steps.check.outputs.last_msg_id }}"
           if [ -n "$LAST_MSG_ID" ]; then
             curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/deleteMessage" \
@@ -224,5 +201,5 @@ jobs:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         run: |
-          MSG="❌ *Falha no Build #${{ github.run_number }}*\n\nOcorreu um erro durante a compilação automática.\n\n[Verificar logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          MSG="❌ *Falha no Build #${{ github.run_number }}*\n\nOcorreu um erro durante a compilação.\n\n[Verificar logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
           curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" -d "chat_id=${TG_CHAT_ID}" -d "text=${MSG}" -d "parse_mode=Markdown"
