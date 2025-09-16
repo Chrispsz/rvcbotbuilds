@@ -1,11 +1,12 @@
-name: Auto Build YouTube & Music
+name: Auto Build YouTube & Music (Smart)
 on:
   schedule:
-    - cron: '0 10 * * *'
+    # Verifica a cada 6 horas por novas versões
+    - cron: '0 */6 * * *'
   workflow_dispatch:
     inputs:
       force_build:
-        description: 'Forçar build mesmo sem atualizações'
+        description: 'Forçar build (ignora verificação de versão)'
         type: boolean
         default: false
 
@@ -16,7 +17,13 @@ permissions:
 jobs:
   check-and-build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
+    outputs:
+      should_build_yt: ${{ steps.check.outputs.should_build_yt }}
+      should_build_music: ${{ steps.check.outputs.should_build_music }}
+      last_msg_id: ${{ steps.check.outputs.last_msg_id }}
+      yt_version: ${{ steps.build.outputs.youtube_version }}
+      music_version: ${{ steps.build.outputs.music_version }}
 
     steps:
       - name: Checkout
@@ -25,116 +32,144 @@ jobs:
           submodules: true
           fetch-depth: 0
 
-      - name: Check for version updates
+      - name: Check for app version updates
         id: check
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
+          
+          # 1. Busca as versões RECOMENDADAS de apps dos patches oficiais
+          PATCHES_BODY=$(gh release view --repo revanced/revanced-patches --json body --jq .body)
+          LATEST_YT_REC=$(echo "$PATCHES_BODY" | grep -oP 'YouTube v\K[0-9.]+' | head -1 || echo "0")
+          LATEST_MUSIC_REC=$(echo "$PATCHES_BODY" | grep -oP 'YouTube Music v\K[0-9.]+' | head -1 || echo "0")
+          
+          echo "Versão recomendada do YouTube: ${LATEST_YT_REC}"
+          echo "Versão recomendada do Music: ${LATEST_MUSIC_REC}"
 
-          # Obtém tag da última release
-          LAST_RELEASE=$(gh release list --limit 1 --json tagName -q '.[0].tagName' || echo "")
-          echo "last_release=$LAST_RELEASE" >> $GITHUB_OUTPUT
+          # 2. Pega a nossa última release para comparar as versões que JÁ buildamos
+          LAST_BUILD_TAG=$(gh release list --limit 1 --json tagName -q '.[0].tagName' || echo "")
+          
+          LAST_BUILT_YT="0"
+          LAST_BUILT_MUSIC="0"
+          LAST_MSG_ID=""
 
-          LAST_BUILD_TIME=0
-          LAST_MSG_ID=
-          if [ -n "$LAST_RELEASE" ]; then
-            BODY=$(gh release view "$LAST_RELEASE" --json body -q '.body' || echo "")
-            # Extrai TIMESTAMP e TG_MSG_ID do body, se existirem
-            LAST_BUILD_TIME=$(echo "$BODY" | sed -n 's/^TIMESTAMP: KATEX_INLINE_OPEN[0-9]\+KATEX_INLINE_CLOSE$/\1/p' | head -1 || echo 0)
+          if [ -n "$LAST_BUILD_TAG" ]; then
+            BODY=$(gh release view "$LAST_BUILD_TAG" --json body -q '.body' || echo "")
+            LAST_BUILT_YT=$(echo "$BODY" | sed -n 's/^YouTube: KATEX_INLINE_OPEN[0-9.]\+KATEX_INLINE_CLOSE$/\1/p' | head -1 || echo "0")
+            LAST_BUILT_MUSIC=$(echo "$BODY" | sed -n 's/^Music: KATEX_INLINE_OPEN[0-9.]\+KATEX_INLINE_CLOSE$/\1/p' | head -1 || echo "0")
             LAST_MSG_ID=$(echo "$BODY" | sed -n 's/^TG_MSG_ID: KATEX_INLINE_OPEN[0-9]\+KATEX_INLINE_CLOSE$/\1/p' | head -1 || true)
+            echo "Última versão que buildamos (YouTube): ${LAST_BUILT_YT}"
+            echo "Última versão que buildamos (Music): ${LAST_BUILT_MUSIC}"
           fi
-
-          echo "last_msg_id=$LAST_MSG_ID" >> $GITHUB_OUTPUT
-
-          SHOULD_BUILD=false
-
-          # Permite forçar build
+          
+          # 3. Decide se deve buildar cada app
+          SHOULD_BUILD_YT=false
+          SHOULD_BUILD_MUSIC=false
+          
           if [ "${{ github.event.inputs.force_build }}" = "true" ]; then
-            SHOULD_BUILD=true
+            echo "Forçando build de ambos os apps."
+            SHOULD_BUILD_YT=true
+            SHOULD_BUILD_MUSIC=true
           else
-            # Se não houver release anterior, builda
-            if [ -z "$LAST_RELEASE" ]; then
-              SHOULD_BUILD=true
-            else
-              # Build se passou mais de 24h desde o último (TIMESTAMP no body)
-              CURRENT_TIME=$(date +%s)
-              TIME_DIFF=$((CURRENT_TIME - LAST_BUILD_TIME))
-              if [ "$TIME_DIFF" -gt 86400 ]; then
-                SHOULD_BUILD=true
-              fi
+            if [ "$LATEST_YT_REC" != "$LAST_BUILT_YT" ]; then
+              echo "Nova versão do YouTube para buildar!"
+              SHOULD_BUILD_YT=true
+            fi
+            if [ "$LATEST_MUSIC_REC" != "$LAST_BUILT_MUSIC" ]; then
+              echo "Nova versão do Music para buildar!"
+              SHOULD_BUILD_MUSIC=true
             fi
           fi
+          
+          # Se não há nada para buildar, sai
+          if [ "$SHOULD_BUILD_YT" = "false" ] && [ "$SHOULD_BUILD_MUSIC" = "false" ]; then
+            echo "Nenhuma atualização necessária. Finalizando."
+            # Usa um output para parar os próximos jobs
+            echo "should_build_anything=false" >> $GITHUB_OUTPUT
+          else
+            echo "should_build_anything=true" >> $GITHUB_OUTPUT
+          fi
 
-          echo "should_build=$SHOULD_BUILD" >> $GITHUB_OUTPUT
+          echo "should_build_yt=$SHOULD_BUILD_YT" >> $GITHUB_OUTPUT
+          echo "should_build_music=$SHOULD_BUILD_MUSIC" >> $GITHUB_OUTPUT
+          echo "last_msg_id=$LAST_MSG_ID" >> $GITHUB_OUTPUT
+          # Passa as versões antigas para o job de build poder usá-las se o build de um app for pulado
+          echo "last_built_yt=$LAST_BUILT_YT" >> $GITHUB_OUTPUT
+          echo "last_built_music=$LAST_BUILT_MUSIC" >> $GITHUB_OUTPUT
 
-      - name: Exit if no updates
-        if: steps.check.outputs.should_build != 'true'
-        run: exit 0
-
-      - name: Setup Java
+      - name: Setup Java and Cache
+        if: steps.check.outputs.should_build_anything == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: "zulu"
           java-version: "17"
+      
+      - name: Cache Gradle
+        if: steps.check.outputs.should_build_anything == 'true'
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('config.toml') }}
 
-      - name: Configure build
-        run: |
-          cat > config.toml << 'EOF'
-          enable-magisk-update = true
-          parallel-jobs = 1
-
-          [YouTube]
-          enabled = true
-          build-mode = "both"
-          arch = "arm64-v8a"
-          version = "auto"
-          apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"
-
-          [Music]
-          enabled = true
-          build-mode = "both"
-          arch = "arm64-v8a"
-          version = "auto"
-          apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"
-          EOF
-
-      - name: Build APKs and Modules
+      - name: Configure and Build Selectively
+        if: steps.check.outputs.should_build_anything == 'true'
         id: build
         run: |
           set -e
-          chmod +x build.sh
-          export JAVA_OPTS="-Xmx2g"
-          ./build.sh config.toml
-
-          if [ -d "build" ] && ls build/*.apk >/dev/null 2>&1; then
-            echo "build_success=true" >> $GITHUB_OUTPUT
-
-            # Extrai versões REAIS dos arquivos gerados
-            YT_VERSION=$(ls build/youtube-revanced-v*.apk | grep -oP 'v\K[0-9.]+' | head -1 || echo "")
-            MUSIC_VERSION=$(ls build/music-revanced-v*.apk | grep -oP 'v\K[0-9.]+' | head -1 || echo "")
-
-            echo "youtube_version=$YT_VERSION" >> $GITHUB_OUTPUT
-            echo "music_version=$MUSIC_VERSION" >> $GITHUB_OUTPUT
-
-            # Timestamp atual
-            echo "timestamp=$(date +%s)" >> $GITHUB_OUTPUT
-          else
-            exit 1
+          
+          # Cria um config.toml dinâmico apenas com os apps que precisam de build
+          echo 'enable-magisk-update = true' > config.toml
+          echo 'parallel-jobs = 1' >> config.toml
+          
+          if [ "${{ steps.check.outputs.should_build_yt }}" = "true" ]; then
+            echo '[YouTube]' >> config.toml
+            echo 'enabled = true' >> config.toml
+            echo 'build-mode = "both"' >> config.toml
+            echo 'arch = "arm64-v8a"' >> config.toml
+            echo 'version = "auto"' >> config.toml
           fi
+          
+          if [ "${{ steps.check.outputs.should_build_music }}" = "true" ]; then
+            echo '[Music]' >> config.toml
+            echo 'enabled = true' >> config.toml
+            echo 'build-mode = "both"' >> config.toml
+            echo 'arch = "arm64-v8a"' >> config.toml
+            echo 'version = "auto"' >> config.toml
+          fi
+
+          echo "Configuração de build gerada:"
+          cat config.toml
+          
+          # Executa o build
+          chmod +x build.sh
+          ./build.sh config.toml
+          
+          # Extrai as versões REAIS dos arquivos gerados
+          # Se o build de um app foi pulado, usa a versão antiga
+          YT_VERSION=$(ls build/youtube-revanced-v*.apk 2>/dev/null | grep -oP 'v\K[0-9.]+' | head -1 || echo "${{ steps.check.outputs.last_built_yt }}")
+          MUSIC_VERSION=$(ls build/music-revanced-v*.apk 2>/dev/null | grep -oP 'v\K[0-9.]+' | head -1 || echo "${{ steps.check.outputs.last_built_music }}")
+          
+          echo "youtube_version=$YT_VERSION" >> $GITHUB_OUTPUT
+          echo "music_version=$MUSIC_VERSION" >> $GITHUB_OUTPUT
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NEXT_VER_CODE: ${{ github.run_number }}
-
-      - name: Get date
-        if: steps.build.outputs.build_success == 'true'
-        id: date
-        run: |
-          echo "date=$(date +'%d/%m/%Y')" >> $GITHUB_OUTPUT
-          echo "time=$(TZ=America/Sao_Paulo date +'%H:%M')" >> $GITHUB_OUTPUT
-
+  
+  notify-and-release:
+    needs: check-and-build
+    # Roda apenas se um dos builds foi necessário
+    if: needs.check-and-build.outputs.should_build_yt == 'true' || needs.check-and-build.outputs.should_build_music == 'true'
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Passos para notificar e criar a release...
+      - name: Download artifacts (se necessário em jobs separados)
+        # Se você separar o build em outro job, precisaria baixar os artefatos
+        # Neste caso, estamos no mesmo job, mas é uma boa prática
+        
       - name: Send Telegram notification
-        if: steps.build.outputs.build_success == 'true'
         id: telegram
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
@@ -142,35 +177,38 @@ jobs:
         run: |
           set -e
           TAG="v${{ github.run_number }}"
-          BASE_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/${TAG}"
-
-          # Mensagem limpa e precisa
-          MSG="*ReVanced Build #${{ github.run_number }}*"$'\n\n'
-          MSG+="YouTube \`${{ steps.build.outputs.youtube_version }}\`"$'\n'
-          MSG+="[APK](${BASE_URL}/youtube-revanced-v${{ steps.build.outputs.youtube_version }}-arm64-v8a.apk) • "
-          MSG+="[Magisk](${BASE_URL}/youtube-revanced-magisk-v${{ steps.build.outputs.youtube_version }}-arm64-v8a.zip)"$'\n\n'
-          MSG+="Music \`${{ steps.build.outputs.music_version }}\`"$'\n'
-          MSG+="[APK](${BASE_URL}/music-revanced-v${{ steps.build.outputs.music_version }}-arm64-v8a.apk) • "
-          MSG+="[Magisk](${BASE_URL}/music-revanced-magisk-v${{ steps.build.outputs.music_version }}-arm64-v8a.zip)"$'\n\n'
+          BASE_URL="${{ github.server_url }}/${{ github.repository }}/releases/download/${TAG}"
+          
+          MSG="✅ *Novo(s) Build(s) #${{ github.run_number }}*\n\n"
+          
+          if [ "${{ needs.check-and-build.outputs.should_build_yt }}" = "true" ]; then
+            MSG+="YouTube \`${{ needs.check-and-build.outputs.yt_version }}\` (✨ NOVO)\n"
+            MSG+="[APK](${BASE_URL}/youtube-revanced-v${{ needs.check-and-build.outputs.yt_version }}-arm64-v8a.apk) • [Magisk](${BASE_URL}/youtube-revanced-magisk-v${{ needs.check-and-build.outputs.yt_version }}-arm64-v8a.zip)\n\n"
+          fi
+          
+          if [ "${{ needs.check-and-build.outputs.should_build_music }}" = "true" ]; then
+            MSG+="Music \`${{ needs.check-and-build.outputs.music_version }}\` (✨ NOVO)\n"
+            MSG+="[APK](${BASE_URL}/music-revanced-v${{ needs.check-and-build.outputs.music_version }}-arm64-v8a.apk) • [Magisk](${BASE_URL}/music-revanced-magisk-v${{ needs.check-and-build.outputs.music_version }}-arm64-v8a.zip)\n\n"
+          fi
+          
           MSG+="#rvcbot"
-
-          RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
-            -d "chat_id=${TG_CHAT_ID}" \
-            -d "text=${MSG}" \
-            -d "parse_mode=Markdown" \
-            -d "disable_web_page_preview=true")
-
+          
+          # Envia a mensagem e captura o ID
+          RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" -d "chat_id=${TG_CHAT_ID}" -d "text=${MSG}" -d "parse_mode=Markdown" -d "disable_web_page_preview=true")
           MSG_ID=$(echo "$RESPONSE" | grep -oP '"message_id":\K[0-9]+' || true)
-          if [ -n "$MSG_ID" ]; then
-            echo "msg_id=$MSG_ID" >> $GITHUB_OUTPUT
+          if [ -n "$MSG_ID" ]; then echo "msg_id=$MSG_ID" >> $GITHUB_OUTPUT; fi
+          
+          # Deleta a mensagem antiga
+          LAST_MSG_ID="${{ needs.check-and-build.outputs.last_msg_id }}"
+          if [ -n "$LAST_MSG_ID" ]; then
+            curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/deleteMessage" -d "chat_id=${TG_CHAT_ID}" -d "message_id=${LAST_MSG_ID}" >/dev/null 2>&1 || true
           fi
 
       - name: Create new release
-        if: steps.build.outputs.build_success == 'true'
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ github.run_number }}
-          name: Build Latest
+          name: Build #${{ github.run_number }}
           files: |
             build/*.apk
             build/*.zip
@@ -178,38 +216,19 @@ jobs:
           prerelease: false
           generate_release_notes: false
           body: |
-            Build #${{ github.run_number }}
-            ${{
-              steps.date.outputs.date
-            }} - ${{
-              steps.date.outputs.time
-            }}
+            **Versões dos Apps:**
+            - YouTube: ${{ needs.check-and-build.outputs.yt_version }}
+            - Music: ${{ needs.check-and-build.outputs.music_version }}
 
-            YouTube: ${{ steps.build.outputs.youtube_version }}
-            Music: ${{ steps.build.outputs.music_version }}
-
+            **Dados de Controle:**
             TG_MSG_ID: ${{ steps.telegram.outputs.msg_id }}
-            TIMESTAMP: ${{ steps.build.outputs.timestamp }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Clean previous data
-        if: steps.build.outputs.build_success == 'true'
+      - name: Clean old releases
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TG_TOKEN: ${{ secrets.TG_TOKEN }}
-          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         run: |
-          set -e
-          # Deleta mensagem anterior (obtida do body da última release)
-          LAST_MSG_ID="${{ steps.check.outputs.last_msg_id }}"
-          if [ -n "$LAST_MSG_ID" ]; then
-            curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/deleteMessage" \
-              -d "chat_id=${TG_CHAT_ID}" \
-              -d "message_id=${LAST_MSG_ID}" >/dev/null 2>&1 || true
-          fi
-
-          # Remove releases anteriores, mantendo apenas a atual
           CURRENT_TAG="v${{ github.run_number }}"
           gh release list --limit 100 | while read -r line; do
             TAG=$(echo "$line" | cut -f3)
@@ -217,3 +236,17 @@ jobs:
               gh release delete "$TAG" -y --cleanup-tag >/dev/null 2>&1 || true
             fi
           done
+
+  notify-on-failure:
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send failure notification
+        env:
+          TG_TOKEN: ${{ secrets.TG_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          MSG="❌ *Falha no Build #${{ github.run_number }}*\n\n"
+          MSG+="Ocorreu um erro durante a compilação.\n"
+          MSG+="[Verificar logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" -d "chat_id=${TG_CHAT_ID}" -d "text=${MSG}" -d "parse_mode=Markdown"
