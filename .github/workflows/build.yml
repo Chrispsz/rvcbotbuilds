@@ -104,29 +104,38 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          # Gera um config.toml só com os apps que precisam de build
-          {
-            echo 'enable-magisk-update = true'
-            echo 'parallel-jobs = 1'
-            if [ "${{ steps.check.outputs.should_build_yt }}" = "true" ]; then
-              echo '[YouTube]'
-              echo 'enabled = true'
-              echo 'build-mode = "both"'
-              echo 'arch = "arm64-v8a"'
-              echo 'version = "auto"'
-            fi
-            if [ "${{ steps.check.outputs.should_build_music }}" = "true" ]; then
-              echo '[Music]'
-              echo 'enabled = true'
-              echo 'build-mode = "both"'
-              echo 'arch = "arm64-v8a"'
-              echo 'version = "auto"'
-            fi
-          } > config.toml
+          
+          # Gera um config.toml dinâmico, habilitando apenas o que precisa de build
+          cat > config.toml << EOF
+          enable-magisk-update = true
+          parallel-jobs = 1
 
+          [YouTube]
+          # Define 'enabled' baseado na necessidade de build
+          enabled = ${{ steps.check.outputs.should_build_yt }}
+          build-mode = "both"
+          arch = "arm64-v8a"
+          version = "auto"
+          # Adiciona a URL de download para satisfazer o script
+          apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"
+
+          [Music]
+          # Define 'enabled' baseado na necessidade de build
+          enabled = ${{ steps.check.outputs.should_build_music }}
+          build-mode = "both"
+          arch = "arm64-v8a"
+          version = "auto"
+          # Adiciona a URL de download para satisfazer o script
+          apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"
+          EOF
+          
+          echo "Configuração de build gerada:"
+          cat config.toml
+          
+          # Executa o build
           chmod +x build.sh
           ./build.sh config.toml
-
+          
           # Extrai versões reais (se app foi pulado, usa última conhecida)
           YT_VERSION=$(ls build/youtube-revanced-v*.apk 2>/dev/null | grep -oP 'v\K[0-9.]+' | head -1 || echo "${{ steps.check.outputs.last_built_yt }}")
           MUSIC_VERSION=$(ls build/music-revanced-v*.apk 2>/dev/null | grep -oP 'v\K[0-9.]+' | head -1 || echo "${{ steps.check.outputs.last_built_music }}")
