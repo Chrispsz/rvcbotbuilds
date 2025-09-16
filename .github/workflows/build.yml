@@ -3,13 +3,18 @@ on:
   schedule:
     - cron: '0 10 * * *'
   workflow_dispatch:
+    inputs:
+      force_build:
+        description: 'Forçar build mesmo sem atualizações'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
   actions: read
 
 jobs:
-  build:
+  check-and-build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     
@@ -20,35 +25,111 @@ jobs:
           submodules: true
           fetch-depth: 0
       
+      - name: Check for version updates
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "🔍 Verificando atualizações..."
+          
+          # Baixa arquivo de versões da última release (se existir)
+          LAST_RELEASE=$(gh release list --limit 1 --json tagName -q '.[0].tagName' || echo "")
+          
+          if [ -n "$LAST_RELEASE" ]; then
+            echo "📦 Baixando versões da release anterior: $LAST_RELEASE"
+            gh release download "$LAST_RELEASE" -p "versions.txt" 2>/dev/null || true
+            
+            if [ -f "versions.txt" ]; then
+              LAST_VERSIONS=$(cat versions.txt)
+              echo "📋 Versões anteriores:"
+              echo "$LAST_VERSIONS"
+            fi
+          fi
+          
+          # Obtém versões atuais disponíveis (do ReVanced Patches)
+          echo "🔄 Obtendo versões atuais..."
+          
+          # Pega info do patches mais recente
+          PATCHES_INFO=$(curl -s "https://api.github.com/repos/revanced/revanced-patches/releases/latest")
+          
+          # Extrai versões recomendadas
+          YT_VERSION=$(echo "$PATCHES_INFO" | grep -oP '"body".*?"YouTube.*?([0-9]+\.[0-9]+\.[0-9]+)' | grep -oP '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          MUSIC_VERSION=$(echo "$PATCHES_INFO" | grep -oP '"body".*?"Music.*?([0-9]+\.[0-9]+\.[0-9]+)' | grep -oP '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          
+          # Fallback para versões conhecidas
+          [ -z "$YT_VERSION" ] && YT_VERSION="19.16.39"
+          [ -z "$MUSIC_VERSION" ] && MUSIC_VERSION="7.27.52"
+          
+          # Cria string de versões atuais
+          CURRENT_VERSIONS="YouTube:$YT_VERSION
+          Music:$MUSIC_VERSION"
+          
+          echo "📱 Versões disponíveis:"
+          echo "$CURRENT_VERSIONS"
+          
+          # Compara versões
+          SHOULD_BUILD=false
+          
+          if [ ! -f "versions.txt" ]; then
+            echo "✅ Primeira build - nenhuma versão anterior encontrada"
+            SHOULD_BUILD=true
+          elif [ "$CURRENT_VERSIONS" != "$LAST_VERSIONS" ]; then
+            echo "✅ Novas versões detectadas!"
+            echo "Anterior:"
+            cat versions.txt
+            echo "Atual:"
+            echo "$CURRENT_VERSIONS"
+            SHOULD_BUILD=true
+          else
+            echo "😴 Mesmas versões - não precisa compilar"
+          fi
+          
+          # Força build se solicitado
+          if [ "${{ github.event.inputs.force_build }}" = "true" ]; then
+            echo "⚡ Build forçado manualmente!"
+            SHOULD_BUILD=true
+          fi
+          
+          # Salva versões atuais para usar depois
+          echo "$CURRENT_VERSIONS" > versions.txt
+          
+          # Outputs
+          echo "should_build=$SHOULD_BUILD" >> $GITHUB_OUTPUT
+          echo "youtube_version=$YT_VERSION" >> $GITHUB_OUTPUT
+          echo "music_version=$MUSIC_VERSION" >> $GITHUB_OUTPUT
+          echo "last_release=$LAST_RELEASE" >> $GITHUB_OUTPUT
+      
+      - name: Exit if no updates
+        if: steps.check.outputs.should_build != 'true'
+        run: |
+          echo "✅ Sem atualizações. Economizando minutos de build!"
+          echo "📊 Versões já compiladas:"
+          cat versions.txt
+          exit 0
+      
       - name: Setup Java
+        if: steps.check.outputs.should_build == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: "zulu"
           java-version: "17"
       
-      - name: Save previous release info (before build)
+      - name: Get previous message ID
+        if: steps.check.outputs.should_build == 'true'
         id: previous
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Salva informações da release anterior ANTES de buildar
-          LAST_RELEASE=$(gh release list --limit 1 --json tagName,createdAt -q '.[0].tagName' || echo "")
-          echo "last_release=$LAST_RELEASE" >> $GITHUB_OUTPUT
-          
-          if [ -n "$LAST_RELEASE" ]; then
-            echo "📦 Release anterior encontrada: $LAST_RELEASE"
-            
-            # Baixa o ID da mensagem do Telegram da release anterior
-            gh release download "$LAST_RELEASE" -p "telegram_msg_id.txt" 2>/dev/null || true
+          if [ -n "${{ steps.check.outputs.last_release }}" ]; then
+            gh release download "${{ steps.check.outputs.last_release }}" -p "telegram_msg_id.txt" 2>/dev/null || true
             
             if [ -f "telegram_msg_id.txt" ]; then
-              LAST_MSG_ID=$(cat telegram_msg_id.txt)
-              echo "last_msg_id=$LAST_MSG_ID" >> $GITHUB_OUTPUT
-              echo "💬 Message ID anterior: $LAST_MSG_ID"
+              echo "last_msg_id=$(cat telegram_msg_id.txt)" >> $GITHUB_OUTPUT
             fi
           fi
       
       - name: Configure build
+        if: steps.check.outputs.should_build == 'true'
         run: |
           cat > config.toml << 'EOF'
           enable-magisk-update = true
@@ -70,19 +151,18 @@ jobs:
           EOF
       
       - name: Build APKs and Modules
+        if: steps.check.outputs.should_build == 'true'
         id: build
         run: |
           chmod +x build.sh
           export JAVA_OPTS="-Xmx2g"
           ./build.sh config.toml
           
-          # Verifica se o build teve sucesso
           if [ -d "build" ] && [ "$(ls -A build/*.apk 2>/dev/null)" ]; then
             echo "build_success=true" >> $GITHUB_OUTPUT
-            echo "✅ Build concluído com sucesso!"
+            echo "✅ Build concluído!"
           else
             echo "build_success=false" >> $GITHUB_OUTPUT
-            echo "❌ Build falhou!"
             exit 1
           fi
         env:
@@ -90,14 +170,15 @@ jobs:
           NEXT_VER_CODE: ${{ github.run_number }}
       
       - name: Get date
+        if: steps.build.outputs.build_success == 'true'
         id: date
         run: |
           echo "date=$(date +'%d/%m/%Y')" >> $GITHUB_OUTPUT
           echo "time=$(TZ=America/Sao_Paulo date +'%H:%M')" >> $GITHUB_OUTPUT
       
       - name: Send Telegram notification
-        id: telegram
         if: steps.build.outputs.build_success == 'true'
+        id: telegram
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
@@ -105,7 +186,7 @@ jobs:
           TAG="v${{ github.run_number }}"
           BASE_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/${TAG}"
           
-          # Organiza arquivos
+          # Organiza links
           APK_FILES=""
           MAGISK_FILES=""
           
@@ -132,6 +213,9 @@ jobs:
           MSG="#rvcbot"$'\n\n'
           MSG+="✅ *Build #${{ github.run_number }}*"$'\n\n'
           MSG+="📅 ${{ steps.date.outputs.date }} - ${{ steps.date.outputs.time }}"$'\n\n'
+          MSG+="📋 *Versões:*"$'\n'
+          MSG+="YouTube: \`${{ steps.check.outputs.youtube_version }}\`"$'\n'
+          MSG+="Music: \`${{ steps.check.outputs.music_version }}\`"$'\n\n'
           
           if [ -n "$APK_FILES" ]; then
             MSG+="📥 *APKs:*"$'\n'
@@ -153,17 +237,13 @@ jobs:
             -d "parse_mode=Markdown" \
             -d "disable_web_page_preview=false")
           
-          # Salva o message_id
+          # Salva ID da mensagem
           MSG_ID=$(echo "$RESPONSE" | grep -oP '"message_id":\K[0-9]+' || echo "")
           
           if [ -n "$MSG_ID" ]; then
-            echo "✅ Mensagem enviada: ID $MSG_ID"
             echo "$MSG_ID" > telegram_msg_id.txt
             echo "message_sent=true" >> $GITHUB_OUTPUT
-            echo "message_id=$MSG_ID" >> $GITHUB_OUTPUT
-          else
-            echo "❌ Erro ao enviar mensagem"
-            echo "message_sent=false" >> $GITHUB_OUTPUT
+            echo "✅ Mensagem enviada: ID $MSG_ID"
           fi
       
       - name: Create new release
@@ -176,16 +256,22 @@ jobs:
             build/*.apk
             build/*.zip
             telegram_msg_id.txt
+            versions.txt
           draft: false
           prerelease: false
           body: |
             📅 ${{ steps.date.outputs.date }} - ${{ steps.date.outputs.time }}
+            
+            **Versões compiladas:**
+            - YouTube: `${{ steps.check.outputs.youtube_version }}`
+            - Music: `${{ steps.check.outputs.music_version }}`
+            
             💬 Telegram: ${{ steps.telegram.outputs.message_id }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: Delete previous release and Telegram message
-        if: steps.build.outputs.build_success == 'true' && steps.telegram.outputs.message_sent == 'true'
+      - name: Clean previous release and message
+        if: steps.build.outputs.build_success == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
@@ -193,50 +279,22 @@ jobs:
         run: |
           echo "🧹 Limpando dados anteriores..."
           
-          # 1. Deleta mensagem anterior do Telegram
+          # Deleta mensagem anterior do Telegram
           if [ -n "${{ steps.previous.outputs.last_msg_id }}" ]; then
-            echo "🗑️ Deletando mensagem Telegram anterior: ${{ steps.previous.outputs.last_msg_id }}"
-            
+            echo "Deletando mensagem Telegram: ${{ steps.previous.outputs.last_msg_id }}"
             curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/deleteMessage" \
               -d "chat_id=${TG_CHAT_ID}" \
-              -d "message_id=${{ steps.previous.outputs.last_msg_id }}" || echo "Não foi possível deletar mensagem"
+              -d "message_id=${{ steps.previous.outputs.last_msg_id }}"
           fi
           
-          # 2. Deleta TODAS as releases anteriores (mantém apenas a atual)
-          echo "🗑️ Deletando releases anteriores..."
-          
+          # Deleta releases anteriores (mantém apenas a atual)
           CURRENT_TAG="v${{ github.run_number }}"
-          
-          # Lista todas as releases EXCETO a atual
           gh release list --limit 100 | while read -r line; do
             TAG=$(echo "$line" | cut -f3)
-            
             if [ "$TAG" != "$CURRENT_TAG" ]; then
               echo "Deletando release: $TAG"
               gh release delete "$TAG" -y --cleanup-tag || true
             fi
           done
           
-          # 3. Limpa tags antigas órfãs (se houver)
-          git fetch --tags
-          for tag in $(git tag); do
-            if [ "$tag" != "$CURRENT_TAG" ]; then
-              echo "Deletando tag: $tag"
-              git push --delete origin "$tag" 2>/dev/null || true
-            fi
-          done
-          
-          echo "✅ Limpeza concluída! Apenas Build #${{ github.run_number }} está disponível."
-      
-      - name: Final cleanup verification
-        if: steps.build.outputs.build_success == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "📊 Status final:"
-          echo "Releases disponíveis:"
-          gh release list || echo "Nenhuma release"
-          
-          echo ""
-          echo "Tags disponíveis:"
-          git tag || echo "Nenhuma tag"
+          echo "✅ Limpeza concluída!"
