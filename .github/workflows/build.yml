@@ -79,13 +79,23 @@ jobs:
         if: steps.check.outputs.should_build_any != 'true'
         run: echo "Nenhuma atualização necessária. Finalizando."
 
-      - name: Setup Java and Cache
+      - name: Setup Java
         if: steps.check.outputs.should_build_any == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: "zulu"
           java-version: "17"
-          cache: 'gradle'
+
+      - name: Cache Gradle dependencies
+        if: steps.check.outputs.should_build_any == 'true'
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('config.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
 
       - name: Configure and Build Selectively
         if: steps.check.outputs.should_build_any == 'true'
@@ -174,7 +184,7 @@ jobs:
             build/*.apk
             build/*.zip
           draft: false
-          prerelease: true # <-- MUDANÇA AQUI
+          prerelease: true
           generate_release_notes: false
           body: |
             Patches Version: ${{ steps.check.outputs.latest_patch_tag }}
