@@ -162,6 +162,7 @@ jobs:
           MSG+="Music \`${{ steps.build.outputs.music_version }}\`"$'\n'
           MSG+="[APK]($BASE_URL/music-revanced-v${{ steps.build.outputs.music_version }}-arm64-v8a.apk) • "
           MSG+="[Magisk]($BASE_URL/music-revanced-magisk-v${{ steps.build.outputs.music_version }}-arm64-v8a.zip)"
+          MSG+="#rvcbot"
           
           RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
             -d "chat_id=${TG_CHAT_ID}" \
