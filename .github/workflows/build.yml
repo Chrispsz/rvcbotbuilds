@@ -15,7 +15,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: true
-          fetch-depth: 0 # Profundidade completa para o git-auto-commit
+          fetch-depth: 0 # Profundidade completa para manipulação do histórico Git
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -42,7 +42,6 @@ jobs:
 
       - name: Build Apps
         run: |
-          # Gera o config.json com as versões mais recentes e então constrói
           UPDATE_CFG=$(./build.sh config.toml --config-update)
           echo "$UPDATE_CFG" > config.json
           ./build.sh config.json
@@ -122,6 +121,14 @@ jobs:
       - name: Update Magisk JSON Branch
         if: success()
         run: |
+          # Configura o Git com o nome e e-mail do bot para o commit
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Cria/reseta a branch 'update' localmente a partir do estado atual da 'main'
+          git checkout -B update
+          
+          # Função para gerar os arquivos JSON
           get_update_json() {
             echo "{
             \"version\": \"$1\",
@@ -131,6 +138,7 @@ jobs:
           }"
           }
 
+          # Navega para a pasta de build, gera os JSONs e volta
           cd build || exit 1
           for OUTPUT in *magisk*.zip; do
             [ "$OUTPUT" = "*magisk*.zip" ] && continue
@@ -143,14 +151,22 @@ jobs:
             get_update_json "$VER" "$DLURL" >"../$UPDATE_JSON"
           done
           cd ..
+          
+          # Copia o changelog para a raiz da branch
           cp -f build.md build.md
           
-      - uses: stefanzweifel/git-auto-commit-action@v5
-        if: success()
-        with:
-          branch: update
-          file_pattern: build.md *-update.json
-          commit_message: "chore: Bump to build #${{ steps.last_build.outputs.next_ver_code }}"
+          # Adiciona todos os arquivos gerados (changelog e JSONs) ao Git
+          git add build.md ./*-update.json
+          
+          # Faz o commit apenas se houver mudanças
+          if ! git diff --staged --quiet; then
+            git commit -m "chore: Bump to build #${{ steps.last_build.outputs.next_ver_code }}"
+            # FORÇA o push para a branch 'update', sobrescrevendo seu histórico.
+            # Isso previne erros de divergência e mantém a branch sempre limpa.
+            git push origin update --force
+          else
+            echo "Nenhuma mudança nos arquivos de atualização. Pulando o commit."
+          fi
           
       - name: Clean old releases
         if: always()
