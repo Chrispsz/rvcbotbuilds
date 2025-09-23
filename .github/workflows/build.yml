@@ -3,15 +3,10 @@ on:
   schedule:
     # Roda todo dia às 10:00 UTC
     - cron: '0 10 * * *'
-  workflow_dispatch:
-    inputs:
-      force_build:
-        description: 'Forçar build (ignora verificação de versão)'
-        type: boolean
-        default: false
+  workflow_dispatch: {}
 
 permissions:
-  contents: write
+  contents: write # Para criar releases e commitar na branch 'update'
   actions: read
 
 jobs:
@@ -24,209 +19,238 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: true
-          fetch-depth: 0
-
-      - name: Check for app version updates
-        id: check
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -e
-          # 1. Obter versões recomendadas dos patches oficiais
-          PATCHES_BODY=$(gh release view --repo revanced/revanced-patches --json body --jq .body)
-          LATEST_YT_REC=$(echo "$PATCHES_BODY" | grep -oP 'YouTube v\K[0-9.]+' | head -1 || echo "0")
-          LATEST_MUSIC_REC=$(echo "$PATCHES_BODY" | grep -oP 'YouTube Music v\K[0-9.]+' | head -1 || echo "0")
-          LATEST_PATCH_TAG=$(gh release view --repo revanced/revanced-patches --json tagName --jq .tagName)
-          echo "latest_patch_tag=$LATEST_PATCH_TAG" >> $GITHUB_OUTPUT
-
-          # 2. Obter versões da nossa última release
-          LAST_BUILD_TAG=$(gh release list --repo ${{ github.repository }} --limit 1 --json tagName --jq '.[0].tagName // ""')
-          LAST_BUILT_YT="0"
-          LAST_BUILT_MUSIC="0"
-          LAST_MSG_ID=""
-
-          if [[ -n "$LAST_BUILD_TAG" ]]; then
-            BODY=$(gh release view "$LAST_BUILD_TAG" --repo ${{ github.repository }} --json body --jq '.body')
-            # CORREÇÃO: Usa grep para extrair a versão entre crases. Mais robusto que o sed.
-            LAST_BUILT_YT=$(echo "$BODY" | grep -oP 'YouTube: `\K[0-9.]+' || echo "0")
-            LAST_BUILT_MUSIC=$(echo "$BODY" | grep -oP 'Music: `\K[0-9.]+' || echo "0")
-            LAST_MSG_ID=$(echo "$BODY" | grep -oP 'TG_MSG_ID: \K[0-9]+' || echo "")
-          fi
-
-          echo "last_built_yt=$LAST_BUILT_YT" >> $GITHUB_OUTPUT
-          echo "last_built_music=$LAST_BUILT_MUSIC" >> $GITHUB_OUTPUT
-          echo "last_msg_id=$LAST_MSG_ID" >> $GITHUB_OUTPUT
-          echo "latest_yt_rec=$LATEST_YT_REC" >> $GITHUB_OUTPUT
-          echo "latest_music_rec=$LATEST_MUSIC_REC" >> $GITHUB_OUTPUT
-
-          # 3. Determinar se a compilação é necessária
-          SHOULD_BUILD_YT=false
-          SHOULD_BUILD_MUSIC=false
-          if [[ "${{ github.event.inputs.force_build }}" == "true" ]]; then
-            SHOULD_BUILD_YT=true
-            SHOULD_BUILD_MUSIC=true
-          else
-            if [[ "$LATEST_YT_REC" != "$LAST_BUILT_YT" && "$LATEST_YT_REC" != "0" ]]; then SHOULD_BUILD_YT=true; fi
-            if [[ "$LATEST_MUSIC_REC" != "$LAST_BUILT_MUSIC" && "$LATEST_MUSIC_REC" != "0" ]]; then SHOULD_BUILD_MUSIC=true; fi
-          fi
-
-          if [[ "$SHOULD_BUILD_YT" == "true" || "$SHOULD_BUILD_MUSIC" == "true" ]]; then
-            echo "should_build_any=true" >> $GITHUB_OUTPUT
-          else
-            echo "should_build_any=false" >> $GITHUB_OUTPUT
-          fi
-          echo "should_build_yt=$SHOULD_BUILD_YT" >> $GITHUB_OUTPUT
-          echo "should_build_music=$SHOULD_BUILD_MUSIC" >> $GITHUB_OUTPUT
-
-      - name: Exit if no updates
-        if: steps.check.outputs.should_build_any != 'true'
-        run: echo "Nenhuma atualização necessária. Finalizando."
+          fetch-depth: 0 # Necessário para o git-auto-commit funcionar corretamente
 
       - name: Setup Java
-        if: steps.check.outputs.should_build_any == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: "zulu"
           java-version: "17"
 
-      - name: Configure and Build Selectively
-        if: steps.check.outputs.should_build_any == 'true'
-        id: build
+      - name: Get Last Build Info
+        id: last_build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -e
-          # Cria o arquivo de configuração dinamicamente
-          {
-            echo 'enable-magisk-update = true'
-            echo 'parallel-jobs = 1'
-            if [[ "${{ steps.check.outputs.should_build_yt }}" == "true" ]]; then
-              echo '[YouTube]'
-              echo 'enabled = true'
-              echo 'build-mode = "both"'
-              echo 'arch = "arm64-v8a"'
-              echo 'version = "auto"'
-              echo 'apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"'
-            fi
-            if [[ "${{ steps.check.outputs.should_build_music }}" == "true" ]]; then
-              echo '[Music]'
-              echo 'enabled = true'
-              echo 'build-mode = "both"'
-              echo 'arch = "arm64-v8a"'
-              echo 'version = "auto"'
-              echo 'apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"'
-            fi
-          } > config.toml
+          # Pega a tag da última release para incrementar e o corpo para comparação
+          LAST_RELEASE=$(gh release view --json tagName,body --jq '{tagName: .tagName, body: .body}' || echo '{"tagName":"0","body":""}')
+          LAST_TAG=$(echo "$LAST_RELEASE" | jq -r '.tagName')
+          LAST_BODY=$(echo "$LAST_RELEASE" | jq -r '.body')
 
-          # Executa o script de compilação
-          chmod +x build.sh
-          ./build.sh config.toml
+          # Extrai as versões dos apps da última release
+          LAST_BUILT_YT=$(echo "$LAST_BODY" | grep -oP 'YouTube: `\K[0-9.]+' || echo "0")
+          LAST_BUILT_MUSIC=$(echo "$LAST_BODY" | grep -oP 'Music: `\K[0-9.]+' || echo "0")
+          LAST_MSG_ID=$(echo "$LAST_BODY" | grep -oP 'TG_MSG_ID: \K[0-9]+' || echo "")
+          
+          echo "last_tag=$LAST_TAG" >> $GITHUB_OUTPUT
+          echo "last_built_yt=$LAST_BUILT_YT" >> $GITHUB_OUTPUT
+          echo "last_built_music=$LAST_BUILT_MUSIC" >> $GITHUB_OUTPUT
+          echo "last_msg_id=$LAST_MSG_ID" >> $GITHUB_OUTPUT
+          echo "next_ver_code=$((LAST_TAG + 1))" >> $GITHUB_OUTPUT
 
-          # CORREÇÃO: Extrai a versão apenas se o arquivo existir, para evitar informações incorretas
-          YT_APK=$(find build -name "youtube-revanced-v*.apk" | head -n 1)
-          MUSIC_APK=$(find build -name "music-revanced-v*.apk" | head -n 1)
-          YT_VERSION=""
-          MUSIC_VERSION=""
-
-          if [[ -n "$YT_APK" ]]; then
-            YT_VERSION=$(echo "$YT_APK" | grep -oP 'v\K[0-9.]+')
+      - name: Check for Updates via Build Script
+        id: check_updates
+        run: |
+          # Roda o script em modo "config-update" para gerar um JSON com as versões mais recentes
+          UPDATE_CFG=$(./build.sh config.toml --config-update || echo "")
+          
+          if [[ -z "$UPDATE_CFG" ]]; then
+            echo "Falha ao obter a configuração de atualização do script de build."
+            echo "should_build_any=false" >> $GITHUB_OUTPUT
+            exit 0
           fi
-          if [[ -n "$MUSIC_APK" ]]; then
-            MUSIC_VERSION=$(echo "$MUSIC_APK" | grep -oP 'v\K[0-9.]+')
+          
+          echo "$UPDATE_CFG" > config.json
+          
+          # Extrai as novas versões do JSON gerado
+          NEW_YT_VERSION=$(jq -r '.YouTube.version // "0"' config.json)
+          NEW_MUSIC_VERSION=$(jq -r '.Music.version // "0"' config.json)
+          
+          echo "new_yt_version=$NEW_YT_VERSION" >> $GITHUB_OUTPUT
+          echo "new_music_version=$NEW_MUSIC_VERSION" >> $GITHUB_OUTPUT
+          
+          # Compara com as versões antigas para decidir se compila
+          SHOULD_BUILD_YT=false
+          if [[ "$NEW_YT_VERSION" != "${{ steps.last_build.outputs.last_built_yt }}" && "$NEW_YT_VERSION" != "0" ]]; then
+            SHOULD_BUILD_YT=true
           fi
 
-          echo "youtube_version=${YT_VERSION:-${{ steps.check.outputs.last_built_yt }}}" >> $GITHUB_OUTPUT
-          echo "music_version=${MUSIC_VERSION:-${{ steps.check.outputs.last_built_music }}}" >> $GITHUB_OUTPUT
-          echo "yt_built=${YT_VERSION:+true}" >> $GITHUB_OUTPUT
-          echo "music_built=${MUSIC_VERSION:+true}" >> $GITHUB_OUTPUT
+          SHOULD_BUILD_MUSIC=false
+          if [[ "$NEW_MUSIC_VERSION" != "${{ steps.last_build.outputs.last_built_music }}" && "$NEW_MUSIC_VERSION" != "0" ]]; then
+            SHOULD_BUILD_MUSIC=true
+          fi
+          
+          if [[ "$SHOULD_BUILD_YT" == "true" || "$SHOULD_BUILD_MUSIC" == "true" ]]; then
+            echo "should_build_any=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_build_any=false" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Send Telegram notification
-        if: success() && steps.check.outputs.should_build_any == 'true'
+      - name: Exit if no updates
+        if: steps.check_updates.outputs.should_build_any != 'true'
+        run: echo "Nenhuma atualização de versão detectada. Finalizando."
+
+      - name: Build Apps
+        if: steps.check_updates.outputs.should_build_any == 'true'
+        run: ./build.sh config.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          NEXT_VER_CODE: ${{ steps.last_build.outputs.next_ver_code }}
+
+      - name: Prepare Release Content
+        if: steps.check_updates.outputs.should_build_any == 'true'
+        id: release_content
+        run: |
+          # Captura o changelog gerado pelo build script
+          CHANGELOG=$(cat build.md)
+          # Adiciona as versões dos apps para o corpo da release
+          YT_VERSION=$(ls build/youtube-revanced-v*.apk 2>/dev/null | grep -oP 'v\K[0-9.]+' | head -1 || echo "${{ steps.last_build.outputs.last_built_yt }}")
+          MUSIC_VERSION=$(ls build/music-revanced-v*.apk 2>/dev/null | grep -oP 'v\K[0-9.]+' | head -1 || echo "${{ steps.last_build.outputs.last_built_music }}")
+          
+          BODY=$(cat <<EOF
+          YouTube: \`${YT_VERSION}\`
+          Music: \`${MUSIC_VERSION}\`
+
+          ---
+          ### Changelog
+          ${CHANGELOG}
+          EOF
+          )
+          
+          # Passa o corpo e o changelog para os próximos passos
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          echo "$BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+
+      - name: Send Telegram Notification
+        if: success() && steps.check_updates.outputs.should_build_any == 'true'
         id: telegram
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         run: |
-          set -e
-          TAG="v${{ github.run_number }}"
+          cd build || { echo "Pasta 'build' não encontrada"; exit 1; }
+          
+          NL=$'\n'
+          APKS=""
+          MODULES=""
+          TAG="${{ steps.last_build.outputs.next_ver_code }}"
           BASE_URL="${{ github.server_url }}/${{ github.repository }}/releases/download/${TAG}"
-          NL=$'\n' # Variável para nova linha
           
-          # Constrói a mensagem dinamicamente
-          MSG="✅ *Novo(s) Build(s) #${{ github.run_number }}*${NL}${NL}"
+          for OUTPUT in *; do
+            if [[ $OUTPUT == *.apk ]]; then
+              APKS+="${NL}📦 [${OUTPUT}](${BASE_URL}/${OUTPUT})"
+            elif [[ $OUTPUT == *.zip ]]; then
+              MODULES+="${NL}📦 [${OUTPUT}](${BASE_URL}/${OUTPUT})"
+            fi
+          done
           
-          # CORREÇÃO: Anuncia apenas os apps que foram compilados com sucesso
-          if [[ "${{ steps.build.outputs.yt_built }}" == "true" ]]; then
-            YT_VERSION="${{ steps.build.outputs.youtube_version }}"
-            MSG+="*YouTube* \`${YT_VERSION}\` (✨ NOVO)${NL}"
-            MSG+="[APK](${BASE_URL}/youtube-revanced-v${YT_VERSION}-arm64-v8a.apk) • [Magisk](${BASE_URL}/youtube-revanced-magisk-v${YT_VERSION}-arm64-v8a.zip)${NL}${NL}"
-          fi
+          BODY="${{ steps.release_content.outputs.changelog }}"
+          # Formata o changelog para o Telegram
+          FORMATTED_BODY=$(echo "$BODY" | sed 's/^\* \*\*/↪ \*\*/g; s/^\* `/↪ \*\*/g; s/`/\*/g; s/^\* /\↪/g; s/\*\*/\*/g; s/###//g; s/^- /↪ /g; /^==/d;')
           
-          if [[ "${{ steps.build.outputs.music_built }}" == "true" ]]; then
-            MUSIC_VERSION="${{ steps.build.outputs.music_version }}"
-            MSG+="*Music* \`${MUSIC_VERSION}\` (✨ NOVO)${NL}"
-            MSG+="[APK](${BASE_URL}/music-revanced-v${MUSIC_VERSION}-arm64-v8a.apk) • [Magisk](${BASE_URL}/music-revanced-magisk-v${MUSIC_VERSION}-arm64-v8a.zip)${NL}${NL}"
-          fi
+          MSG="*Build #${TAG} disponível!*${NL}${NL}${FORMATTED_BODY}${NL}${NL}*▼ Downloads*${NL}"
+          if [[ -n "$MODULES" ]]; then MSG+="*Módulos:*${MODULES}${NL}"; fi
+          if [[ -n "$APKS" ]]; then MSG+="*APKs:*${APKS}${NL}"; fi
           
-          MSG+="#rvcbot"
-
-          # Envia a nova mensagem
+          # Envia a mensagem e captura o ID
           RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
             --data-urlencode "chat_id=${TG_CHAT_ID}" \
             --data-urlencode "text=${MSG}" \
             --data-urlencode "parse_mode=Markdown" \
             --data-urlencode "disable_web_page_preview=true")
-            
+          
           MSG_ID=$(echo "$RESPONSE" | grep -oP '"message_id":\K[0-9]+' || echo "")
-          if [[ -n "$MSG_ID" ]]; then echo "msg_id=$MSG_ID" >> $GITHUB_OUTPUT; fi
+          [ -n "$MSG_ID" ] && echo "msg_id=$MSG_ID" >> $GITHUB_OUTPUT
 
-          # Apaga a mensagem anterior se existir
-          LAST_MSG_ID="${{ steps.check.outputs.last_msg_id }}"
+          # Apaga a mensagem anterior
+          LAST_MSG_ID="${{ steps.last_build.outputs.last_msg_id }}"
           if [[ -n "$LAST_MSG_ID" ]]; then
             curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/deleteMessage" \
               -d "chat_id=${TG_CHAT_ID}" \
               -d "message_id=${LAST_MSG_ID}" >/dev/null 2>&1 || true
           fi
 
-      - name: Create Release
-        if: success() && steps.check.outputs.should_build_any == 'true'
-        uses: softprops/action-gh-release@v1
+      - name: Create Release and Upload Artifacts
+        if: success() && steps.check_updates.outputs.should_build_any == 'true'
+        uses: svenstaro/upload-release-action@v2
         with:
-          tag_name: v${{ github.run_number }}
-          name: "Daily Build #${{ github.run_number }}"
-          files: |
-            build/*.apk
-            build/*.zip
-          draft: false
-          prerelease: false
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ steps.last_build.outputs.next_ver_code }}
+          release_name: "Build #${{ steps.last_build.outputs.next_ver_code }}"
           body: |
-            Patches: `${{ steps.check.outputs.latest_patch_tag }}`
-
-            YouTube: `${{ steps.build.outputs.youtube_version }}`
-            Music: `${{ steps.build.outputs.music_version }}`
+            ${{ steps.release_content.outputs.body }}
 
             ---
             TG_MSG_ID: ${{ steps.telegram.outputs.msg_id }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          file: ./build/*
+          file_glob: true
+          overwrite: true
+
+      - name: Update Magisk JSON Branch
+        if: success() && steps.check_updates.outputs.should_build_any == 'true'
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git fetch origin update || true
+          git checkout -B update origin/update || git checkout -b update
+          
+          # Copia o changelog para a nova branch
+          cp -f build.md build.md
+          
+          get_update_json() {
+            echo "{
+            \"version\": \"$1\",
+            \"versionCode\": ${{ steps.last_build.outputs.next_ver_code }},
+            \"zipUrl\": \"$2\",
+            \"changelog\": \"https://raw.githubusercontent.com/$GITHUB_REPOSITORY/update/build.md\"
+          }"
+          }
+
+          cd build || exit 1
+          for OUTPUT in *magisk*.zip; do
+            [ "$OUTPUT" = "*magisk*.zip" ] && continue
+            ZIP_S=$(unzip -p "$OUTPUT" module.prop)
+            if ! UPDATE_JSON=$(echo "$ZIP_S" | grep updateJson); then continue; fi
+            UPDATE_JSON="${UPDATE_JSON##*/}"
+            VER=$(echo "$ZIP_S" | grep version=)
+            VER="${VER##*=}"
+            DLURL="${{ github.server_url }}/${{ github.repository }}/releases/download/${{ steps.last_build.outputs.next_ver_code }}/${OUTPUT}"
+            get_update_json "$VER" "$DLURL" >"../$UPDATE_JSON"
+          done
+          cd ..
+          
+          find . -maxdepth 1 -name "*-update.json" -print0 | xargs -0 git add
+          git add build.md
+          
+          if ! git diff --staged --quiet; then
+            git commit -m "Bump to build #${{ steps.last_build.outputs.next_ver_code }}"
+            git push --force origin update
+          else
+            echo "Nenhuma mudança nos arquivos de atualização."
+          fi
 
       - name: Clean old releases
-        if: success() && steps.check.outputs.should_build_any == 'true'
+        if: always() && steps.check_updates.outputs.should_build_any == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # CORREÇÃO: Mantém as 5 releases mais recentes e apaga as mais antigas.
-          # Este método é mais seguro e não apaga todo o histórico.
           gh release list --repo ${{ github.repository }} --limit 100 --json tagName | \
           jq -r '.[5:].[].tagName' | \
           xargs -r -I {} gh release delete {} --repo ${{ github.repository }} --yes --cleanup-tag
 
       - name: Notify on Failure
-        if: failure() && steps.check.outputs.should_build_any == 'true'
+        if: failure() && steps.check_updates.outputs.should_build_any == 'true'
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         run: |
-          MSG="❌ *Falha no Build #${{ github.run_number }}*${{'\n\n'}}Ocorreu um erro durante a compilação.${{'\n\n'}}[Verificar logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
-          curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
-            --data-urlencode "chat_id=${TG_CHAT_ID}" \
-            --data-urlencode "text=${MSG}" \
-            --data-urlencode "parse_mode=Markdown"
+          MSG="❌ *Falha no Build #${{ steps.last_build.outputs.next_ver_code }}*\n\nOcorreu um erro durante a compilação.\n\n[Verificar logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" -d "chat_id=${TG_CHAT_ID}" -d "text=${MSG}" -d "parse_mode=Markdown"
