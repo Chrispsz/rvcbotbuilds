@@ -25,21 +25,37 @@ jobs:
       - name: Decide if a new build is needed
         id: should_build
         run: |
-          # Tenta buscar a branch 'update' para comparação. Falhar aqui não é um problema.
+          set -e # Exit immediately if a command fails
+          
           git fetch origin update:update --depth=1 || true
           
-          # Verifica se o arquivo build.md existe na branch 'update'.
-          # Se não existir, é a primeira execução.
           if ! git cat-file -e update:build.md 2>/dev/null; then
-            echo "Branch 'update' ou 'build.md' não encontrado. Primeira execução, build necessário."
+            echo "Branch 'update' or 'build.md' not found. This is the first run. Build is necessary."
             echo "should_build=true" >> $GITHUB_OUTPUT
           else
-            echo "Arquivo build.md anterior encontrado. Comparando para atualizações..."
+            echo "Previous build.md found. Comparing for updates..."
             
-            # Extrai o build.md anterior para o disco para que o script de build possa lê-lo.
+            # --- DEBUGGING AND FIX ---
+            echo "Step 1: Extracting previous build.md from update branch."
             git show update:build.md > build.md
             
-            # Executa o script de build (que está na raiz) para verificar se há atualizações.
+            echo "Step 2: Verifying the state of the workspace."
+            echo "Current directory is: $(pwd)"
+            echo "Listing all files and directories (long format):"
+            ls -la
+            
+            echo "Step 3: Checking if build.md exists and is not empty."
+            if [ -s "build.md" ]; then
+              echo "SUCCESS: build.md was created and is not empty. Contents:"
+              # Only show the first 10 lines to avoid cluttering logs
+              head -n 10 build.md
+            else
+              echo "CRITICAL FAILURE: build.md was NOT created or is EMPTY. Aborting early."
+              # We will exit here to prevent the script from running and failing.
+              exit 1
+            fi
+            
+            echo "Step 4: Proceeding to run the build script for update check."
             UPDATE_CFG=$(./build.sh config.toml --config-update)
             
             if [[ -n "$UPDATE_CFG" ]]; then
@@ -53,7 +69,7 @@ jobs:
 
       - name: Clean older workflow runs
         if: always()
-        continue-on-error: true # Continua mesmo que a limpeza falhe
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
