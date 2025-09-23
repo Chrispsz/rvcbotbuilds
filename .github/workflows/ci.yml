@@ -10,34 +10,35 @@ jobs:
     name: Check for updates
     runs-on: ubuntu-latest
     permissions:
-      actions: write # Permissão para apagar runs antigos
+      # We only need read here, since we are not writing anything in this job anymore.
+      # The write permission for actions is still needed for cleaning up old runs.
+      contents: read
+      actions: write
 
     outputs:
       should_build: ${{ steps.should_build.outputs.should_build }}
 
     steps:
-      - name: Checkout
+      - name: Checkout main branch (for build script)
         uses: actions/checkout@v4
         with:
-          ref: 'update'
-          fetch-depth: 1
-        continue-on-error: true
-
-      - name: Checkout main branch for build script
-        uses: actions/checkout@v4
-        with:
-          path: 'main'
           submodules: true
 
       - name: Decide if a new build is needed
         id: should_build
         run: |
-          if [[ ! -f "build.md" ]]; then
-            echo "Branch 'update' ou 'build.md' não encontrado. Primeira execução, build necessário."
+          # Try to get the last build.md from the 'update' branch.
+          # The command will fail if the branch doesn't exist, which is fine.
+          git fetch origin update:update --depth=1 || true
+          
+          # Check if the build.md file exists locally after the fetch
+          if ! git cat-file -e update:build.md 2>/dev/null; then
+            echo "Branch 'update' or 'build.md' not found. First execution, build necessary."
             echo "should_build=true" >> $GITHUB_OUTPUT
           else
             echo "Verificando atualizações usando o script de build..."
-            UPDATE_CFG=$(cd main && ./build.sh config.toml --config-update)
+            # Now we can run the build script directly from the root directory
+            UPDATE_CFG=$(./build.sh config.toml --config-update)
             
             if [[ -n "$UPDATE_CFG" ]]; then
               echo "Novas versões encontradas. Build necessário."
@@ -50,6 +51,7 @@ jobs:
 
       - name: Clean older workflow runs
         if: always()
+        continue-on-error: true # Keep this in case of permission issues
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -59,12 +61,8 @@ jobs:
     name: Build, Release and Notify
     needs: check
     if: needs.check.outputs.should_build == 'true'
-    
-    # --- CORREÇÃO AQUI ---
-    # Adicionamos este bloco para conceder as permissões necessárias ao workflow filho.
     permissions:
-      contents: write # Essencial para criar releases e fazer commit na branch 'update'.
-      actions: read   # Corresponde ao que o build.yml pede.
-
+      contents: write
+      actions: read
     uses: ./.github/workflows/build.yml
     secrets: inherit
