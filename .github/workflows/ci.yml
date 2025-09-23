@@ -1,4 +1,9 @@
-name: CI Controller
+# CI.yml: O Orquestrador
+# Responsabilidade: Verificar se há atualizações e, SOMENTE SE HOUVER,
+# chamar o workflow 'build.yml' para fazer o trabalho pesado.
+# Isso economiza tempo e recursos, cumprindo o requisito de "não compilar a mesma versão".
+
+name: Controlador de CI
 on:
   schedule:
     # Roda todo dia às 10:00 UTC
@@ -7,7 +12,7 @@ on:
 
 jobs:
   check:
-    name: Check for updates
+    name: Verificar Atualizações
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -15,33 +20,34 @@ jobs:
 
     outputs:
       should_build: ${{ steps.should_build.outputs.should_build }}
-      # Novo: Passamos a configuração de build completa para o próximo job
       build_config: ${{ steps.should_build.outputs.build_config }}
 
     steps:
-      - name: Checkout main branch
+      - name: Checkout da branch principal
         uses: actions/checkout@v4
         with:
           submodules: true
 
-      - name: Decide if a new build is needed
+      - name: Decidir se um novo build é necessário
         id: should_build
         run: |
           git fetch origin update:update --depth=1 || true
           
           if ! git cat-file -e update:build.md 2>/dev/null; then
             echo "Branch 'update' ou 'build.md' não encontrado. Primeira execução."
-            # Gera a configuração inicial já que não há histórico
             UPDATE_CFG=$(./build.sh config.toml --config-update)
             echo "should_build=true" >> $GITHUB_OUTPUT
-            # Transforma o JSON em uma única linha para passar como output
             echo "build_config=$(echo $UPDATE_CFG | jq -c .)" >> $GITHUB_OUTPUT
           else
-            echo "Arquivo build.md anterior encontrado. Comparando..."
-            # Extrai o build.md para o disco para que o script possa comparar
+            echo "Arquivo build.md anterior encontrado. Comparando para atualizações..."
             git show update:build.md > build.md
             
-            # Executa o script para verificar se há atualizações
+            # ========================================================================
+            # PONTO CHAVE: NÃO COMPILAR A MESMA VERSÃO
+            # O script 'build.sh --config-update' compara o 'build.md' antigo com as
+            # versões mais recentes online. Se não houver nada novo, a variável
+            # $UPDATE_CFG ficará VAZIA.
+            # ========================================================================
             UPDATE_CFG=$(./build.sh config.toml --config-update)
             
             if [[ -n "$UPDATE_CFG" ]]; then
@@ -55,7 +61,7 @@ jobs:
             fi
           fi
 
-      - name: Clean older workflow runs
+      - name: Limpar execuções de workflows antigos
         if: always()
         continue-on-error: true
         env:
@@ -64,7 +70,7 @@ jobs:
           gh run list -L 100 --json databaseId -q '.[].databaseId' | tail -n+11 | xargs -r -IID gh api "repos/$GITHUB_REPOSITORY/actions/runs/ID" -X DELETE || echo "Falha ao limpar runs antigos, continuando."
 
   build:
-    name: Build, Release and Notify
+    name: Compilar, Lançar e Notificar
     needs: check
     if: needs.check.outputs.should_build == 'true'
     permissions:
@@ -72,6 +78,5 @@ jobs:
       actions: read
     uses: ./.github/workflows/build.yml
     secrets: inherit
-    # Novo: Passa a configuração gerada como um input para o workflow filho
     with:
       build_config: ${{ needs.check.outputs.build_config }}
