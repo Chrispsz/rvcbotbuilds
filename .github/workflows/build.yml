@@ -129,10 +129,8 @@ jobs:
           cd ..
           
           # --- CORREÇÃO AQUI ---
-          # A linha 'cp -f build.md build.md' foi removida.
-          
-          # Adiciona o build.md (que já existe) e os novos JSONs ao stage do Git
-          git add build.md ./*-update.json
+          # Adiciona a flag '-f' para forçar a adição de 'build.md', mesmo que ignorado.
+          git add -f build.md ./*-update.json
           
           if ! git diff --staged --quiet; then
             git commit -m "chore: Bump to build #${{ steps.last_build.outputs.next_ver_code }}"
