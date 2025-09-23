@@ -1,6 +1,11 @@
 name: Reusable Build Workflow
 on:
+  # Define que este workflow aceita um input chamado 'build_config'
   workflow_call:
+    inputs:
+      build_config:
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -15,7 +20,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: true
-          fetch-depth: 0 # Profundidade completa para manipulação do histórico Git
+          fetch-depth: 0
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -30,20 +35,25 @@ jobs:
         run: |
           LAST_TAG=$(gh release list -L 1 | awk -F '\t' '{print $3}' | grep -oP '[0-9]+' || echo "0")
           NEXT_VER_CODE=$((LAST_TAG + 1))
-          
           LAST_MSG_ID=""
           if [[ "$LAST_TAG" != "0" ]]; then
             BODY=$(gh release view "$LAST_TAG" --json body -q '.body' || echo "")
             LAST_MSG_ID=$(echo "$BODY" | grep -oP 'TG_MSG_ID: \K[0-9]+' || echo "")
           fi
-          
           echo "next_ver_code=$NEXT_VER_CODE" >> $GITHUB_OUTPUT
           echo "last_msg_id=$LAST_MSG_ID" >> $GITHUB_OUTPUT
 
       - name: Build Apps
         run: |
-          UPDATE_CFG=$(./build.sh config.toml --config-update)
-          echo "$UPDATE_CFG" > config.json
+          echo "Recebida a configuração de build do job 'check'."
+          # Usa o input para criar o config.json e depois executa o build.
+          # Não há mais verificação aqui, apenas a compilação.
+          echo '${{ inputs.build_config }}' > config.json
+          
+          echo "Conteúdo de config.json gerado:"
+          cat config.json
+
+          echo "Iniciando a compilação..."
           ./build.sh config.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -66,37 +76,23 @@ jobs:
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         run: |
           cd build || { echo "Pasta 'build' não encontrada"; exit 1; }
-          
           NL=$'\n'
           APKS=""
           MODULES=""
           TAG="${{ steps.last_build.outputs.next_ver_code }}"
           BASE_URL="${{ github.server_url }}/${{ github.repository }}/releases/download/${TAG}"
-          
           for OUTPUT in *; do
-            if [[ $OUTPUT == *.apk ]]; then
-              APKS+="${NL}📦 [${OUTPUT}](${BASE_URL}/${OUTPUT})"
-            elif [[ $OUTPUT == *.zip ]]; then
-              MODULES+="${NL}📦 [${OUTPUT}](${BASE_URL}/${OUTPUT})"
-            fi
+            if [[ $OUTPUT == *.apk ]]; then APKS+="${NL}📦 [${OUTPUT}](${BASE_URL}/${OUTPUT})";
+            elif [[ $OUTPUT == *.zip ]]; then MODULES+="${NL}📦 [${OUTPUT}](${BASE_URL}/${OUTPUT})"; fi
           done
-          
           BODY="${{ steps.content.outputs.changelog }}"
           FORMATTED_BODY=$(echo "$BODY" | sed 's/^\* \*\*/↪ \*\*/g; s/^\* `/↪ \*\*/g; s/`/\*/g; s/^\* /\↪/g; s/\*\*/\*/g; s/###//g; s/^- /↪ /g; /^==/d;')
-          
           MSG="*Build #${TAG} disponível!*${NL}${NL}${FORMATTED_BODY}${NL}${NL}*▼ Downloads*${NL}"
           if [[ -n "$MODULES" ]]; then MSG+="*Módulos:*${MODULES}${NL}"; fi
           if [[ -n "$APKS" ]]; then MSG+="*APKs:*${APKS}${NL}"; fi
-          
-          RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
-            --data-urlencode "chat_id=${TG_CHAT_ID}" \
-            --data-urlencode "text=${MSG}" \
-            --data-urlencode "parse_mode=Markdown" \
-            --data-urlencode "disable_web_page_preview=true")
-          
+          RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" --data-urlencode "chat_id=${TG_CHAT_ID}" --data-urlencode "text=${MSG}" --data-urlencode "parse_mode=Markdown" --data-urlencode "disable_web_page_preview=true")
           MSG_ID=$(echo "$RESPONSE" | grep -oP '"message_id":\K[0-9]+' || echo "")
           [ -n "$MSG_ID" ] && echo "msg_id=$MSG_ID" >> $GITHUB_OUTPUT
-
           LAST_MSG_ID="${{ steps.last_build.outputs.last_msg_id }}"
           if [[ -n "$LAST_MSG_ID" ]]; then
             curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/deleteMessage" -d "chat_id=${TG_CHAT_ID}" -d "message_id=${LAST_MSG_ID}" >/dev/null 2>&1 || true
@@ -121,24 +117,10 @@ jobs:
       - name: Update Magisk JSON Branch
         if: success()
         run: |
-          # Configura o Git com o nome e e-mail do bot para o commit
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Cria/reseta a branch 'update' localmente a partir do estado atual da 'main'
           git checkout -B update
-          
-          # Função para gerar os arquivos JSON
-          get_update_json() {
-            echo "{
-            \"version\": \"$1\",
-            \"versionCode\": ${{ steps.last_build.outputs.next_ver_code }},
-            \"zipUrl\": \"$2\",
-            \"changelog\": \"https://raw.githubusercontent.com/$GITHUB_REPOSITORY/update/build.md\"
-          }"
-          }
-
-          # Navega para a pasta de build, gera os JSONs e volta
+          get_update_json() { echo "{\"version\": \"$1\",\"versionCode\": ${{ steps.last_build.outputs.next_ver_code }},\"zipUrl\": \"$2\",\"changelog\": \"https://raw.githubusercontent.com/$GITHUB_REPOSITORY/update/build.md\"}"; }
           cd build || exit 1
           for OUTPUT in *magisk*.zip; do
             [ "$OUTPUT" = "*magisk*.zip" ] && continue
@@ -151,18 +133,10 @@ jobs:
             get_update_json "$VER" "$DLURL" >"../$UPDATE_JSON"
           done
           cd ..
-          
-          # Copia o changelog para a raiz da branch
           cp -f build.md build.md
-          
-          # Adiciona todos os arquivos gerados (changelog e JSONs) ao Git
           git add build.md ./*-update.json
-          
-          # Faz o commit apenas se houver mudanças
           if ! git diff --staged --quiet; then
             git commit -m "chore: Bump to build #${{ steps.last_build.outputs.next_ver_code }}"
-            # FORÇA o push para a branch 'update', sobrescrevendo seu histórico.
-            # Isso previne erros de divergência e mantém a branch sempre limpa.
             git push origin update --force
           else
             echo "Nenhuma mudança nos arquivos de atualização. Pulando o commit."
