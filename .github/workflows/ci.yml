@@ -15,6 +15,8 @@ jobs:
 
     outputs:
       should_build: ${{ steps.should_build.outputs.should_build }}
+      # Novo: Passamos a configuração de build completa para o próximo job
+      build_config: ${{ steps.should_build.outputs.build_config }}
 
     steps:
       - name: Checkout main branch
@@ -25,45 +27,31 @@ jobs:
       - name: Decide if a new build is needed
         id: should_build
         run: |
-          set -e # Exit immediately if a command fails
-          
           git fetch origin update:update --depth=1 || true
           
           if ! git cat-file -e update:build.md 2>/dev/null; then
-            echo "Branch 'update' or 'build.md' not found. This is the first run. Build is necessary."
+            echo "Branch 'update' ou 'build.md' não encontrado. Primeira execução."
+            # Gera a configuração inicial já que não há histórico
+            UPDATE_CFG=$(./build.sh config.toml --config-update)
             echo "should_build=true" >> $GITHUB_OUTPUT
+            # Transforma o JSON em uma única linha para passar como output
+            echo "build_config=$(echo $UPDATE_CFG | jq -c .)" >> $GITHUB_OUTPUT
           else
-            echo "Previous build.md found. Comparing for updates..."
-            
-            # --- DEBUGGING AND FIX ---
-            echo "Step 1: Extracting previous build.md from update branch."
+            echo "Arquivo build.md anterior encontrado. Comparando..."
+            # Extrai o build.md para o disco para que o script possa comparar
             git show update:build.md > build.md
             
-            echo "Step 2: Verifying the state of the workspace."
-            echo "Current directory is: $(pwd)"
-            echo "Listing all files and directories (long format):"
-            ls -la
-            
-            echo "Step 3: Checking if build.md exists and is not empty."
-            if [ -s "build.md" ]; then
-              echo "SUCCESS: build.md was created and is not empty. Contents:"
-              # Only show the first 10 lines to avoid cluttering logs
-              head -n 10 build.md
-            else
-              echo "CRITICAL FAILURE: build.md was NOT created or is EMPTY. Aborting early."
-              # We will exit here to prevent the script from running and failing.
-              exit 1
-            fi
-            
-            echo "Step 4: Proceeding to run the build script for update check."
+            # Executa o script para verificar se há atualizações
             UPDATE_CFG=$(./build.sh config.toml --config-update)
             
             if [[ -n "$UPDATE_CFG" ]]; then
               echo "Novas versões encontradas. Build necessário."
               echo "should_build=true" >> $GITHUB_OUTPUT
+              echo "build_config=$(echo $UPDATE_CFG | jq -c .)" >> $GITHUB_OUTPUT
             else
               echo "Nenhuma nova versão encontrada. Pulando o build."
               echo "should_build=false" >> $GITHUB_OUTPUT
+              echo "build_config={}" >> $GITHUB_OUTPUT
             fi
           fi
 
@@ -84,3 +72,6 @@ jobs:
       actions: read
     uses: ./.github/workflows/build.yml
     secrets: inherit
+    # Novo: Passa a configuração gerada como um input para o workflow filho
+    with:
+      build_config: ${{ needs.check.outputs.build_config }}
