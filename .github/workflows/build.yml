@@ -1,9 +1,7 @@
-name: Daily Auto Build (YouTube & Music)
+name: Reusable Build Workflow
 on:
-  schedule:
-    # Roda todo dia às 10:00 UTC
-    - cron: '0 10 * * *'
-  workflow_dispatch: {}
+  # Isso o torna um workflow reutilizável, que só pode ser chamado por outro workflow
+  workflow_call:
 
 permissions:
   contents: write # Para criar releases e commitar na branch 'update'
@@ -13,13 +11,12 @@ jobs:
   build-and-release:
     runs-on: ubuntu-latest
     timeout-minutes: 45
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: true
-          fetch-depth: 0 # Necessário para o git-auto-commit funcionar corretamente
+          fetch-depth: 0 # Profundidade completa para o git-auto-commit
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -32,109 +29,46 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Pega a tag da última release para incrementar e o corpo para comparação
-          LAST_RELEASE=$(gh release view --json tagName,body --jq '{tagName: .tagName, body: .body}' || echo '{"tagName":"0","body":""}')
-          LAST_TAG=$(echo "$LAST_RELEASE" | jq -r '.tagName')
-          LAST_BODY=$(echo "$LAST_RELEASE" | jq -r '.body')
-
-          # Extrai as versões dos apps da última release
-          LAST_BUILT_YT=$(echo "$LAST_BODY" | grep -oP 'YouTube: `\K[0-9.]+' || echo "0")
-          LAST_BUILT_MUSIC=$(echo "$LAST_BODY" | grep -oP 'Music: `\K[0-9.]+' || echo "0")
-          LAST_MSG_ID=$(echo "$LAST_BODY" | grep -oP 'TG_MSG_ID: \K[0-9]+' || echo "")
+          LAST_TAG=$(gh release list -L 1 | awk -F '\t' '{print $3}' | grep -oP '[0-9]+' || echo "0")
+          NEXT_VER_CODE=$((LAST_TAG + 1))
           
-          echo "last_tag=$LAST_TAG" >> $GITHUB_OUTPUT
-          echo "last_built_yt=$LAST_BUILT_YT" >> $GITHUB_OUTPUT
-          echo "last_built_music=$LAST_BUILT_MUSIC" >> $GITHUB_OUTPUT
+          # Obter ID da última mensagem do Telegram do corpo da release anterior
+          LAST_MSG_ID=""
+          if [[ "$LAST_TAG" != "0" ]]; then
+            BODY=$(gh release view "$LAST_TAG" --json body -q '.body' || echo "")
+            LAST_MSG_ID=$(echo "$BODY" | grep -oP 'TG_MSG_ID: \K[0-9]+' || echo "")
+          fi
+          
+          echo "next_ver_code=$NEXT_VER_CODE" >> $GITHUB_OUTPUT
           echo "last_msg_id=$LAST_MSG_ID" >> $GITHUB_OUTPUT
-          echo "next_ver_code=$((LAST_TAG + 1))" >> $GITHUB_OUTPUT
-
-      - name: Check for Updates via Build Script
-        id: check_updates
-        run: |
-          # Roda o script em modo "config-update" para gerar um JSON com as versões mais recentes
-          UPDATE_CFG=$(./build.sh config.toml --config-update || echo "")
-          
-          if [[ -z "$UPDATE_CFG" ]]; then
-            echo "Falha ao obter a configuração de atualização do script de build."
-            echo "should_build_any=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          
-          echo "$UPDATE_CFG" > config.json
-          
-          # Extrai as novas versões do JSON gerado
-          NEW_YT_VERSION=$(jq -r '.YouTube.version // "0"' config.json)
-          NEW_MUSIC_VERSION=$(jq -r '.Music.version // "0"' config.json)
-          
-          echo "new_yt_version=$NEW_YT_VERSION" >> $GITHUB_OUTPUT
-          echo "new_music_version=$NEW_MUSIC_VERSION" >> $GITHUB_OUTPUT
-          
-          # Compara com as versões antigas para decidir se compila
-          SHOULD_BUILD_YT=false
-          if [[ "$NEW_YT_VERSION" != "${{ steps.last_build.outputs.last_built_yt }}" && "$NEW_YT_VERSION" != "0" ]]; then
-            SHOULD_BUILD_YT=true
-          fi
-
-          SHOULD_BUILD_MUSIC=false
-          if [[ "$NEW_MUSIC_VERSION" != "${{ steps.last_build.outputs.last_built_music }}" && "$NEW_MUSIC_VERSION" != "0" ]]; then
-            SHOULD_BUILD_MUSIC=true
-          fi
-          
-          if [[ "$SHOULD_BUILD_YT" == "true" || "$SHOULD_BUILD_MUSIC" == "true" ]]; then
-            echo "should_build_any=true" >> $GITHUB_OUTPUT
-          else
-            echo "should_build_any=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Exit if no updates
-        if: steps.check_updates.outputs.should_build_any != 'true'
-        run: echo "Nenhuma atualização de versão detectada. Finalizando."
 
       - name: Build Apps
-        if: steps.check_updates.outputs.should_build_any == 'true'
-        run: ./build.sh config.json
+        run: |
+          # Gera o config.json com as versões mais recentes e então constrói
+          UPDATE_CFG=$(./build.sh config.toml --config-update)
+          echo "$UPDATE_CFG" > config.json
+          ./build.sh config.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           NEXT_VER_CODE: ${{ steps.last_build.outputs.next_ver_code }}
-
-      - name: Prepare Release Content
-        if: steps.check_updates.outputs.should_build_any == 'true'
-        id: release_content
+          
+      - name: Prepare Release and Telegram Content
+        id: content
         run: |
-          # Captura o changelog gerado pelo build script
-          CHANGELOG=$(cat build.md)
-          # Adiciona as versões dos apps para o corpo da release
-          YT_VERSION=$(ls build/youtube-revanced-v*.apk 2>/dev/null | grep -oP 'v\K[0-9.]+' | head -1 || echo "${{ steps.last_build.outputs.last_built_yt }}")
-          MUSIC_VERSION=$(ls build/music-revanced-v*.apk 2>/dev/null | grep -oP 'v\K[0-9.]+' | head -1 || echo "${{ steps.last_build.outputs.last_built_music }}")
-          
-          BODY=$(cat <<EOF
-          YouTube: \`${YT_VERSION}\`
-          Music: \`${MUSIC_VERSION}\`
-
-          ---
-          ### Changelog
-          ${CHANGELOG}
-          EOF
-          )
-          
-          # Passa o corpo e o changelog para os próximos passos
-          echo "body<<EOF" >> $GITHUB_OUTPUT
-          echo "$BODY" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          
-          echo "changelog<<EOF" >> $GITHUB_OUTPUT
-          echo "$CHANGELOG" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
+          DELIM="$(openssl rand -hex 8)"
+          echo "changelog<<${DELIM}" >> "$GITHUB_OUTPUT"
+          cat build.md >> "$GITHUB_OUTPUT"
+          echo "${DELIM}" >> "$GITHUB_OUTPUT"
 
       - name: Send Telegram Notification
-        if: success() && steps.check_updates.outputs.should_build_any == 'true'
         id: telegram
+        if: success()
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         run: |
+          # (Lógica de notificação do Telegram que já tínhamos)
           cd build || { echo "Pasta 'build' não encontrada"; exit 1; }
           
           NL=$'\n'
@@ -151,15 +85,13 @@ jobs:
             fi
           done
           
-          BODY="${{ steps.release_content.outputs.changelog }}"
-          # Formata o changelog para o Telegram
+          BODY="${{ steps.content.outputs.changelog }}"
           FORMATTED_BODY=$(echo "$BODY" | sed 's/^\* \*\*/↪ \*\*/g; s/^\* `/↪ \*\*/g; s/`/\*/g; s/^\* /\↪/g; s/\*\*/\*/g; s/###//g; s/^- /↪ /g; /^==/d;')
           
           MSG="*Build #${TAG} disponível!*${NL}${NL}${FORMATTED_BODY}${NL}${NL}*▼ Downloads*${NL}"
           if [[ -n "$MODULES" ]]; then MSG+="*Módulos:*${MODULES}${NL}"; fi
           if [[ -n "$APKS" ]]; then MSG+="*APKs:*${APKS}${NL}"; fi
           
-          # Envia a mensagem e captura o ID
           RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
             --data-urlencode "chat_id=${TG_CHAT_ID}" \
             --data-urlencode "text=${MSG}" \
@@ -169,42 +101,31 @@ jobs:
           MSG_ID=$(echo "$RESPONSE" | grep -oP '"message_id":\K[0-9]+' || echo "")
           [ -n "$MSG_ID" ] && echo "msg_id=$MSG_ID" >> $GITHUB_OUTPUT
 
-          # Apaga a mensagem anterior
           LAST_MSG_ID="${{ steps.last_build.outputs.last_msg_id }}"
           if [[ -n "$LAST_MSG_ID" ]]; then
-            curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/deleteMessage" \
-              -d "chat_id=${TG_CHAT_ID}" \
-              -d "message_id=${LAST_MSG_ID}" >/dev/null 2>&1 || true
+            curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/deleteMessage" -d "chat_id=${TG_CHAT_ID}" -d "message_id=${LAST_MSG_ID}" >/dev/null 2>&1 || true
           fi
 
       - name: Create Release and Upload Artifacts
-        if: success() && steps.check_updates.outputs.should_build_any == 'true'
+        if: success()
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ steps.last_build.outputs.next_ver_code }}
           release_name: "Build #${{ steps.last_build.outputs.next_ver_code }}"
           body: |
-            ${{ steps.release_content.outputs.body }}
+            ${{ steps.content.outputs.changelog }}
 
             ---
             TG_MSG_ID: ${{ steps.telegram.outputs.msg_id }}
           file: ./build/*
           file_glob: true
           overwrite: true
-
+      
       - name: Update Magisk JSON Branch
-        if: success() && steps.check_updates.outputs.should_build_any == 'true'
+        if: success()
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          
-          git fetch origin update || true
-          git checkout -B update origin/update || git checkout -b update
-          
-          # Copia o changelog para a nova branch
-          cp -f build.md build.md
-          
+          # (Lógica para atualizar a branch `update` que já tínhamos)
           get_update_json() {
             echo "{
             \"version\": \"$1\",
@@ -226,19 +147,17 @@ jobs:
             get_update_json "$VER" "$DLURL" >"../$UPDATE_JSON"
           done
           cd ..
+          cp -f build.md build.md # Copia o changelog para ser commitado
           
-          find . -maxdepth 1 -name "*-update.json" -print0 | xargs -0 git add
-          git add build.md
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        if: success()
+        with:
+          branch: update
+          file_pattern: build.md *-update.json
+          commit_message: "chore: Bump to build #${{ steps.last_build.outputs.next_ver_code }}"
           
-          if ! git diff --staged --quiet; then
-            git commit -m "Bump to build #${{ steps.last_build.outputs.next_ver_code }}"
-            git push --force origin update
-          else
-            echo "Nenhuma mudança nos arquivos de atualização."
-          fi
-
       - name: Clean old releases
-        if: always() && steps.check_updates.outputs.should_build_any == 'true'
+        if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -247,7 +166,7 @@ jobs:
           xargs -r -I {} gh release delete {} --repo ${{ github.repository }} --yes --cleanup-tag
 
       - name: Notify on Failure
-        if: failure() && steps.check_updates.outputs.should_build_any == 'true'
+        if: failure()
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
