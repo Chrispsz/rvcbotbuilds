@@ -19,28 +19,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # Faz o checkout da branch 'update' para verificar o último build.md
           ref: 'update'
           fetch-depth: 1
-        # Continua mesmo se a branch 'update' não existir
         continue-on-error: true
 
       - name: Checkout main branch for build script
         uses: actions/checkout@v4
         with:
-          path: 'main' # Coloca o código da branch principal em um subdiretório
+          path: 'main'
           submodules: true
 
       - name: Decide if a new build is needed
         id: should_build
         run: |
-          # Se o checkout da branch 'update' falhou, é a primeira vez, então precisa construir.
           if [[ ! -f "build.md" ]]; then
             echo "Branch 'update' ou 'build.md' não encontrado. Primeira execução, build necessário."
             echo "should_build=true" >> $GITHUB_OUTPUT
           else
             echo "Verificando atualizações usando o script de build..."
-            # O script de build está no subdiretório 'main'
             UPDATE_CFG=$(cd main && ./build.sh config.toml --config-update)
             
             if [[ -n "$UPDATE_CFG" ]]; then
@@ -53,7 +49,7 @@ jobs:
           fi
 
       - name: Clean older workflow runs
-        if: always() # Roda mesmo se os passos anteriores falharem
+        if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -62,9 +58,13 @@ jobs:
   build:
     name: Build, Release and Notify
     needs: check
-    # Condição crucial: só roda se o job 'check' disser que sim
     if: needs.check.outputs.should_build == 'true'
-    # Chama o workflow reutilizável
+    
+    # --- CORREÇÃO AQUI ---
+    # Adicionamos este bloco para conceder as permissões necessárias ao workflow filho.
+    permissions:
+      contents: write # Essencial para criar releases e fazer commit na branch 'update'.
+      actions: read   # Corresponde ao que o build.yml pede.
+
     uses: ./.github/workflows/build.yml
-    # Passa todos os segredos para o workflow filho
     secrets: inherit
