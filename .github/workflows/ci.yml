@@ -25,22 +25,22 @@ jobs:
       - name: Decide if a new build is needed
         id: should_build
         run: |
+          # Tenta buscar a branch 'update' para comparação. Falhar aqui não é um problema.
           git fetch origin update:update --depth=1 || true
           
+          # Verifica se o arquivo build.md existe na branch 'update'.
+          # Se não existir, é a primeira execução.
           if ! git cat-file -e update:build.md 2>/dev/null; then
-            echo "Branch 'update' or 'build.md' not found. This is the first run. Build is necessary."
+            echo "Branch 'update' ou 'build.md' não encontrado. Primeira execução, build necessário."
             echo "should_build=true" >> $GITHUB_OUTPUT
           else
-            echo "Previous build.md found. Comparing for updates..."
+            echo "Arquivo build.md anterior encontrado. Comparando para atualizações..."
             
-            # --- CORREÇÃO AQUI ---
-            # Extract the old build.md from the update branch and create the file
+            # Extrai o build.md anterior para o disco para que o script de build possa lê-lo.
             git show update:build.md > build.md
             
-            # Now, the physical file 'build.md' exists in the root directory.
-            # We can proceed with the check.
-            cd revanced-builder
-            UPDATE_CFG=$(./build.sh ../config.toml --config-update)
+            # Executa o script de build (que está na raiz) para verificar se há atualizações.
+            UPDATE_CFG=$(./build.sh config.toml --config-update)
             
             if [[ -n "$UPDATE_CFG" ]]; then
               echo "Novas versões encontradas. Build necessário."
@@ -53,7 +53,7 @@ jobs:
 
       - name: Clean older workflow runs
         if: always()
-        continue-on-error: true
+        continue-on-error: true # Continua mesmo que a limpeza falhe
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
