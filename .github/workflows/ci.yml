@@ -10,8 +10,6 @@ jobs:
     name: Check for updates
     runs-on: ubuntu-latest
     permissions:
-      # We only need read here, since we are not writing anything in this job anymore.
-      # The write permission for actions is still needed for cleaning up old runs.
       contents: read
       actions: write
 
@@ -19,7 +17,7 @@ jobs:
       should_build: ${{ steps.should_build.outputs.should_build }}
 
     steps:
-      - name: Checkout main branch (for build script)
+      - name: Checkout main branch
         uses: actions/checkout@v4
         with:
           submodules: true
@@ -27,18 +25,22 @@ jobs:
       - name: Decide if a new build is needed
         id: should_build
         run: |
-          # Try to get the last build.md from the 'update' branch.
-          # The command will fail if the branch doesn't exist, which is fine.
           git fetch origin update:update --depth=1 || true
           
-          # Check if the build.md file exists locally after the fetch
           if ! git cat-file -e update:build.md 2>/dev/null; then
-            echo "Branch 'update' or 'build.md' not found. First execution, build necessary."
+            echo "Branch 'update' or 'build.md' not found. This is the first run. Build is necessary."
             echo "should_build=true" >> $GITHUB_OUTPUT
           else
-            echo "Verificando atualizações usando o script de build..."
-            # Now we can run the build script directly from the root directory
-            UPDATE_CFG=$(./build.sh config.toml --config-update)
+            echo "Previous build.md found. Comparing for updates..."
+            
+            # --- CORREÇÃO AQUI ---
+            # Extract the old build.md from the update branch and create the file
+            git show update:build.md > build.md
+            
+            # Now, the physical file 'build.md' exists in the root directory.
+            # We can proceed with the check.
+            cd revanced-builder
+            UPDATE_CFG=$(./build.sh ../config.toml --config-update)
             
             if [[ -n "$UPDATE_CFG" ]]; then
               echo "Novas versões encontradas. Build necessário."
@@ -51,7 +53,7 @@ jobs:
 
       - name: Clean older workflow runs
         if: always()
-        continue-on-error: true # Keep this in case of permission issues
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
