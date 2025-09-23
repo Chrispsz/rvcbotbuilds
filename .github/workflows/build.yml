@@ -1,6 +1,5 @@
 name: Reusable Build Workflow
 on:
-  # Define que este workflow aceita um input chamado 'build_config'
   workflow_call:
     inputs:
       build_config:
@@ -45,14 +44,9 @@ jobs:
 
       - name: Build Apps
         run: |
-          echo "Recebida a configuração de build do job 'check'."
-          # Usa o input para criar o config.json e depois executa o build.
-          # Não há mais verificação aqui, apenas a compilação.
           echo '${{ inputs.build_config }}' > config.json
-          
           echo "Conteúdo de config.json gerado:"
           cat config.json
-
           echo "Iniciando a compilação..."
           ./build.sh config.json
         env:
@@ -133,8 +127,13 @@ jobs:
             get_update_json "$VER" "$DLURL" >"../$UPDATE_JSON"
           done
           cd ..
-          cp -f build.md build.md
+          
+          # --- CORREÇÃO AQUI ---
+          # A linha 'cp -f build.md build.md' foi removida.
+          
+          # Adiciona o build.md (que já existe) e os novos JSONs ao stage do Git
           git add build.md ./*-update.json
+          
           if ! git diff --staged --quiet; then
             git commit -m "chore: Bump to build #${{ steps.last_build.outputs.next_ver_code }}"
             git push origin update --force
