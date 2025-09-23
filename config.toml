@@ -7,7 +7,9 @@ parallel-jobs = 1
 # you can use rvmm-config-gen to generate a config
 
 [YouTube]
+enabled = true
 build-mode = "both"
+arch = "arm64-v8a" # <--- ALTERAÇÃO AQUI
 excluded-patches = ""
 included-patches = ""
 version = "auto"
@@ -16,13 +18,15 @@ uptodown-dlurl = "https://youtube.en.uptodown.com/android"
 archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.youtube"
 
 [Music]
+enabled = true
 build-mode = "both"
-arch = "both"
+arch = "arm64-v8a" # <--- ALTERAÇÃO AQUI
 apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"
 uptodown-dlurl = "https://youtube-music.en.uptodown.com/android"
 archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.apps.youtube.music"
 
 [GooglePhotos]
+enabled = false # <--- ALTERAÇÃO AQUI
 build-mode = "both"
 arch = "both"
 version = "auto"
