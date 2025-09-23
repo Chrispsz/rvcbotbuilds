@@ -1,8 +1,4 @@
-# build.yml: O Trabalhador
-# Responsabilidade: Compilar os apps, criar a release, enviar notificação
-# para o Telegram e limpar artefatos antigos.
-
-name: Workflow de Build Reutilizável
+name: Reusable Build Workflow
 on:
   workflow_call:
     inputs:
@@ -38,7 +34,6 @@ jobs:
         run: |
           LAST_TAG=$(gh release list -L 1 | awk -F '\t' '{print $3}' | grep -oP '[0-9]+' || echo "0")
           NEXT_VER_CODE=$((LAST_TAG + 1))
-          # Pega o ID da mensagem do Telegram da release anterior para poder apagá-la
           LAST_MSG_ID=""
           if [[ "$LAST_TAG" != "0" ]]; then
             BODY=$(gh release view "$LAST_TAG" --json body -q '.body' || echo "")
@@ -49,7 +44,6 @@ jobs:
 
       - name: Compilar Apps
         run: |
-          echo "Recebida a configuração de build do job 'check'."
           echo '${{ inputs.build_config }}' > config.json
           echo "Conteúdo de config.json gerado:"
           cat config.json
@@ -93,33 +87,31 @@ jobs:
           RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" --data-urlencode "chat_id=${TG_CHAT_ID}" --data-urlencode "text=${MSG}" --data-urlencode "parse_mode=Markdown" --data-urlencode "disable_web_page_preview=true")
           MSG_ID=$(echo "$RESPONSE" | grep -oP '"message_id":\K[0-9]+' || echo "")
           [ -n "$MSG_ID" ] && echo "msg_id=$MSG_ID" >> $GITHUB_OUTPUT
-          
-          # =============================================================
-          # PONTO CHAVE: APAGAR A MENSAGEM ANTERIOR DO TELEGRAM
-          # Se encontramos um ID de mensagem na release anterior,
-          # enviamos um comando para a API do Telegram para apagá-la.
-          # =============================================================
           LAST_MSG_ID="${{ steps.last_build.outputs.last_msg_id }}"
           if [[ -n "$LAST_MSG_ID" ]]; then
-            echo "Apagando mensagem anterior do Telegram (ID: $LAST_MSG_ID)..."
             curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/deleteMessage" -d "chat_id=${TG_CHAT_ID}" -d "message_id=${LAST_MSG_ID}" >/dev/null 2>&1 || true
           fi
 
-      - name: Criar Release e Enviar Artefatos
+      - name: Criar Pre-Release e Enviar Artefatos
         if: success()
-        uses: svenstaro/upload-release-action@v2
+        uses: softprops/action-gh-release@v1
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ steps.last_build.outputs.next_ver_code }}
-          release_name: "Build #${{ steps.last_build.outputs.next_ver_code }}"
+          # Define que esta é uma pre-release
+          prerelease: true
+          # Nome da tag, ex: 21
+          tag_name: ${{ steps.last_build.outputs.next_ver_code }}
+          # Título da release, ex: "Build #21"
+          name: "Build #${{ steps.last_build.outputs.next_ver_code }}"
+          # Corpo da release (changelog + ID da mensagem do Telegram)
           body: |
             ${{ steps.content.outputs.changelog }}
 
             ---
             TG_MSG_ID: ${{ steps.telegram.outputs.msg_id }}
-          file: ./build/*
-          file_glob: true
-          overwrite: true
+          # Arquivos a serem enviados (todos os .apk e .zip da pasta 'build')
+          files: |
+            ./build/*.apk
+            ./build/*.zip
       
       - name: Atualizar Branch de JSON do Magisk
         if: success()
@@ -153,11 +145,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # =============================================================
-          # PONTO CHAVE: APAGAR BUILDS ANTERIORES NO GITHUB
-          # Este comando lista todas as releases, pula as 5 mais recentes
-          # e apaga todas as outras mais antigas.
-          # =============================================================
           echo "Limpando releases antigas, mantendo as 5 mais recentes..."
           gh release list --repo ${{ github.repository }} --limit 100 --json tagName | \
           jq -r '.[5:].[].tagName' | \
