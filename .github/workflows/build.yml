@@ -30,7 +30,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if git checkout origin/update build.md; then
+          if git checkout origin/main build.md; then
             UPDATE_CFG=$(./build.sh config.toml --config-update)
             if [ "$UPDATE_CFG" ]; then
               echo "$UPDATE_CFG" > config.json
@@ -79,14 +79,14 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -f update || git switch --discard-changes --orphan update
+          git checkout -f main || git switch --discard-changes --orphan main
           cp -f build.tmp build.md
           get_update_json() {
             echo "{
             \"version\": \"$1\",
             \"versionCode\": ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }},
             \"zipUrl\": \"$2\",
-            \"changelog\": \"https://raw.githubusercontent.com/$GITHUB_REPOSITORY/update/build.md\"
+            \"changelog\": \"https://raw.githubusercontent.com/$GITHUB_REPOSITORY/main/build.md\"
           }"
           }
 
@@ -107,7 +107,7 @@ jobs:
 
       - uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          branch: update
+          branch: main
           skip_checkout: true
           file_pattern: build.md *-update.json
           commit_message: "🚀 Build #${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}"
