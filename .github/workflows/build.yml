@@ -29,7 +29,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: temp
-          key: revanced-${{ runner.os }}-v3
+          key: revanced-${{ runner.os }}-v4
 
       - name: Get next version code
         id: next_ver_code
