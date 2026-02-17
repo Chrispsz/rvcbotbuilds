@@ -29,7 +29,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: temp
-          key: revanced-${{ runner.os }}
+          key: revanced-${{ runner.os }}-v2
           restore-keys: revanced-
 
       - name: Update config
