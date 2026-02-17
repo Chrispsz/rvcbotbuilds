@@ -110,7 +110,7 @@ jobs:
           branch: main
           skip_checkout: true
           file_pattern: build.md *-update.json
-          commit_message: "🚀 Build #${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}"
+          commit_message: "Build #${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}"
 
       - name: Notificar Telegram
         env:
@@ -137,39 +137,18 @@ jobs:
           MODULES=${MODULES#"$NL"}
           APKS=${APKS#"$NL"}
 
-          # Processar changelog
-          BODY="$(sed -E '
-            s/^\* \*\*/↪ /g
-            s/^\* `/↪ /g
-            s/`/\*/g
-            s/\*\*/\*/g
-            s/###//g
-            s/^- /↪ /g
-            /^==/d
-            s/YouTube:/📺 YouTube:/g
-            s/Music:/🎵 Music:/g
-            s/Patches:/🔧 Patches:/g
-            s/CLI:/⚙️ CLI:/g
-            s/Changelog/📝 Changelog/g
-          ' ../build.md)"
+          BODY="$(sed -E 's/^\* \*\*/- /g; s/^\* `/- /g; s/`/*/g; s/\*\*/*/g; s/###//g; s/^- /- /g; /^==/d; s/YouTube:/YouTube:/g; s/Music:/Music:/g; s/Patches:/Patches:/g; s/CLI:/CLI:/g; s/Changelog/Changelog/g' ../build.md)"
 
-          MSG="🚀 *Nova Build Disponível\\!*
-━━━━━━━━━━━━━━━━━
-🔖 *Versão:* \`${BUILD_NUM}\`
-📅 *Data:* $(date '+%d/%m/%Y %H:%M')
+          MSG="*Nova Build Disponivel\\!*
+          Versao: ${BUILD_NUM}
+          Data: $(date '+%d/%m/%Y %H:%M')
 
-${BODY}
+          ${BODY}
 
-━━━━━━━━━━━━━━━━━
-⬇️ *Downloads:*
-${MODULES}
+          Downloads:
+          ${MODULES}
+          ${APKS}"
 
-${APKS}
-
-━━━━━━━━━━━━━━━━━
-💡 *Dica:* Use \`!youtube\` no bot para ver releases antigas."
-
-          echo "'$MSG'"
           MSG=${MSG:0:4000}
           POST="https://api.telegram.org/bot${TG_TOKEN}/sendMessage"
           curl -X POST \
