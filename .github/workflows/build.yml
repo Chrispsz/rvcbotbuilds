@@ -29,8 +29,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: temp
-          key: revanced-${{ runner.os }}-v2
-          restore-keys: revanced-
+          key: revanced-${{ runner.os }}-v3
 
       - name: Update config
         if: ${{ inputs.from_ci }}
