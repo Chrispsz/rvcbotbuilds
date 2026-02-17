@@ -1,60 +1,55 @@
-# Config
+# Configuração
 
-Adding another revanced app is as easy as this:
-```toml
-[Some-App]
-apkmirror-dlurl = "https://www.apkmirror.com/apk/inc/app"
-# or uptodown-dlurl = "https://app.en.uptodown.com/android"
-```
+Este projeto é focado em **YouTube** e **YouTube Music** para arquitetura **ARM64-v8a**.
 
-## More about other options:
+## Configuração Básica
 
-There exists an example below with all defaults shown and all the keys explicitly set.  
-**All keys are optional** (except download urls) and are assigned to their default values if not set explicitly.  
+O arquivo `config.toml` já vem configurado para build automático:
 
 ```toml
-parallel-jobs = 1                    # amount of cores to use for parallel patching, if not set $(nproc) is used
-compression-level = 9                # module zip compression level
-remove-rv-integrations-checks = true # remove checks from the revanced integrations
+enable-magisk-update = true
+parallel-jobs = 1
+compression-level = 9
 
-patches-source = "revanced/revanced-patches" # where to fetch patches bundle from. default: "revanced/revanced-patches"
-cli-source = "j-hc/revanced-cli"             # where to fetch cli from. default: "j-hc/revanced-cli"
-# options like cli-source can also set per app
-rv-brand = "ReVanced Extended" # rebrand from 'ReVanced' to something different. default: "ReVanced"
+[YouTube]
+enabled = true
+build-mode = "both"      # "apk", "module" ou "both"
+arch = "arm64-v8a"       # Apenas ARM64 é suportado
+version = "auto"         # "auto", "latest", "beta", ou versão específica
+apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"
+uptodown-dlurl = "https://youtube.en.uptodown.com/android"
 
-patches-version = "v2.160.0" # 'latest', 'dev', or a version number. default: "latest"
-cli-version = "v5.0.0"       # 'latest', 'dev', or a version number. default: "latest"
-
-[Some-App]
-app-name = "SomeApp" # if set, release name becomes SomeApp instead of Some-App. default is same as table name, which is 'Some-App' here.
-enabled = true       # whether to build the app. default: true
-build-mode = "apk"   # 'both', 'apk' or 'module'. default: apk
-
-# 'auto' option gets the latest possible version supported by all the included patches
-# 'latest' gets the latest stable without checking patches support. 'beta' gets the latest beta/alpha
-# whitespace seperated list of patches to exclude. default: ""
-version = "auto"     # 'auto', 'latest', 'beta' or a version number (e.g. '17.40.41'). default: auto
-
-# optional args to be passed to cli. can be used to set patch options
-# multiline strings in the config is supported
-patcher-args = """\
-  -OdarkThemeBackgroundColor=#FF0F0F0F \
-  -Oanother-option=value \
-  """
-
-excluded-patches = """\
-  'Some Patch' \
-  'Some Other Patch' \
-  """
-
-included-patches = "'Some Patch'"                          # whitespace seperated list of non-default patches to include. default: ""
-include-stock = true                                       # includes stock apk in the module. default: true
-exclusive-patches = false                                  # exclude all patches by default. default: false
-apkmirror-dlurl = "https://www.apkmirror.com/apk/inc/app"
-uptodown-dlurl = "https://spotify.en.uptodown.com/android"
-module-prop-name = "some-app-magisk"                       # magisk module prop name.
-apkmirror-dpi = "360-480dpi"                               # used to select apk variant from apkmirror. default: nodpi
-arch = "arm64-v8a"                                         # 'arm64-v8a', 'arm-v7a', 'all', 'both'. 'both' downloads both arm64-v8a and arm-v7a. default: all
-riplib = true                                              # enables ripping x86 and x86_64 libs from apks with j-hc revanced cli. default: true
-
+[Music]
+enabled = true
+build-mode = "both"
+arch = "arm64-v8a"
+version = "auto"
+apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"
+uptodown-dlurl = "https://youtube-music.en.uptodown.com/android"
 ```
+
+## Opções Disponíveis
+
+| Opção | Descrição | Padrão |
+|-------|-----------|--------|
+| `enabled` | Habilitar/desabilitar build | `true` |
+| `build-mode` | Tipo de build: `apk`, `module`, `both` | `both` |
+| `arch` | Arquitetura (apenas `arm64-v8a`) | `arm64-v8a` |
+| `version` | Versão: `auto`, `latest`, `beta`, ou específica | `auto` |
+| `excluded-patches` | Patches para excluir | `""` |
+| `included-patches` | Patches para incluir | `""` |
+
+## Exemplo: Excluir Patches
+
+```toml
+[YouTube]
+enabled = true
+build-mode = "both"
+excluded-patches = "'Some Patch' 'Another Patch'"
+```
+
+## Notas
+
+- Apenas **ARM64-v8a** é suportado neste fork
+- Use `version = "auto"` para obter a versão mais recente compatível com os patches
+- Os builds são gerados na pasta `build/`

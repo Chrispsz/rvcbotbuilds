@@ -1,50 +1,80 @@
-# ReVanced Magisk Module
-[![Telegram](https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/rvc_magisk)
-[![CI](https://github.com/j-hc/revanced-magisk-module/actions/workflows/ci.yml/badge.svg?event=schedule)](https://github.com/j-hc/revanced-magisk-module/actions/workflows/ci.yml)
+# RVCBotBuilds
 
-Extensive ReVanced builder  
+[![CI](https://github.com/Chrispsz/rvcbotbuilds/actions/workflows/ci.yml/badge.svg?event=schedule)](https://github.com/Chrispsz/rvcbotbuilds/actions/workflows/ci.yml)
 
-Get the [latest CI release](https://github.com/j-hc/revanced-magisk-module/releases).
+**ReVanced Magisk Module Builder** - Focado em YouTube e YouTube Music (ARM64-v8a)
 
-Use [**zygisk-detach**](https://github.com/j-hc/zygisk-detach) to detach YouTube and YT Music from Play Store if you are using magisk modules. 
+## 📥 Downloads
 
-<details><summary><big>Features</big></summary>
-<ul>
- <li>Support all present and future ReVanced and <a href="https://github.com/inotia00/revanced-patches">ReVanced Extended</a> apps</li>
- <li> Can build Magisk modules and non-root APKs</li>
- <li> Updated daily with the latest versions of apps and patches</li>
- <li> Optimize APKs and modules for size</li>
- <li> Modules</li>
-    <ul>
-     <li> recompile invalidated odex for faster usage</li>
-     <li> receive updates from Magisk app</li>
-     <li> do not break safetynet or trigger root detections</li>
-     <li> handle installation of the correct version of the stock app and all that</li>
-     <li> support Magisk and KernelSU</li>
-    </ul>
-</ul>
-Note that the <a href="../../actions/workflows/ci.yml">CI workflow</a> is scheduled to build the modules and APKs everyday using GitHub Actions if there is a change in ReVanced patches. You may want to disable it.
-</details>
+Baixe os módulos e APKs mais recentes nas [Releases](https://github.com/Chrispsz/rvcbotbuilds/releases).
 
-## To include/exclude patches or patch other apps
+## ✨ Recursos
 
- * Star the repo :eyes:
- * Use the repo as a [template](https://github.com/new?template_name=revanced-magisk-module&template_owner=j-hc)
- * Customize [`config.toml`](./config.toml) using [rvmm-config-gen](https://j-hc.github.io/rvmm-config-gen/)
- * Run the build [workflow](../../actions/workflows/build.yml)
- * Grab your modules and APKs from [releases](../../releases)
+- ✅ **YouTube** - Módulo Magisk + APK Non-Root
+- ✅ **YouTube Music** - Módulo Magisk + APK Non-Root
+- 🚀 Focado exclusivamente em **ARM64-v8a** (dispositivos modernos)
+- 📦 Atualizações automáticas via GitHub Actions
+- 🔧 Suporte a Magisk e KernelSU
 
-also see here [`CONFIG.md`](./CONFIG.md)
+## 📱 Instalação
 
-## Building Locally
-### On Termux
-```console
-bash <(curl -sSf https://raw.githubusercontent.com/j-hc/revanced-magisk-module/main/build-termux.sh)
+### Para usuários de Magisk/KernelSU (Root):
+1. Baixe o módulo `.zip` da [última release](https://github.com/Chrispsz/rvcbotbuilds/releases)
+2. Instale via Magisk/KernelSU Manager
+3. Reinicie o dispositivo
+
+### Para usuários Non-Root:
+1. Baixe o APK da [última release](https://github.com/Chrispsz/rvcbotbuilds/releases)
+2. Instale o [MicroG](https://github.com/ReVanced/GmsCore/releases) primeiro
+3. Instale o APK do ReVanced
+
+## 🔨 Build Local
+
+### No Termux:
+```bash
+bash <(curl -sSf https://raw.githubusercontent.com/Chrispsz/rvcbotbuilds/main/build-termux.sh)
 ```
 
-### On Desktop
-```console
-$ git clone https://github.com/j-hc/revanced-magisk-module
-$ cd revanced-magisk-module
-$ ./build.sh
+### No Desktop:
+```bash
+git clone https://github.com/Chrispsz/rvcbotbuilds
+cd rvcbotbuilds
+./build.sh
 ```
+
+## ⚙️ Configuração
+
+Edite o arquivo `config.toml` para personalizar os builds:
+
+```toml
+[YouTube]
+enabled = true
+build-mode = "both"  # "apk", "module" ou "both"
+version = "auto"     # "auto", "latest", ou versão específica
+
+[Music]
+enabled = true
+build-mode = "both"
+version = "auto"
+```
+
+## 📋 Requisitos para Build
+
+- Java 17+
+- jq
+- zip
+- curl
+
+## 🔗 Links Úteis
+
+- [MicroG](https://github.com/ReVanced/GmsCore/releases) - Necessário para APKs non-root
+- [zygisk-detach](https://github.com/j-hc/zygisk-detach) - Desanexar do Play Store
+- [ReVanced Patches](https://github.com/ReVanced/revanced-patches)
+
+## 📄 Licença
+
+Este projeto é baseado no [revanced-magisk-module](https://github.com/j-hc/revanced-magisk-module) de j-hc.
+
+---
+
+**Made with ❤️ by [Chrispsz](https://github.com/Chrispsz)**
