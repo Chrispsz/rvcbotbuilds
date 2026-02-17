@@ -4,7 +4,7 @@
 # ============================================
 
 enable-magisk-update = true
-parallel-jobs = 2
+parallel-jobs = 1
 compression-level = 6
 
 # ============================================
