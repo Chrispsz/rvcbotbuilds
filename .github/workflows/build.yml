@@ -31,18 +31,6 @@ jobs:
           path: temp
           key: revanced-${{ runner.os }}-v3
 
-      - name: Update config
-        if: ${{ inputs.from_ci }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if git checkout origin/main build.md; then
-            UPDATE_CFG=$(./build.sh config.toml --config-update)
-            if [ "$UPDATE_CFG" ]; then
-              echo "$UPDATE_CFG" > config.json
-            fi
-          fi
-
       - name: Get next version code
         id: next_ver_code
         env:
@@ -52,26 +40,17 @@ jobs:
           if [ -z "$TAG" ]; then TAG=0; fi
           echo "NEXT_VER_CODE=$((TAG + 1))" >> $GITHUB_OUTPUT
 
-      - name: Build modules/APKs
-        run: if [ -f "config.json" ]; then ./build.sh config.json; else ./build.sh config.toml; fi
+      - name: Build APKs
+        run: ./build.sh config.toml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           NEXT_VER_CODE: ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}
+          JAVA_OPTS: "-Xmx4g -XX:+UseG1GC"
 
-      - name: Get output
-        id: get_output
-        run: |
-          DELIM="$(openssl rand -hex 8)"
-          echo "BUILD_LOG<<${DELIM}" >> "$GITHUB_OUTPUT"
-          cat build.md >> "$GITHUB_OUTPUT"
-          echo "${DELIM}" >> "$GITHUB_OUTPUT"
-          cp -f build.md build.tmp
-
-      - name: Upload modules to release
+      - name: Upload to release
         uses: svenstaro/upload-release-action@v2
         with:
-          body: ${{ steps.get_output.outputs.BUILD_LOG }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: ./build/*
           release_name: RVCBotBuilds v${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}
@@ -79,42 +58,6 @@ jobs:
           file_glob: true
           overwrite: true
           prerelease: false
-
-      - name: Update changelog and Magisk update json
-        id: update_config
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -f main || git switch --discard-changes --orphan main
-          cp -f build.tmp build.md
-          get_update_json() {
-            echo "{
-            \"version\": \"$1\",
-            \"versionCode\": ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }},
-            \"zipUrl\": \"$2\",
-            \"changelog\": \"https://raw.githubusercontent.com/$GITHUB_REPOSITORY/main/build.md\"
-          }"
-          }
-          cd build || { echo "build folder not found"; exit 1; }
-          for OUTPUT in *magisk*.zip; do
-            [ "$OUTPUT" = "*magisk*.zip" ] && continue
-            ZIP_S=$(unzip -p "$OUTPUT" module.prop)
-            if ! UPDATE_JSON=$(echo "$ZIP_S" | grep updateJson); then continue; fi
-            UPDATE_JSON="${UPDATE_JSON##*/}"
-            VER=$(echo "$ZIP_S" | grep version=)
-            VER="${VER##*=}"
-            DLURL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}/${OUTPUT}"
-            get_update_json "$VER" "$DLURL" >"../$UPDATE_JSON"
-          done
-          cd ..
-          find . -name "*-update.json" | grep . || : >dummy-update.json
-
-      - uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          branch: main
-          skip_checkout: true
-          file_pattern: build.md *-update.json
-          commit_message: "Build #${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}"
 
       - name: Notificar Telegram
         env:
@@ -125,24 +68,12 @@ jobs:
           cd build || exit 1
           TG_CHAT="${{ secrets.TG_CHAT_ID }}"
           BUILD_NUM="${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}"
-          NL=$'\n'
-          APKS=""
-          MODULES=""
-          for OUTPUT in *; do
-            DL_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/${BUILD_NUM}/${OUTPUT}"
-            SIZE=$(du -h "$OUTPUT" 2>/dev/null | cut -f1)
-            if [[ $OUTPUT = *.apk ]]; then
-              APKS+="${NL}📱 [${OUTPUT}](${DL_URL}) _(${SIZE})_"
-            elif [[ $OUTPUT = *.zip ]]; then
-              MODULES+="${NL}📦 [${OUTPUT}](${DL_URL}) _(${SIZE})_"
-            fi
-          done
           MSG="*Nova Build\\!*
           Versao: ${BUILD_NUM}
+          Data: $(date '+%d/%m/%Y %H:%M')
+          
           Downloads:
-          ${MODULES}
-          ${APKS}"
-          MSG=${MSG:0:4000}
+          https://github.com/${{ github.repository }}/releases/tag/${BUILD_NUM}"
           curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
             -d "parse_mode=MarkdownV2" \
             -d "disable_web_page_preview=true" \
