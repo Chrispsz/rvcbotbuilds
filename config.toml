@@ -4,11 +4,11 @@
 # ============================================
 
 enable-magisk-update = true
-parallel-jobs = 1
-compression-level = 9
+parallel-jobs = 2
+compression-level = 6
 
 # ============================================
-# 📺 YouTube - Módulo Magisk + APK Non-Root
+# YouTube - Módulo Magisk + APK Non-Root
 # Fonte: Uptodown
 # ============================================
 [YouTube]
@@ -19,7 +19,7 @@ version = "auto"
 uptodown-dlurl = "https://youtube.en.uptodown.com/android"
 
 # ============================================
-# 🎵 YouTube Music - Módulo Magisk + APK Non-Root
+# YouTube Music - Módulo Magisk + APK Non-Root
 # Fonte: Uptodown
 # ============================================
 [Music]

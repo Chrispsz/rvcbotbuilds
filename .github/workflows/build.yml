@@ -25,6 +25,13 @@ jobs:
           fetch-depth: 0
           submodules: true
 
+      - name: Cache prebuilts
+        uses: actions/cache@v4
+        with:
+          path: temp
+          key: revanced-${{ runner.os }}
+          restore-keys: revanced-
+
       - name: Update config
         if: ${{ inputs.from_ci }}
         env:
@@ -89,7 +96,6 @@ jobs:
             \"changelog\": \"https://raw.githubusercontent.com/$GITHUB_REPOSITORY/main/build.md\"
           }"
           }
-
           cd build || { echo "build folder not found"; exit 1; }
           for OUTPUT in *magisk*.zip; do
             [ "$OUTPUT" = "*magisk*.zip" ] && continue
@@ -102,7 +108,6 @@ jobs:
             get_update_json "$VER" "$DLURL" >"../$UPDATE_JSON"
           done
           cd ..
-
           find . -name "*-update.json" | grep . || : >dummy-update.json
 
       - uses: stefanzweifel/git-auto-commit-action@v5
@@ -115,16 +120,15 @@ jobs:
       - name: Notificar Telegram
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
-        if: env.TG_TOKEN != null
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+        if: env.TG_TOKEN != null && env.TG_CHAT_ID != null
         run: |
-          cd build || { echo "build folder not found"; exit 1; }
-
+          cd build || exit 1
           TG_CHAT="${{ secrets.TG_CHAT_ID }}"
           BUILD_NUM="${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}"
           NL=$'\n'
           APKS=""
           MODULES=""
-          
           for OUTPUT in *; do
             DL_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/${BUILD_NUM}/${OUTPUT}"
             SIZE=$(du -h "$OUTPUT" 2>/dev/null | cut -f1)
@@ -134,26 +138,14 @@ jobs:
               MODULES+="${NL}📦 [${OUTPUT}](${DL_URL}) _(${SIZE})_"
             fi
           done
-          MODULES=${MODULES#"$NL"}
-          APKS=${APKS#"$NL"}
-
-          BODY="$(sed -E 's/^\* \*\*/- /g; s/^\* `/- /g; s/`/*/g; s/\*\*/*/g; s/###//g; s/^- /- /g; /^==/d; s/YouTube:/YouTube:/g; s/Music:/Music:/g; s/Patches:/Patches:/g; s/CLI:/CLI:/g; s/Changelog/Changelog/g' ../build.md)"
-
-          MSG="*Nova Build Disponivel\\!*
+          MSG="*Nova Build\\!*
           Versao: ${BUILD_NUM}
-          Data: $(date '+%d/%m/%Y %H:%M')
-
-          ${BODY}
-
           Downloads:
           ${MODULES}
           ${APKS}"
-
           MSG=${MSG:0:4000}
-          POST="https://api.telegram.org/bot${TG_TOKEN}/sendMessage"
-          curl -X POST \
-            --data-urlencode "parse_mode=MarkdownV2" \
-            --data-urlencode "disable_web_page_preview=true" \
+          curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            -d "parse_mode=MarkdownV2" \
+            -d "disable_web_page_preview=true" \
             --data-urlencode "text=${MSG}" \
-            --data-urlencode "chat_id=${TG_CHAT}" \
-            "$POST"
+            -d "chat_id=${TG_CHAT}"
