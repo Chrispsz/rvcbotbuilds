@@ -1,82 +1,50 @@
-# CI.yml: O Orquestrador
-# Responsabilidade: Verificar se há atualizações e, SOMENTE SE HOUVER,
-# chamar o workflow 'build.yml' para fazer o trabalho pesado.
-# Isso economiza tempo e recursos, cumprindo o requisito de "não compilar a mesma versão".
-
-name: Controlador de CI
+name: CI
 on:
-  schedule:
-    # Roda todo dia às 10:00 UTC
-    - cron: '0 10 * * *'
   workflow_dispatch:
+  schedule:
+    - cron: "0 16 * * *"
 
 jobs:
   check:
-    name: Verificar Atualizações
+    permissions: write-all
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      actions: write
-
-    outputs:
-      should_build: ${{ steps.should_build.outputs.should_build }}
-      build_config: ${{ steps.should_build.outputs.build_config }}
-
     steps:
-      - name: Checkout da branch principal
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: true
+          fetch-depth: 0
 
-      - name: Decidir se um novo build é necessário
+      - name: Should build?
         id: should_build
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git fetch origin update:update --depth=1 || true
-          
-          if ! git cat-file -e update:build.md 2>/dev/null; then
-            echo "Branch 'update' ou 'build.md' não encontrado. Primeira execução."
-            UPDATE_CFG=$(./build.sh config.toml --config-update)
-            echo "should_build=true" >> $GITHUB_OUTPUT
-            echo "build_config=$(echo $UPDATE_CFG | jq -c .)" >> $GITHUB_OUTPUT
+          if ! git checkout origin/update build.md; then
+            echo "first time building!"
+            echo "SHOULD_BUILD=1" >> $GITHUB_OUTPUT
           else
-            echo "Arquivo build.md anterior encontrado. Comparando para atualizações..."
-            git show update:build.md > build.md
-            
-            # ========================================================================
-            # PONTO CHAVE: NÃO COMPILAR A MESMA VERSÃO
-            # O script 'build.sh --config-update' compara o 'build.md' antigo com as
-            # versões mais recentes online. Se não houver nada novo, a variável
-            # $UPDATE_CFG ficará VAZIA.
-            # ========================================================================
             UPDATE_CFG=$(./build.sh config.toml --config-update)
-            
-            if [[ -n "$UPDATE_CFG" ]]; then
-              echo "Novas versões encontradas. Build necessário."
-              echo "should_build=true" >> $GITHUB_OUTPUT
-              echo "build_config=$(echo $UPDATE_CFG | jq -c .)" >> $GITHUB_OUTPUT
+            if [ "$UPDATE_CFG" ]; then
+              echo "'$UPDATE_CFG'"
+              echo "SHOULD_BUILD=1" >> $GITHUB_OUTPUT
             else
-              echo "Nenhuma nova versão encontrada. Pulando o build."
-              echo "should_build=false" >> $GITHUB_OUTPUT
-              echo "build_config={}" >> $GITHUB_OUTPUT
+              echo "SHOULD_BUILD=0" >> $GITHUB_OUTPUT
             fi
           fi
 
-      - name: Limpar execuções de workflows antigos
-        if: always()
-        continue-on-error: true
+      - name: Clear older runs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh run list -L 100 --json databaseId -q '.[].databaseId' | tail -n+11 | xargs -r -IID gh api "repos/$GITHUB_REPOSITORY/actions/runs/ID" -X DELETE || echo "Falha ao limpar runs antigos, continuando."
+          gh run list -L400 --json databaseId -q '.[].databaseId' | tail -n+10 | xargs -IID gh api "repos/$GITHUB_REPOSITORY/actions/runs/ID" -X DELETE || :
+
+    outputs:
+      SHOULD_BUILD: ${{ steps.should_build.outputs.SHOULD_BUILD }}
 
   build:
-    name: Compilar, Lançar e Notificar
+    permissions: write-all
     needs: check
-    if: needs.check.outputs.should_build == 'true'
-    permissions:
-      contents: write
-      actions: read
     uses: ./.github/workflows/build.yml
+    if: ${{ needs.check.outputs.SHOULD_BUILD == 1 }}
     secrets: inherit
-    with:
-      build_config: ${{ needs.check.outputs.build_config }}

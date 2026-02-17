@@ -1,126 +1,91 @@
-name: Reusable Build Workflow
+name: Build Modules
 on:
   workflow_call:
     inputs:
-      build_config:
-        required: true
-        type: string
+      from_ci:
+        type: boolean
+        required: false
+        default: true
 
-permissions:
-  contents: write
-  actions: read
+  workflow_dispatch:
 
 jobs:
-  build-and-release:
+  run:
+    permissions: write-all
     runs-on: ubuntu-latest
-    timeout-minutes: 45
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: true
-          fetch-depth: 0
-
-      - name: Configurar Java
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: "zulu"
           java-version: "17"
 
-      - name: Obter Informações da Última Build
-        id: last_build
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: true
+
+      - name: Update config
+        if: ${{ inputs.from_ci }}
+        run: |
+          if git checkout origin/update build.md; then
+            UPDATE_CFG=$(./build.sh config.toml --config-update)
+            if [ "$UPDATE_CFG" ]; then
+              echo "$UPDATE_CFG" > config.json
+            fi
+          fi
+
+      - name: Get next version code
+        id: next_ver_code
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          LAST_TAG=$(gh release list -L 1 | awk -F '\t' '{print $3}' | grep -oP '[0-9]+' || echo "0")
-          NEXT_VER_CODE=$((LAST_TAG + 1))
-          LAST_MSG_ID=""
-          if [[ "$LAST_TAG" != "0" ]]; then
-            BODY=$(gh release view "$LAST_TAG" --json body -q '.body' || echo "")
-            LAST_MSG_ID=$(echo "$BODY" | grep -oP 'TG_MSG_ID: \K[0-9]+' || echo "")
-          fi
-          echo "next_ver_code=$NEXT_VER_CODE" >> $GITHUB_OUTPUT
-          echo "last_msg_id=$LAST_MSG_ID" >> $GITHUB_OUTPUT
+          TAG=$(gh release list -L 1 | awk -F '\t' '{print $3}')
+          if [ -z "$TAG" ]; then TAG=0; fi
+          echo "NEXT_VER_CODE=$((TAG + 1))" >> $GITHUB_OUTPUT
 
-      - name: Compilar Apps
-        run: |
-          echo '${{ inputs.build_config }}' > config.json
-          echo "Conteúdo de config.json gerado:"
-          cat config.json
-          echo "Iniciando a compilação..."
-          ./build.sh config.json
+      - name: Build modules/APKs
+        run: if [ -f "config.json" ]; then ./build.sh config.json; else ./build.sh config.toml; fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          NEXT_VER_CODE: ${{ steps.last_build.outputs.next_ver_code }}
-          
-      - name: Preparar Conteúdo da Release e Notificação
-        id: content
+          GITHUB_REPOSITORY: $GITHUB_REPOSITORY
+          NEXT_VER_CODE: ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}
+
+      - name: Get output
+        id: get_output
         run: |
           DELIM="$(openssl rand -hex 8)"
-          echo "changelog<<${DELIM}" >> "$GITHUB_OUTPUT"
+          echo "BUILD_LOG<<${DELIM}" >> "$GITHUB_OUTPUT"
           cat build.md >> "$GITHUB_OUTPUT"
           echo "${DELIM}" >> "$GITHUB_OUTPUT"
+          cp -f build.md build.tmp
 
-      - name: Enviar Notificação para o Telegram
-        id: telegram
-        if: success()
-        env:
-          TG_TOKEN: ${{ secrets.TG_TOKEN }}
-          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
-        run: |
-          cd build || { echo "Pasta 'build' não encontrada"; exit 1; }
-          NL=$'\n'
-          APKS=""
-          MODULES=""
-          TAG="${{ steps.last_build.outputs.next_ver_code }}"
-          BASE_URL="${{ github.server_url }}/${{ github.repository }}/releases/download/${TAG}"
-          for OUTPUT in *; do
-            if [[ $OUTPUT == *.apk ]]; then APKS+="${NL}📦 [${OUTPUT}](${BASE_URL}/${OUTPUT})";
-            elif [[ $OUTPUT == *.zip ]]; then MODULES+="${NL}📦 [${OUTPUT}](${BASE_URL}/${OUTPUT})"; fi
-          done
-          BODY="${{ steps.content.outputs.changelog }}"
-          FORMATTED_BODY=$(echo "$BODY" | sed 's/^\* \*\*/↪ \*\*/g; s/^\* `/↪ \*\*/g; s/`/\*/g; s/^\* /\↪/g; s/\*\*/\*/g; s/###//g; s/^- /↪ /g; /^==/d;')
-          MSG="*Build #${TAG} disponível!*${NL}${NL}${FORMATTED_BODY}${NL}${NL}*▼ Downloads*${NL}"
-          if [[ -n "$MODULES" ]]; then MSG+="*Módulos:*${MODULES}${NL}"; fi
-          if [[ -n "$APKS" ]]; then MSG+="*APKs:*${APKS}${NL}"; fi
-          RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" --data-urlencode "chat_id=${TG_CHAT_ID}" --data-urlencode "text=${MSG}" --data-urlencode "parse_mode=Markdown" --data-urlencode "disable_web_page_preview=true")
-          MSG_ID=$(echo "$RESPONSE" | grep -oP '"message_id":\K[0-9]+' || echo "")
-          [ -n "$MSG_ID" ] && echo "msg_id=$MSG_ID" >> $GITHUB_OUTPUT
-          LAST_MSG_ID="${{ steps.last_build.outputs.last_msg_id }}"
-          if [[ -n "$LAST_MSG_ID" ]]; then
-            curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/deleteMessage" -d "chat_id=${TG_CHAT_ID}" -d "message_id=${LAST_MSG_ID}" >/dev/null 2>&1 || true
-          fi
-
-      - name: Criar Pre-Release e Enviar Artefatos
-        if: success()
-        uses: softprops/action-gh-release@v1
+      - name: Upload modules to release
+        uses: svenstaro/upload-release-action@v2
         with:
-          # Define que esta é uma pre-release
-          prerelease: true
-          # Nome da tag, ex: 21
-          tag_name: ${{ steps.last_build.outputs.next_ver_code }}
-          # Título da release, ex: "Build #21"
-          name: "Build #${{ steps.last_build.outputs.next_ver_code }}"
-          # Corpo da release (changelog + ID da mensagem do Telegram)
-          body: |
-            ${{ steps.content.outputs.changelog }}
+          body: ${{ steps.get_output.outputs.BUILD_LOG }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ./build/*
+          release_name: RVCBotBuilds
+          tag: ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}
+          file_glob: true
+          overwrite: true
 
-            ---
-            TG_MSG_ID: ${{ steps.telegram.outputs.msg_id }}
-          # Arquivos a serem enviados (todos os .apk e .zip da pasta 'build')
-          files: |
-            ./build/*.apk
-            ./build/*.zip
-      
-      - name: Atualizar Branch de JSON do Magisk
-        if: success()
+      - name: Update changelog and Magisk update json
+        id: update_config
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -B update
-          get_update_json() { echo "{\"version\": \"$1\",\"versionCode\": ${{ steps.last_build.outputs.next_ver_code }},\"zipUrl\": \"$2\",\"changelog\": \"https://raw.githubusercontent.com/$GITHUB_REPOSITORY/update/build.md\"}"; }
-          cd build || exit 1
+          git checkout -f update || git switch --discard-changes --orphan update
+          cp -f build.tmp build.md
+          get_update_json() {
+            echo "{
+            \"version\": \"$1\",
+            \"versionCode\": ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }},
+            \"zipUrl\": \"$2\",
+            \"changelog\": \"https://raw.githubusercontent.com/$GITHUB_REPOSITORY/update/build.md\"
+          }"
+          }
+
+          cd build || { echo "build folder not found"; exit 1; }
           for OUTPUT in *magisk*.zip; do
             [ "$OUTPUT" = "*magisk*.zip" ] && continue
             ZIP_S=$(unzip -p "$OUTPUT" module.prop)
@@ -128,33 +93,55 @@ jobs:
             UPDATE_JSON="${UPDATE_JSON##*/}"
             VER=$(echo "$ZIP_S" | grep version=)
             VER="${VER##*=}"
-            DLURL="${{ github.server_url }}/${{ github.repository }}/releases/download/${{ steps.last_build.outputs.next_ver_code }}/${OUTPUT}"
+            DLURL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}/${OUTPUT}"
             get_update_json "$VER" "$DLURL" >"../$UPDATE_JSON"
           done
           cd ..
-          git add -f build.md ./*-update.json
-          if ! git diff --staged --quiet; then
-            git commit -m "chore: Bump para build #${{ steps.last_build.outputs.next_ver_code }}"
-            git push origin update --force
-          else
-            echo "Nenhuma mudança nos arquivos de atualização. Pulando o commit."
-          fi
-          
-      - name: Limpar releases antigas do GitHub
-        if: always()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "Limpando releases antigas, mantendo as 5 mais recentes..."
-          gh release list --repo ${{ github.repository }} --limit 100 --json tagName | \
-          jq -r '.[5:].[].tagName' | \
-          xargs -r -I {} gh release delete {} --repo ${{ github.repository }} --yes --cleanup-tag
 
-      - name: Notificar em Caso de Falha
-        if: failure()
+          find . -name "*-update.json" | grep . || : >dummy-update.json
+
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          branch: update
+          skip_checkout: true
+          file_pattern: build.md *-update.json
+          commit_message: Bump version ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}
+
+      - name: Report to Telegram
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
-          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+        if: env.TG_TOKEN != null
         run: |
-          MSG="❌ *Falha no Build #${{ steps.last_build.outputs.next_ver_code }}*\n\nOcorreu um erro durante a compilação.\n\n[Verificar logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
-          curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" -d "chat_id=${TG_CHAT_ID}" -d "text=${MSG}" -d "parse_mode=Markdown"
+          cd build || { echo "build folder not found"; exit 1; }
+
+          TG_CHAT="${{ secrets.TG_CHAT_ID }}"
+          NL=$'\n'
+          APKS=""
+          MODULES=""
+          for OUTPUT in *; do
+            DL_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}/${OUTPUT}"
+            if [[ $OUTPUT = *.apk ]]; then
+              APKS+="${NL}📦[${OUTPUT}](${DL_URL})"
+            elif [[ $OUTPUT = *.zip ]]; then
+              MODULES+="${NL}📦[${OUTPUT}](${DL_URL})"
+            fi
+          done
+          MODULES=${MODULES#"$NL"}
+          APKS=${APKS#"$NL"}
+
+          BODY="$(sed 's/^\* \*\*/↪ \*\*/g; s/^\* `/↪ \*\*/g; s/`/\*/g; s/^\* /\↪/g; s/\*\*/\*/g; s/###//g; s/^- /↪ /g; /^==/d;' ../build.md)"
+          MSG="*New build!*
+
+          ${BODY}
+
+          *▼ Download Links:*
+          Modules:
+          ${MODULES}
+
+          APKs:
+          ${APKS}
+          "
+          echo "'$MSG'"
+          MSG=${MSG:0:9450}
+          POST="https://api.telegram.org/bot${TG_TOKEN}/sendMessage"
+          curl -X POST --data-urlencode "parse_mode=Markdown" --data-urlencode "disable_web_page_preview=true" --data-urlencode "text=${MSG}" --data-urlencode "chat_id=${TG_CHAT}" "$POST"
