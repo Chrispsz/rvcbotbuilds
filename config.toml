@@ -1,6 +1,6 @@
 # ============================================
-# RVCBotBuilds - ReVanced Magisk Module Builder
-# Focado em YouTube e YouTube Music (arm64-v8a)
+# RVCBotBuilds - Builder de Módulos ReVanced
+# Focado em YouTube e YouTube Music (ARM64-v8a)
 # ============================================
 
 enable-magisk-update = true
@@ -8,8 +8,8 @@ parallel-jobs = 1
 compression-level = 9
 
 # ============================================
-# YouTube - Módulo Magisk + APK Non-Root
-# Fonte: Uptodown (APKMirror bloqueia bots)
+# 📺 YouTube - Módulo Magisk + APK Non-Root
+# Fonte: Uptodown
 # ============================================
 [YouTube]
 enabled = true
@@ -19,8 +19,8 @@ version = "auto"
 uptodown-dlurl = "https://youtube.en.uptodown.com/android"
 
 # ============================================
-# YouTube Music - Módulo Magisk + APK Non-Root
-# Fonte: Uptodown (APKMirror bloqueia bots)
+# 🎵 YouTube Music - Módulo Magisk + APK Non-Root
+# Fonte: Uptodown
 # ============================================
 [Music]
 enabled = true

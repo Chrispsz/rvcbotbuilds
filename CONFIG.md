@@ -16,7 +16,6 @@ enabled = true
 build-mode = "both"      # "apk", "module" ou "both"
 arch = "arm64-v8a"       # Apenas ARM64 é suportado
 version = "auto"         # "auto", "latest", "beta", ou versão específica
-apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"
 uptodown-dlurl = "https://youtube.en.uptodown.com/android"
 
 [Music]
@@ -24,20 +23,19 @@ enabled = true
 build-mode = "both"
 arch = "arm64-v8a"
 version = "auto"
-apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"
 uptodown-dlurl = "https://youtube-music.en.uptodown.com/android"
 ```
 
 ## Opções Disponíveis
 
-| Opção | Descrição | Padrão |
-|-------|-----------|--------|
-| `enabled` | Habilitar/desabilitar build | `true` |
-| `build-mode` | Tipo de build: `apk`, `module`, `both` | `both` |
-| `arch` | Arquitetura (apenas `arm64-v8a`) | `arm64-v8a` |
-| `version` | Versão: `auto`, `latest`, `beta`, ou específica | `auto` |
-| `excluded-patches` | Patches para excluir | `""` |
-| `included-patches` | Patches para incluir | `""` |
+| Opção | Descrição | Valores | Padrão |
+|-------|-----------|---------|--------|
+| `enabled` | Habilitar/desabilitar build | `true`, `false` | `true` |
+| `build-mode` | Tipo de build | `apk`, `module`, `both` | `both` |
+| `arch` | Arquitetura | `arm64-v8a` (apenas) | `arm64-v8a` |
+| `version` | Versão do app | `auto`, `latest`, `beta`, ou específica | `auto` |
+| `excluded-patches` | Patches para excluir | Lista entre aspas | `""` |
+| `included-patches` | Patches para incluir | Lista entre aspas | `""` |
 
 ## Exemplo: Excluir Patches
 
@@ -45,8 +43,12 @@ uptodown-dlurl = "https://youtube-music.en.uptodown.com/android"
 [YouTube]
 enabled = true
 build-mode = "both"
-excluded-patches = "'Some Patch' 'Another Patch'"
+excluded-patches = "'Hide shorts components' 'Disable shorts on startup'"
 ```
+
+## Fontes de Download
+
+Usamos **Uptodown** como fonte pois o APKMirror bloqueia requisições automatizadas (erro 403).
 
 ## Notas
 

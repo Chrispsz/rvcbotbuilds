@@ -68,10 +68,11 @@ jobs:
           body: ${{ steps.get_output.outputs.BUILD_LOG }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: ./build/*
-          release_name: RVCBotBuilds
+          release_name: RVCBotBuilds v${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}
           tag: ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}
           file_glob: true
           overwrite: true
+          prerelease: false
 
       - name: Update changelog and Magisk update json
         id: update_config
@@ -109,9 +110,9 @@ jobs:
           branch: update
           skip_checkout: true
           file_pattern: build.md *-update.json
-          commit_message: Bump version ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}
+          commit_message: "🚀 Build #${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}"
 
-      - name: Report to Telegram
+      - name: Notificar Telegram
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
         if: env.TG_TOKEN != null
@@ -119,33 +120,61 @@ jobs:
           cd build || { echo "build folder not found"; exit 1; }
 
           TG_CHAT="${{ secrets.TG_CHAT_ID }}"
+          BUILD_NUM="${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}"
           NL=$'\n'
           APKS=""
           MODULES=""
+          
           for OUTPUT in *; do
-            DL_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}/${OUTPUT}"
+            DL_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/${BUILD_NUM}/${OUTPUT}"
+            SIZE=$(du -h "$OUTPUT" 2>/dev/null | cut -f1)
             if [[ $OUTPUT = *.apk ]]; then
-              APKS+="${NL}📦[${OUTPUT}](${DL_URL})"
+              APKS+="${NL}📱 [${OUTPUT}](${DL_URL}) _(${SIZE})_"
             elif [[ $OUTPUT = *.zip ]]; then
-              MODULES+="${NL}📦[${OUTPUT}](${DL_URL})"
+              MODULES+="${NL}📦 [${OUTPUT}](${DL_URL}) _(${SIZE})_"
             fi
           done
           MODULES=${MODULES#"$NL"}
           APKS=${APKS#"$NL"}
 
-          BODY="$(sed 's/^\* \*\*/↪ \*\*/g; s/^\* `/↪ \*\*/g; s/`/\*/g; s/^\* /\↪/g; s/\*\*/\*/g; s/###//g; s/^- /↪ /g; /^==/d;' ../build.md)"
-          MSG="*New build!*
+          # Processar changelog
+          BODY="$(sed -E '
+            s/^\* \*\*/↪ /g
+            s/^\* `/↪ /g
+            s/`/\*/g
+            s/\*\*/\*/g
+            s/###//g
+            s/^- /↪ /g
+            /^==/d
+            s/YouTube:/📺 YouTube:/g
+            s/Music:/🎵 Music:/g
+            s/Patches:/🔧 Patches:/g
+            s/CLI:/⚙️ CLI:/g
+            s/Changelog/📝 Changelog/g
+          ' ../build.md)"
 
-          ${BODY}
+          MSG="🚀 *Nova Build Disponível\\!*
+━━━━━━━━━━━━━━━━━
+🔖 *Versão:* \`${BUILD_NUM}\`
+📅 *Data:* $(date '+%d/%m/%Y %H:%M')
 
-          *▼ Download Links:*
-          Modules:
-          ${MODULES}
+${BODY}
 
-          APKs:
-          ${APKS}
-          "
+━━━━━━━━━━━━━━━━━
+⬇️ *Downloads:*
+${MODULES}
+
+${APKS}
+
+━━━━━━━━━━━━━━━━━
+💡 *Dica:* Use \`!youtube\` no bot para ver releases antigas."
+
           echo "'$MSG'"
-          MSG=${MSG:0:9450}
+          MSG=${MSG:0:4000}
           POST="https://api.telegram.org/bot${TG_TOKEN}/sendMessage"
-          curl -X POST --data-urlencode "parse_mode=Markdown" --data-urlencode "disable_web_page_preview=true" --data-urlencode "text=${MSG}" --data-urlencode "chat_id=${TG_CHAT}" "$POST"
+          curl -X POST \
+            --data-urlencode "parse_mode=MarkdownV2" \
+            --data-urlencode "disable_web_page_preview=true" \
+            --data-urlencode "text=${MSG}" \
+            --data-urlencode "chat_id=${TG_CHAT}" \
+            "$POST"
