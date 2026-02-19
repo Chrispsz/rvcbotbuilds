@@ -2,35 +2,30 @@
 
 [![CI](https://github.com/Chrispsz/rvcbotbuilds/actions/workflows/ci.yml/badge.svg?event=schedule)](https://github.com/Chrispsz/rvcbotbuilds/actions/workflows/ci.yml)
 
-**Builder de Módulos Magisk ReVanced** - Focado em YouTube e YouTube Music (ARM64-v8a)
+**Builder de APKs ReVanced** - Focado em YouTube e YouTube Music (ARM64-v8a)
 
 ## 📥 Downloads
 
-Baixe os módulos e APKs mais recentes nas [Releases](https://github.com/Chrispsz/rvcbotbuilds/releases).
+Baixe os APKs mais recentes nas [Releases](https://github.com/Chrispsz/rvcbotbuilds/releases).
 
 ## ✨ Recursos
 
-| App | Módulo Magisk | APK Non-Root |
-|-----|---------------|--------------|
-| 📺 YouTube | ✅ | ✅ |
-| 🎵 YouTube Music | ✅ | ✅ |
+| App | APK Non-Root |
+|-----|--------------|
+| 📺 YouTube | ✅ |
+| 🎵 YouTube Music | ✅ |
 
 ### 🎯 Características:
 - 🚀 Focado exclusivamente em **ARM64-v8a** (dispositivos modernos)
-- 📦 Atualizações automáticas via GitHub Actions (diariamente às 13:00 BR)
-- 🔧 Suporte a **Magisk** e **KernelSU**
+- 📦 Atualizações automáticas quando há novos patches (verificação diária às 13:00 BR)
 - 📢 Notificações automáticas no Telegram
+- ⚡ Build otimizada (~2 minutos)
 
 ## 📱 Instalação
 
-### Para usuários Root (Magisk/KernelSU):
-1. Baixe o módulo `.zip` da [última release](https://github.com/Chrispsz/rvcbotbuilds/releases)
-2. Instale via Magisk/KernelSU Manager
-3. Reinicie o dispositivo
-
 ### Para usuários Non-Root:
-1. Baixe o APK da [última release](https://github.com/Chrispsz/rvcbotbuilds/releases)
-2. Instale o [MicroG](https://github.com/ReVanced/GmsCore/releases) primeiro
+1. Instale o [MicroG](https://github.com/ReVanced/GmsCore/releases) primeiro
+2. Baixe o APK da [última release](https://github.com/Chrispsz/rvcbotbuilds/releases)
 3. Instale o APK do ReVanced
 
 ## 🔨 Build Local
@@ -54,12 +49,12 @@ Edite o arquivo `config.toml` para personalizar:
 ```toml
 [YouTube]
 enabled = true           # Habilitar/desabilitar
-build-mode = "both"      # "apk", "module" ou "both"
+build-mode = "apk"       # Apenas APK (non-root)
 version = "auto"         # "auto", "latest", ou versão específica
 
 [Music]
 enabled = true
-build-mode = "both"
+build-mode = "apk"
 version = "auto"
 ```
 
@@ -82,10 +77,9 @@ version = "auto"
 ## ❓ FAQ
 
 <details>
-<summary><b>Qual a diferença entre Módulo e APK?</b></summary>
+<summary><b>Por que apenas APKs?</b></summary>
 
-- **Módulo Magisk**: Para dispositivos com root. O app original é substituído automaticamente.
-- **APK Non-Root**: Para dispositivos sem root. Requer instalação do MicroG para funcionar.
+Este projeto é focado em usuários sem root. Para usar, basta instalar o MicroG e o APK do ReVanced. Se você tem root e prefere módulos Magisk, use o projeto original [j-hc/revanced-magisk-module](https://github.com/j-hc/revanced-magisk-module).
 
 </details>
 
@@ -97,9 +91,9 @@ A maioria dos smartphones modernos usa ARM64. Isso reduz o tamanho dos builds e 
 </details>
 
 <details>
-<summary><b>Como recebo notificações de novas builds?</b></summary>
+<summary><b>Quando são geradas novas builds?</b></summary>
 
-Entre no canal/grupo do Telegram onde o bot está configurado. Use `!youtube` ou `!rvcbot` para ver a última release.
+O sistema verifica diariamente (13:00 horário de Brasília) se há novos patches do ReVanced. Se houver, uma nova build é gerada automaticamente.
 
 </details>
 

@@ -114,6 +114,7 @@ get_prebuilts() {
                         name=$(basename "$file")
                         tag_name=$(cut -d'-' -f3- <<<"$name")
                         tag_name=v${tag_name%.*}
+                        echo "$tag: $(cut -d/ -f1 <<<"$src")/${name}  " >>"${cl_dir}/changelog.md"
                 fi
 
                 if [ "$tag" = "CLI" ]; then
