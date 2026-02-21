@@ -1,106 +1,72 @@
-# RVCBotBuilds
+# RVC Bot Builds
 
-[![CI](https://github.com/Chrispsz/rvcbotbuilds/actions/workflows/ci.yml/badge.svg?event=schedule)](https://github.com/Chrispsz/rvcbotbuilds/actions/workflows/ci.yml)
+[![CI](https://github.com/Chrispsz/rvcbotbuilds/actions/workflows/ci.yml/badge.svg)](https://github.com/Chrispsz/rvcbotbuilds/actions/workflows/ci.yml)
 
-**Builder de APKs ReVanced** - Focado em YouTube e YouTube Music (ARM64-v8a)
+Automated build pipeline for Android APK compilation with CI/CD integration.
 
-## 📥 Downloads
+## Features
 
-Baixe os APKs mais recentes nas [Releases](https://github.com/Chrispsz/rvcbotbuilds/releases).
+- 🤖 Automated daily builds
+- 📦 Multi-architecture support (ARM64-v8a)
+- 🔔 Telegram notifications
+- ⚡ Optimized build process (~2 minutes)
+- 📋 Customizable configuration
 
-## ✨ Recursos
+## Downloads
 
-| App | APK Non-Root |
-|-----|--------------|
-| 📺 YouTube | ✅ |
-| 🎵 YouTube Music | ✅ |
+Get the latest builds from [Releases](https://github.com/Chrispsz/rvcbotbuilds/releases).
 
-### 🎯 Características:
-- 🚀 Focado exclusivamente em **ARM64-v8a** (dispositivos modernos)
-- 📦 Atualizações automáticas quando há novos patches (verificação diária às 13:00 BR)
-- 📢 Notificações automáticas no Telegram
-- ⚡ Build otimizada (~2 minutos)
+## Installation
 
-## 📱 Instalação
+1. Install required dependencies (MicroG for non-root)
+2. Download APK from releases
+3. Install on your device
 
-### Para usuários Non-Root:
-1. Instale o [MicroG](https://github.com/ReVanced/GmsCore/releases) primeiro
-2. Baixe o APK da [última release](https://github.com/Chrispsz/rvcbotbuilds/releases)
-3. Instale o APK do ReVanced
+## Build Locally
 
-## 🔨 Build Local
-
-### No Termux (Android):
+### Termux (Android)
 ```bash
 bash <(curl -sSf https://raw.githubusercontent.com/Chrispsz/rvcbotbuilds/main/build-termux.sh)
 ```
 
-### No Desktop (Linux/Windows):
+### Desktop (Linux/Windows)
 ```bash
 git clone https://github.com/Chrispsz/rvcbotbuilds
 cd rvcbotbuilds
 ./build.sh
 ```
 
-## ⚙️ Configuração
+## Configuration
 
-Edite o arquivo `config.toml` para personalizar:
+Edit `config.toml` to customize builds:
 
 ```toml
-[YouTube]
-enabled = true           # Habilitar/desabilitar
-build-mode = "apk"       # Apenas APK (non-root)
-version = "auto"         # "auto", "latest", ou versão específica
-
-[Music]
+[App]
 enabled = true
 build-mode = "apk"
-version = "auto"
+version = "auto"  # "auto", "latest", or specific version
 ```
 
-## 📋 Requisitos para Build
+## Requirements
 
 - Java 17+
 - jq
 - zip
 - curl
 
-## 🔗 Links Úteis
+## Tech Stack
 
-| Recurso | Link |
-|---------|------|
-| 📱 MicroG | [ReVanced/GmsCore](https://github.com/ReVanced/GmsCore/releases) |
-| 🔓 Zygisk Detach | [j-hc/zygisk-detach](https://github.com/j-hc/zygisk-detach) |
-| 🔧 Patches Originais | [ReVanced/revanced-patches](https://github.com/ReVanced/revanced-patches) |
-| 🤖 Bot Telegram | Use `!youtube` ou `!rvcbot` |
+| Tool | Purpose |
+|------|---------|
+| GitHub Actions | CI/CD pipeline |
+| Shell | Build scripts |
+| jq | JSON processing |
+| curl | HTTP requests |
 
-## ❓ FAQ
+## License
 
-<details>
-<summary><b>Por que apenas APKs?</b></summary>
-
-Este projeto é focado em usuários sem root. Para usar, basta instalar o MicroG e o APK do ReVanced. Se você tem root e prefere módulos Magisk, use o projeto original [j-hc/revanced-magisk-module](https://github.com/j-hc/revanced-magisk-module).
-
-</details>
-
-<details>
-<summary><b>Por que apenas ARM64-v8a?</b></summary>
-
-A maioria dos smartphones modernos usa ARM64. Isso reduz o tamanho dos builds e mantém o projeto mais limpo. Se você tem um dispositivo ARM32 (antigo), use o projeto original [j-hc/revanced-magisk-module](https://github.com/j-hc/revanced-magisk-module).
-
-</details>
-
-<details>
-<summary><b>Quando são geradas novas builds?</b></summary>
-
-O sistema verifica diariamente (13:00 horário de Brasília) se há novos patches do ReVanced. Se houver, uma nova build é gerada automaticamente.
-
-</details>
-
-## 📄 Licença
-
-Este projeto é um fork de [revanced-magisk-module](https://github.com/j-hc/revanced-magisk-module) de j-hc.
+GPL-3.0 License
 
 ---
 
-**Feito com ❤️ por [Chrispsz](https://github.com/Chrispsz)**
+Built with ❤️ by [Chrispsz](https://github.com/Chrispsz)
