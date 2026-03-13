@@ -10,7 +10,11 @@ if [ "$ARCH" = "arm" ]; then
         ARCH_LIB=armeabi-v7a
 elif [ "$ARCH" = "arm64" ]; then
         ARCH_LIB=arm64-v8a
-else abort "ERROR: Only arm64 is supported. Your device: ${ARCH}"; fi
+elif [ "$ARCH" = "x86" ]; then
+        ARCH_LIB=x86
+elif [ "$ARCH" = "x64" ]; then
+        ARCH_LIB=x86_64
+else abort "ERROR: unreachable: ${ARCH}"; fi
 RVPATH=/data/adb/rvhc/${MODPATH##*/}.apk
 
 set_perm_recursive "$MODPATH/bin" 0 0 0755 0777
@@ -191,4 +195,5 @@ rm -rf "${MODPATH:?}/bin" "$MODPATH/$PKG_NAME.apk"
 
 ui_print "* Done"
 ui_print "  by Chrispsz (github.com/Chrispsz)"
+ui_print "  with j-hc patches and updates"
 ui_print " "
