@@ -2,15 +2,23 @@
 
 [![CI](https://github.com/Chrispsz/rvcbotbuilds/actions/workflows/ci.yml/badge.svg)](https://github.com/Chrispsz/rvcbotbuilds/actions/workflows/ci.yml)
 
-Automated build pipeline for Android APK compilation with CI/CD integration.
+Automated build pipeline for ReVanced and Morphe APKs with CI/CD integration.
 
 ## Features
 
-- 🤖 Automated daily builds
-- 📦 Multi-architecture support (ARM64-v8a)
+- 🤖 Automated daily builds (4PM UTC)
+- 📦 ARM64-v8a architecture optimized
+- 🔄 Dual patch sources: ReVanced + Morphe
 - 🔔 Telegram notifications
-- ⚡ Optimized build process (~2 minutes)
-- 📋 Customizable configuration
+- ⚡ Optimized build process
+
+## What's Built
+
+| App | Type | Patches |
+|-----|------|---------|
+| YouTube | APK + Module | ReVanced |
+| YouTube | APK + Module | Morphe |
+| YouTube Music | APK | ReVanced |
 
 ## Downloads
 
@@ -18,9 +26,15 @@ Get the latest builds from [Releases](https://github.com/Chrispsz/rvcbotbuilds/r
 
 ## Installation
 
-1. Install required dependencies (MicroG for non-root)
+### Non-Root (APK)
+1. Install [MicroG/GmsCore](https://github.com/ReVanced/GmsCore/releases)
 2. Download APK from releases
 3. Install on your device
+
+### Root (Magisk Module)
+1. Download module zip from releases
+2. Flash in Magisk
+3. Reboot
 
 ## Build Locally
 
@@ -29,7 +43,7 @@ Get the latest builds from [Releases](https://github.com/Chrispsz/rvcbotbuilds/r
 bash <(curl -sSf https://raw.githubusercontent.com/Chrispsz/rvcbotbuilds/main/build-termux.sh)
 ```
 
-### Desktop (Linux/Windows)
+### Desktop (Linux)
 ```bash
 git clone https://github.com/Chrispsz/rvcbotbuilds
 cd rvcbotbuilds
@@ -41,10 +55,15 @@ cd rvcbotbuilds
 Edit `config.toml` to customize builds:
 
 ```toml
-[App]
-enabled = true
-build-mode = "apk"
-version = "auto"  # "auto", "latest", or specific version
+[YouTube]
+build-mode = "both"        # "apk", "module", or "both"
+arch = "arm64-v8a"         # Architecture
+version = "auto"           # "auto", "latest", or specific version
+
+[YouTube-Morphe]
+patches-source = "MorpheApp/morphe-patches"
+cli-source = "MorpheApp/morphe-cli"
+rv-brand = "Morphe"
 ```
 
 ## Requirements
@@ -54,14 +73,11 @@ version = "auto"  # "auto", "latest", or specific version
 - zip
 - curl
 
-## Tech Stack
+## Credits
 
-| Tool | Purpose |
-|------|---------|
-| GitHub Actions | CI/CD pipeline |
-| Shell | Build scripts |
-| jq | JSON processing |
-| curl | HTTP requests |
+- [j-hc/revanced-magisk-module](https://github.com/j-hc/revanced-magisk-module) - Build system
+- [ReVanced](https://github.com/ReVanced) - Patches & CLI
+- [MorpheApp](https://github.com/MorpheApp) - Morphe patches
 
 ## License
 
