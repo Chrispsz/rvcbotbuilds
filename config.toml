@@ -1,7 +1,5 @@
 # ============================================
-# RVCBotBuilds - Builder de Módulos ReVanced
-# Atualizado com correções do j-hc + Morphe
-# Arquitetura: arm64-v8a apenas
+# RVCBotBuilds - Morphe Builds (arm64-v8a)
 # ============================================
 
 enable-module-update = true
@@ -9,19 +7,9 @@ parallel-jobs = 2
 compression-level = 9
 
 # ============================================
-# YouTube ReVanced - APK + Módulo Magisk (arm64-v8a)
+# YouTube Morphe - APK + Módulo (arm64-v8a)
 # ============================================
 [YouTube]
-build-mode = "both"
-arch = "arm64-v8a"
-apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"
-uptodown-dlurl = "https://youtube.en.uptodown.com/android"
-archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.youtube"
-
-# ============================================
-# YouTube Morphe - APK + Módulo com Morphe Patches (arm64-v8a)
-# ============================================
-[YouTube-Morphe]
 app-name = "YouTube"
 patches-source = "MorpheApp/morphe-patches"
 cli-source = "MorpheApp/morphe-cli"
@@ -33,7 +21,7 @@ uptodown-dlurl = "https://youtube.en.uptodown.com/android"
 archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.youtube"
 
 # ============================================
-# YouTube Music ReVanced - APK Non-Root (arm64-v8a)
+# YouTube Music - APK (arm64-v8a)
 # ============================================
 [Music]
 build-mode = "apk"
