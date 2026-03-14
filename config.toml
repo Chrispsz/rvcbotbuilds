@@ -1,11 +1,10 @@
 # ============================================
-# RVCBotBuilds - Morphe Builds (arm64-v8a)
-# Apenas Morphe patches, sem ReVanced
+# RVCBotBuilds - Morphe Only (arm64-v8a)
+# Sem ReVanced, apenas Morphe patches
 # ============================================
 
 enable-module-update = true
 parallel-jobs = 2
-compression-level = 9
 
 # ============================================
 # YouTube Morphe - APK + Módulo (arm64-v8a)
@@ -24,7 +23,7 @@ uptodown-dlurl = "https://youtube.en.uptodown.com/android"
 archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.youtube"
 
 # ============================================
-# YouTube Music Morphe - APK (arm64-v8a)
+# Music Morphe - APK (arm64-v8a)
 # Ícone e nome padrão
 # ============================================
 [Music]
