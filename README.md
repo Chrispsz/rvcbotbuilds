@@ -1,24 +1,16 @@
-# RVC Bot Builds
+# RVCBot Builds
 
 [![CI](https://github.com/Chrispsz/rvcbotbuilds/actions/workflows/ci.yml/badge.svg)](https://github.com/Chrispsz/rvcbotbuilds/actions/workflows/ci.yml)
 
-Automated build pipeline for ReVanced and Morphe APKs with CI/CD integration.
+Automated ReVanced builds with Magisk module support.
 
 ## Features
 
 - 🤖 Automated daily builds (4PM UTC)
-- 📦 ARM64-v8a architecture optimized
-- 🔄 Dual patch sources: ReVanced + Morphe
-- 🔔 Telegram notifications
-- ⚡ Optimized build process
-
-## What's Built
-
-| App | Type | Patches |
-|-----|------|---------|
-| YouTube | APK + Module | ReVanced |
-| YouTube | APK + Module | Morphe |
-| YouTube Music | APK | ReVanced |
+- 📦 arm64-v8a architecture optimized
+- 🔄 ReVanced official patches
+- 📱 YouTube APK + Magisk Module
+- 🎵 YouTube Music APK
 
 ## Downloads
 
@@ -27,7 +19,7 @@ Get the latest builds from [Releases](https://github.com/Chrispsz/rvcbotbuilds/r
 ## Installation
 
 ### Non-Root (APK)
-1. Install [MicroG/GmsCore](https://github.com/ReVanced/GmsCore/releases)
+1. Install [GmsCore](https://github.com/ReVanced/GmsCore/releases)
 2. Download APK from releases
 3. Install on your device
 
@@ -50,22 +42,6 @@ cd rvcbotbuilds
 ./build.sh
 ```
 
-## Configuration
-
-Edit `config.toml` to customize builds:
-
-```toml
-[YouTube]
-build-mode = "both"        # "apk", "module", or "both"
-arch = "arm64-v8a"         # Architecture
-version = "auto"           # "auto", "latest", or specific version
-
-[YouTube-Morphe]
-patches-source = "MorpheApp/morphe-patches"
-cli-source = "MorpheApp/morphe-cli"
-rv-brand = "Morphe"
-```
-
 ## Requirements
 
 - Java 17+
@@ -77,7 +53,6 @@ rv-brand = "Morphe"
 
 - [j-hc/revanced-magisk-module](https://github.com/j-hc/revanced-magisk-module) - Build system
 - [ReVanced](https://github.com/ReVanced) - Patches & CLI
-- [MorpheApp](https://github.com/MorpheApp) - Morphe patches
 
 ## License
 
