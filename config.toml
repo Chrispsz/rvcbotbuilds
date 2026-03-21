@@ -1,26 +1,32 @@
 # ============================================
-# RVCBotBuilds - ReVanced Only (arm64-v8a)
+# RVCBotBuilds - ReVanced (arm64-v8a)
 # ============================================
 
 enable-module-update = true
 parallel-jobs = 2
 
 # ============================================
-# YouTube ReVanced - APK + Module (arm64-v8a)
+# YouTube ReVanced - APK + Módulo (arm64-v8a)
+# Ícone e nome padrão do YouTube
 # ============================================
 [YouTube]
 build-mode = "both"
 arch = "arm64-v8a"
+excluded-patches = "'Custom branding'"
+included-patches = "'Disable Play Store updates'"
 apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"
 uptodown-dlurl = "https://youtube.en.uptodown.com/android"
 archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.youtube"
 
 # ============================================
-# YouTube Music ReVanced - APK (arm64-v8a)
+# Music ReVanced - APK (arm64-v8a)
+# Ícone e nome padrão
 # ============================================
 [Music]
 build-mode = "apk"
 arch = "arm64-v8a"
+excluded-patches = "'Custom branding'"
+included-patches = "'Disable Play Store updates'"
 apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"
 uptodown-dlurl = "https://youtube-music.en.uptodown.com/android"
 archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.apps.youtube.music"
