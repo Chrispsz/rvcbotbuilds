@@ -2,19 +2,8 @@
 
 # ============================================
 # RVCBotBuilds - ReVanced with Auto-Detach
-# Integração do zygisk-detach por j-hc
+# Segue o modelo do zygisk-detach por j-hc
 # ============================================
-
-# Log em local sempre acessível
-DEBUG_LOG="/data/local/tmp/rvcbot-install.log"
-
-log() {
-    echo "[$(date '+%H:%M:%S')] $1" >> "$DEBUG_LOG"
-}
-
-: > "$DEBUG_LOG"
-log "=== RVCBotBuilds Installation ==="
-log "ARCH=$ARCH, PKG=$PKG_NAME"
 
 ui_print ""
 if [ -n "$MODULE_ARCH" ] && [ "$MODULE_ARCH" != "$ARCH" ]; then
@@ -26,98 +15,63 @@ fi
 # Architecture mapping
 if [ "$ARCH" = "arm" ]; then
 	ARCH_LIB=armeabi-v7a
-	ZYGISK_ARCH=armeabi-v7a
-	BIN_ARCH=arm
 elif [ "$ARCH" = "arm64" ]; then
 	ARCH_LIB=arm64-v8a
-	ZYGISK_ARCH=arm64-v8a
-	BIN_ARCH=arm64
 elif [ "$ARCH" = "x86" ]; then
 	ARCH_LIB=x86
-	ZYGISK_ARCH=x86
-	BIN_ARCH=x86
 elif [ "$ARCH" = "x64" ]; then
 	ARCH_LIB=x86_64
-	ZYGISK_ARCH=x86_64
-	BIN_ARCH=x64
 else abort "ERROR: unreachable: ${ARCH}"; fi
-
 RVPATH=/data/adb/rvhc/${MODPATH##*/}.apk
-log "BIN_ARCH=$BIN_ARCH, ZYGISK_ARCH=$ZYGISK_ARCH"
 
 set_perm_recursive "$MODPATH/bin" 0 0 0755 0777
 
-ui_print "=========================================="
-ui_print "  RVCBotBuilds - ReVanced + Auto-Detach"
-ui_print "=========================================="
-ui_print ""
-
 # ============================================
-# AUTO-DETACH SETUP - SEMPRE EXECUTA
-# Não depende de detecção de Zygisk
-# O .so só funciona se Zygisk estiver ativo
+# AUTO-DETACH (zygisk-detach por j-hc)
+# SEMPRE executa - não depende de detecção
 # ============================================
-ui_print "Setting up Auto-Detach..."
-log "Setting up auto-detach"
 
 # KernelSU support
 if [ -n "$KSU" ]; then
-	log "KernelSU detected"
+	ui_print "- KernelSU detected. Make sure you are using a Zygisk module!"
+
 	uid=$(dumpsys package "com.android.vending" 2>&1 | grep -m1 "uid")
 	uid=${uid#*=} uid=${uid%% *}
 	if [ -z "$uid" ]; then
 		uid=$(dumpsys package "com.android.vending" 2>&1 | grep -m1 "userId")
 		uid=${uid#*=} uid=${uid%% *}
 	fi
-	if [ -n "$uid" ]; then
-		"$MODPATH/bin/$ARCH/ksu_profile" "$uid" "com.android.vending" 2>/dev/null || :
+	if [ -z "$uid" ]; then
+		ui_print "* UID could not be found for com.android.vending"
+	else
+		if ! OP=$("$MODPATH/bin/$ARCH/ksu_profile" "$uid" "com.android.vending" 2>&1); then
+			ui_print "ERROR ksu_profile: $OP"
+		fi
 	fi
 fi
 
-# Mover detach para raiz do módulo (igual zygisk-detach oficial)
-mv -f "$MODPATH/bin/$BIN_ARCH/detach" "$MODPATH/detach"
-chmod +x "$MODPATH/detach"
-log "Moved detach binary to module root"
-
-# Criar diretório do zygisk-detach
-mkdir -p /data/adb/zygisk-detach
+# Mover detach para raiz do módulo (padrão zygisk-detach)
+mv -f "$MODPATH/bin/$ARCH/detach" "$MODPATH/detach"
+mkdir -p /data/adb/zygisk-detach/
 
 DBIN="/data/adb/zygisk-detach/detach.bin"
 
-# Preservar detach.bin existente de outros módulos
+# Preservar detach.bin existente
 if [ -f "/data/adb/modules/zygisk-detach/detach.bin" ]; then
 	cp -f "/data/adb/modules/zygisk-detach/detach.bin" "$DBIN"
-	log "Preserved existing detach.bin"
 fi
 
-# Criar detach.txt com o package name
+# Criar detach.txt com o package name e gerar detach.bin
 echo "$PKG_NAME" > "$MODPATH/detach.txt"
-log "Package to detach: $PKG_NAME"
-
-# Gerar detach.bin
 ui_print "- Adding $PKG_NAME to detach list"
 OP=$("$MODPATH/detach" serialize "$MODPATH/detach.txt" "$DBIN" 2>&1)
-log "detach output: $OP"
+ui_print "$OP"
 
 if [ -f "$DBIN" ]; then
-	ui_print "✅ $PKG_NAME added to detach list"
-	ui_print "   Play Store updates will be blocked"
-	log "detach.bin created: $(stat -c %s "$DBIN") bytes"
+	ui_print "✅ Auto-Detach enabled for $PKG_NAME"
 else
 	ui_print "⚠️  Failed to create detach.bin"
-	log "ERROR: detach.bin not created"
 fi
-
-# Verificar se o .so existe
-if [ -f "$MODPATH/zygisk/$ZYGISK_ARCH.so" ]; then
-	log "Zygisk .so found: $ZYGISK_ARCH.so"
-	ui_print "   Zygisk module ready"
-else
-	log "WARNING: Zygisk .so missing for $ZYGISK_ARCH"
-	ui_print "⚠️  Zygisk .so not found"
-fi
-
-ui_print ""
 
 # ============================================
 # STANDARD MODULE INSTALLATION
@@ -166,7 +120,7 @@ if BASEPATH=$(pmex path "$PKG_NAME"); then
 			module:    $PKG_VER
 			"
 		fi
-	elif "${MODPATH:?}/bin/$BIN_ARCH/cmpr" "$BASEPATH/base.apk" "$MODPATH/$PKG_NAME.apk"; then
+	elif "${MODPATH:?}/bin/$ARCH/cmpr" "$BASEPATH/base.apk" "$MODPATH/$PKG_NAME.apk"; then
 		ui_print "* $PKG_NAME is up-to-date"
 		INS=false
 	fi
@@ -290,7 +244,7 @@ if [ "$KSU" ]; then
 		UID=${UID#*=} UID=${UID%% *}
 	fi
 	if [ "$UID" ]; then
-		if ! OP=$("${MODPATH:?}/bin/$BIN_ARCH/ksu_profile" "$UID" "$PKG_NAME" 2>&1); then
+		if ! OP=$("${MODPATH:?}/bin/$ARCH/ksu_profile" "$UID" "$PKG_NAME" 2>&1); then
 			ui_print "  $OP"
 			ui_print "* Because you are using a fork of KernelSU, "
 			ui_print "  you need to go to your root manager app and"
@@ -306,17 +260,7 @@ fi
 rm -rf "${MODPATH:?}/bin" "$MODPATH/$PKG_NAME.apk"
 
 ui_print ""
-ui_print "=========================================="
-ui_print "  Installation Complete!"
-ui_print "=========================================="
-ui_print ""
-ui_print "✅ Auto-Detach configured"
-ui_print "   Requires Zygisk enabled in Magisk"
-ui_print ""
-ui_print "Log: /data/local/tmp/rvcbot-install.log"
-ui_print ""
 ui_print "* Done"
 ui_print "  by j-hc (github.com/j-hc)"
 ui_print "  RVCBotBuilds with Auto-Detach"
-
-log "=== Installation complete ==="
+ui_print " "
