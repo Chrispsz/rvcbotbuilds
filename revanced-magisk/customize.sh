@@ -1,12 +1,34 @@
 . "$MODPATH/config"
 
+# ============================================
+# DEBUG LOG FUNCTION
+# ============================================
+DEBUG_LOG="/sdcard/rvcbot-debug.txt"
+debug_log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$DEBUG_LOG"
+}
+
+# Initialize debug log
+echo "========================================" > "$DEBUG_LOG"
+echo "RVCBotBuilds Auto-Detach Debug Log" >> "$DEBUG_LOG"
+echo "========================================" >> "$DEBUG_LOG"
+debug_log "Starting installation..."
+debug_log "MODPATH: $MODPATH"
+debug_log "ARCH: $ARCH"
+debug_log "PKG_NAME: $PKG_NAME"
+debug_log "PKG_VER: $PKG_VER"
+
 ui_print ""
 if [ -n "$MODULE_ARCH" ] && [ "$MODULE_ARCH" != "$ARCH" ]; then
+        debug_log "ERROR: Architecture mismatch - Device: $ARCH, Module: $MODULE_ARCH"
         abort "ERROR: Wrong arch
 Your device: $ARCH
 Module: $MODULE_ARCH"
 fi
 
+# ============================================
+# ARCHITECTURE MAPPING
+# ============================================
 if [ "$ARCH" = "arm" ]; then
         ARCH_LIB=armeabi-v7a
         ZYGISK_ARCH=armeabi-v7a
@@ -22,24 +44,65 @@ elif [ "$ARCH" = "x86" ]; then
 elif [ "$ARCH" = "x64" ]; then
         ARCH_LIB=x86_64
         ZYGISK_ARCH=x86_64
-        BIN_ARCH=x86_64
-else abort "ERROR: unreachable: ${ARCH}"; fi
+        BIN_ARCH=x64
+else
+        debug_log "ERROR: Unknown architecture: $ARCH"
+        abort "ERROR: unreachable: ${ARCH}"
+fi
+
 RVPATH=/data/adb/rvhc/${MODPATH##*/}.apk
+debug_log "ARCH_LIB: $ARCH_LIB"
+debug_log "ZYGISK_ARCH: $ZYGISK_ARCH"
+debug_log "BIN_ARCH: $BIN_ARCH"
+
+# Check bin folder structure
+debug_log "Bin folder contents:"
+ls -la "$MODPATH/bin/" >> "$DEBUG_LOG" 2>&1
+debug_log "Bin/$BIN_ARCH contents:"
+ls -la "$MODPATH/bin/$BIN_ARCH/" >> "$DEBUG_LOG" 2>&1
+
+# Check zygisk folder
+debug_log "Zygisk folder contents:"
+ls -la "$MODPATH/zygisk/" >> "$DEBUG_LOG" 2>&1
 
 set_perm_recursive "$MODPATH/bin" 0 0 0755 0777
 
-# Check Zygisk status
+# ============================================
+# ZYGISK DETECTION
+# ============================================
 ZYGISK_ENABLED=false
-if [ -d "/data/adb/modules/zygisk" ] || [ -f "/data/adb/zygisk_enabled" ]; then
-        ZYGISK_ENABLED=true
-fi
+ZYGISK_MODE=""
 
-# Also check Magisk DenyList (alternative to Zygisk)
+# Method 1: Check Magisk Zygisk
 if [ -f "/data/adb/magisk.db" ]; then
-        if magisk --denylist status 2>/dev/null | grep -q "enabled"; then
+        ZYGISK_SETTING=$(magisk --sqlite "SELECT value FROM settings WHERE key='zygisk'" 2>/dev/null || echo "")
+        if [ "$ZYGISK_SETTING" = "1" ]; then
                 ZYGISK_ENABLED=true
+                ZYGISK_MODE="Magisk Zygisk"
         fi
 fi
+
+# Method 2: Check Zygisk module folder (for KernelSU with Zygisk)
+if [ "$ZYGISK_ENABLED" = false ] && [ -d "/data/adb/modules/zygisk" ]; then
+        ZYGISK_ENABLED=true
+        ZYGISK_MODE="KernelSU Zygisk Module"
+fi
+
+# Method 3: Check Zygisk flag file
+if [ "$ZYGISK_ENABLED" = false ] && [ -f "/data/adb/zygisk_enabled" ]; then
+        ZYGISK_ENABLED=true
+        ZYGISK_MODE="Zygisk Flag File"
+fi
+
+# Method 4: Check if Magisk has denylist (alternative)
+if [ "$ZYGISK_ENABLED" = false ]; then
+        if magisk --denylist status 2>/dev/null | grep -q "enabled"; then
+                ZYGISK_MODE="Magisk DenyList (not Zygisk)"
+        fi
+fi
+
+debug_log "Zygisk enabled: $ZYGISK_ENABLED"
+debug_log "Zygisk mode: $ZYGISK_MODE"
 
 ui_print "=========================================="
 ui_print "  RVCBotBuilds - ReVanced with Auto-Detach"
@@ -60,6 +123,11 @@ if [ "$ZYGISK_ENABLED" = false ]; then
         ui_print "    Alternatively, use zygisk-detach module separately"
         ui_print "    or disable auto-update in Play Store manually."
         ui_print ""
+        debug_log "WARNING: Zygisk not enabled, auto-detach will NOT work"
+else
+        ui_print "✅ Zygisk detected: $ZYGISK_MODE"
+        ui_print ""
+        debug_log "Zygisk detected successfully"
 fi
 
 if su -M -c true >/dev/null 2>/dev/null; then
@@ -106,7 +174,7 @@ if BASEPATH=$(pmex path "$PKG_NAME"); then
                         module:    $PKG_VER
                         "
                 fi
-        elif "${MODPATH:?}/bin/$ARCH/cmpr" "$BASEPATH/base.apk" "$MODPATH/$PKG_NAME.apk"; then
+        elif "${MODPATH:?}/bin/$BIN_ARCH/cmpr" "$BASEPATH/base.apk" "$MODPATH/$PKG_NAME.apk"; then
                 ui_print "* $PKG_NAME is up-to-date"
                 INS=false
         fi
@@ -220,52 +288,105 @@ am force-stop "$PKG_NAME"
 ui_print "* Optimizing $PKG_NAME"
 
 cmd package compile -m speed-profile -f "$PKG_NAME"
-# nohup cmd package compile -m speed-profile -f "$PKG_NAME" >/dev/null 2>&1
 
-# Setup Auto-Detach for Zygisk
+# ============================================
+# AUTO-DETACH SETUP (ZYGISK)
+# ============================================
+ui_print ""
+ui_print "=========================================="
+ui_print "  Setting up Auto-Detach (Zygisk)"
+ui_print "=========================================="
+
+DETACH_SUCCESS=false
+
 if [ "$ZYGISK_ENABLED" = true ]; then
-        ui_print ""
-        ui_print "=========================================="
-        ui_print "  Setting up Auto-Detach (Zygisk)"
-        ui_print "=========================================="
-        
+        debug_log "Starting auto-detach setup..."
+
+        # Create zygisk-detach directory
         mkdir -p /data/adb/zygisk-detach
-        
-        # Create detach.txt with package name
-        echo "$PKG_NAME" > "$MODPATH/detach.txt"
-        
-        # Generate detach.bin using the detach binary
-        if [ -f "$MODPATH/bin/$BIN_ARCH/detach" ]; then
-                chmod +x "$MODPATH/bin/$BIN_ARCH/detach"
+        debug_log "Created /data/adb/zygisk-detach directory"
+
+        # Check if detach binary exists
+        DETACH_BIN="$MODPATH/bin/$BIN_ARCH/detach"
+        debug_log "Looking for detach binary at: $DETACH_BIN"
+
+        if [ -f "$DETACH_BIN" ]; then
+                debug_log "Detatch binary found!"
+                chmod +x "$DETACH_BIN"
+
+                # Create detach.txt with package name
+                DETACH_TXT="$MODPATH/detach.txt"
+                echo "$PKG_NAME" > "$DETACH_TXT"
+                debug_log "Created detach.txt with: $PKG_NAME"
+                cat "$DETACH_TXT" >> "$DEBUG_LOG"
+
+                # Set target detach.bin path
                 DBIN="/data/adb/zygisk-detach/detach.bin"
-                
-                # Preserve existing detach.bin if it exists
-                if [ -f "/data/adb/zygisk-detach/detach.bin" ]; then
-                        # Merge with existing packages
-                        cp -f "/data/adb/zygisk-detach/detach.bin" "$DBIN.tmp"
-                        "$MODPATH/bin/$BIN_ARCH/detach" merge "$MODPATH/detach.txt" "$DBIN.tmp" "$DBIN" 2>/dev/null || \
-                        "$MODPATH/bin/$BIN_ARCH/detach" serialize "$MODPATH/detach.txt" "$DBIN" 2>/dev/null
-                else
-                        "$MODPATH/bin/$BIN_ARCH/detach" serialize "$MODPATH/detach.txt" "$DBIN" 2>/dev/null
-                fi
-                
+
+                # Run the detach binary to create detach.bin
+                debug_log "Running: $DETACH_BIN serialize $DETACH_TXT $DBIN"
+
+                # Execute and capture output
+                SERIALIZE_OUTPUT=$("$DETACH_BIN" serialize "$DETACH_TXT" "$DBIN" 2>&1)
+                SERIALIZE_RET=$?
+
+                debug_log "Serialize return code: $SERIALIZE_RET"
+                debug_log "Serialize output: $SERIALIZE_OUTPUT"
+
                 if [ -f "$DBIN" ]; then
-                        ui_print "* $PKG_NAME added to detach list"
-                        ui_print "* Play Store updates blocked for this app"
+                        DETACH_SUCCESS=true
+                        debug_log "detach.bin created successfully!"
+                        debug_log "detach.bin location: $DBIN"
+                        debug_log "detach.bin size: $(stat -c %s "$DBIN") bytes"
+                        debug_log "detach.bin permissions: $(stat -c %a "$DBIN")"
+                        debug_log "detach.bin contents (hex):"
+                        xxd "$DBIN" | head -5 >> "$DEBUG_LOG"
+
+                        # Set proper permissions
+                        chmod 644 "$DBIN"
+                        chown root:root "$DBIN"
+                        debug_log "Set permissions on detach.bin"
                 else
-                        ui_print "* Warning: Could not create detach.bin"
-                        ui_print "* Auto-detach may not work"
+                        debug_log "ERROR: detach.bin was NOT created!"
+                        debug_log "Checking if zygisk-detach directory exists..."
+                        ls -la /data/adb/zygisk-detach/ >> "$DEBUG_LOG"
                 fi
         else
-                ui_print "* Warning: detach binary not found for $BIN_ARCH"
-                ui_print "* Auto-detach will not work"
+                debug_log "ERROR: Detach binary NOT found at $DETACH_BIN"
+                debug_log "Available binaries in bin folder:"
+                find "$MODPATH/bin" -type f -name "detach" >> "$DEBUG_LOG"
         fi
-        
+
+        # Copy zygisk .so to proper location for this module
+        # The .so should stay in zygisk/ folder for Zygisk to load
+        if [ -f "$MODPATH/zygisk/$ZYGISK_ARCH.so" ]; then
+                debug_log "Zygisk .so found: $MODPATH/zygisk/$ZYGISK_ARCH.so"
+                chmod 644 "$MODPATH/zygisk/$ZYGISK_ARCH.so"
+                debug_log "Zygisk .so permissions set"
+        else
+                debug_log "WARNING: Zygisk .so NOT found for architecture $ZYGISK_ARCH"
+                debug_log "Available .so files:"
+                ls -la "$MODPATH/zygisk/" >> "$DEBUG_LOG"
+        fi
+
         ui_print ""
+        if [ "$DETACH_SUCCESS" = true ]; then
+                ui_print "✅ $PKG_NAME added to detach list"
+                ui_print "   Play Store updates will be blocked"
+        else
+                ui_print "⚠️  Failed to create detach.bin"
+                ui_print "   Check /sdcard/rvcbot-debug.txt for details"
+        fi
+else
+        ui_print "⚠️  Skipping auto-detach (Zygisk not enabled)"
+        debug_log "Skipped auto-detach setup - Zygisk not enabled"
 fi
 
-# KernelSU support
+# ============================================
+# KERNELSU SUPPORT
+# ============================================
 if [ "$KSU" ]; then
+        debug_log "KernelSU detected"
         UID=$(dumpsys package "$PKG_NAME" 2>&1 | grep -m1 uid)
         UID=${UID#*=} UID=${UID%% *}
         if [ -z "$UID" ]; then
@@ -273,31 +394,45 @@ if [ "$KSU" ]; then
                 UID=${UID#*=} UID=${UID%% *}
         fi
         if [ "$UID" ]; then
-                if ! OP=$("${MODPATH:?}/bin/$ARCH/ksu_profile" "$UID" "$PKG_NAME" 2>&1); then
+                if ! OP=$("${MODPATH:?}/bin/$BIN_ARCH/ksu_profile" "$UID" "$PKG_NAME" 2>&1); then
                         ui_print "  $OP"
                         ui_print "* Because you are using a fork of KernelSU, "
                         ui_print "  you need to go to your root manager app and"
                         ui_print "  disable 'Unmount modules' option for $PKG_NAME"
                 fi
+                debug_log "KernelSU profile configured for UID: $UID"
         else
                 ui_print "ERROR: UID could not be found for $PKG_NAME"
                 dumpsys package "$PKG_NAME" >&2
+                debug_log "ERROR: Could not find UID for $PKG_NAME"
         fi
 fi
 
+# ============================================
+# CLEANUP
+# ============================================
+# Remove bin folder (detach binary no longer needed after creating detach.bin)
 rm -rf "${MODPATH:?}/bin" "$MODPATH/$PKG_NAME.apk"
 
 ui_print ""
 ui_print "=========================================="
 ui_print "  Installation Complete!"
 ui_print "=========================================="
-if [ "$ZYGISK_ENABLED" = true ]; then
+if [ "$ZYGISK_ENABLED" = true ] && [ "$DETACH_SUCCESS" = true ]; then
         ui_print ""
         ui_print "✅ Auto-Detach: ENABLED"
         ui_print "   Play Store cannot update this app"
+        ui_print ""
+        ui_print "   Debug log saved to:"
+        ui_print "   /sdcard/rvcbot-debug.txt"
 else
         ui_print ""
-        ui_print "⚠️  Auto-Detach: DISABLED (no Zygisk)"
+        ui_print "⚠️  Auto-Detach: DISABLED"
+        if [ "$ZYGISK_ENABLED" = false ]; then
+                ui_print "   Reason: Zygisk not enabled"
+        else
+                ui_print "   Reason: Failed to create detach.bin"
+        fi
         ui_print "   Disable auto-update in Play Store manually"
 fi
 ui_print ""
@@ -305,3 +440,17 @@ ui_print "* Done"
 ui_print "  by j-hc (github.com/j-hc)"
 ui_print "  RVCBotBuilds fork with Auto-Detach"
 ui_print " "
+
+# ============================================
+# FINAL DEBUG INFO
+# ============================================
+debug_log "=========================================="
+debug_log "INSTALLATION COMPLETE"
+debug_log "=========================================="
+debug_log "Zygisk enabled: $ZYGISK_ENABLED"
+debug_log "Detach success: $DETACH_SUCCESS"
+debug_log "Module path: $MODPATH"
+debug_log "Final module contents:"
+ls -la "$MODPATH/" >> "$DEBUG_LOG"
+debug_log "zygisk-detach directory:"
+ls -la /data/adb/zygisk-detach/ >> "$DEBUG_LOG"
