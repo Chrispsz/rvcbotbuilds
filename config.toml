@@ -1,5 +1,6 @@
 # ============================================
 # RVCBotBuilds - ReVanced (arm64-v8a)
+# With Auto-Detach (Zygisk)
 # ============================================
 
 enable-module-update = true
@@ -8,12 +9,12 @@ parallel-jobs = 2
 # ============================================
 # YouTube ReVanced - APK + Módulo (arm64-v8a)
 # Ícone e nome padrão do YouTube
+# Auto-Detach bloqueia atualizações do Play Store
 # ============================================
 [YouTube]
 build-mode = "both"
 arch = "arm64-v8a"
 excluded-patches = "'Custom branding'"
-included-patches = "'Disable Play Store updates'"
 apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"
 uptodown-dlurl = "https://youtube.en.uptodown.com/android"
 archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.youtube"
@@ -26,7 +27,6 @@ archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.y
 build-mode = "apk"
 arch = "arm64-v8a"
 excluded-patches = "'Custom branding'"
-included-patches = "'Disable Play Store updates'"
 apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"
 uptodown-dlurl = "https://youtube-music.en.uptodown.com/android"
 archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.apps.youtube.music"
