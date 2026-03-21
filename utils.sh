@@ -271,7 +271,7 @@ get_patch_last_supported_ver() {
                         return
                 fi
         fi
-        op=$(java -jar "$cli_jar" list-versions -p "$patches_jar" -b --filter-package-name="$pkg_name" 2>&1 | tail -n +3 | awk '{$1=$1}1')
+        op=$(java -jar "$cli_jar" list-versions -p "$patches_jar" -b --filter-package-names="$pkg_name" 2>&1 | tail -n +3 | awk '{$1=$1}1')
         if [ "$op" = "Any" ]; then return; fi
         pcount=$(head -1 <<<"$op") pcount=${pcount#*(} pcount=${pcount% *}
         if [ -z "$pcount" ]; then
