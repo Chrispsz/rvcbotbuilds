@@ -10,7 +10,6 @@ err() {
 
 until [ "$(getprop sys.boot_completed)" = 1 ]; do sleep 1; done
 until [ -d "/sdcard/Android" ]; do sleep 1; done
-
 while
 	BASEPATH=$(pm path "$PKG_NAME" 2>&1 </dev/null)
 	SVCL=$?

@@ -11,8 +11,6 @@ if [ -n "$MODULE_ARCH" ] && [ "$MODULE_ARCH" != "$ARCH" ]; then
 Your device: $ARCH
 Module: $MODULE_ARCH"
 fi
-
-# Architecture mapping
 if [ "$ARCH" = "arm" ]; then
         ARCH_LIB=armeabi-v7a
 elif [ "$ARCH" = "arm64" ]; then
@@ -234,8 +232,8 @@ am force-stop "$PKG_NAME"
 ui_print "* Optimizing $PKG_NAME"
 
 cmd package compile -m speed-profile -f "$PKG_NAME"
+# nohup cmd package compile -m speed-profile -f "$PKG_NAME" >/dev/null 2>&1
 
-# KernelSU root profile
 if [ "$KSU" ]; then
         UID=$(dumpsys package "$PKG_NAME" 2>&1 | grep -m1 uid)
         UID=${UID#*=} UID=${UID%% *}
@@ -256,10 +254,8 @@ if [ "$KSU" ]; then
         fi
 fi
 
-# Cleanup
 rm -rf "${MODPATH:?}/bin" "$MODPATH/$PKG_NAME.apk"
 
-ui_print ""
 ui_print "* Done"
 ui_print "  RVCBotBuilds with Auto-Detach"
 ui_print " "

@@ -1,63 +1,56 @@
-# RVCBot Builds
+# ReVanced Magisk Module
+[![Telegram](https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/rvc_magisk)
+[![CI](https://github.com/j-hc/revanced-magisk-module/actions/workflows/ci.yml/badge.svg?event=schedule)](https://github.com/j-hc/revanced-magisk-module/actions/workflows/ci.yml)
 
-[![CI](https://github.com/Chrispsz/rvcbotbuilds/actions/workflows/ci.yml/badge.svg)](https://github.com/Chrispsz/rvcbotbuilds/actions/workflows/ci.yml)
+Extensive ReVanced builder  
 
-Automated ReVanced builds with Magisk module support.
+Get the [latest CI release](https://github.com/j-hc/revanced-magisk-module/releases).
 
-## Features
+Use [**zygisk-detach**](https://github.com/j-hc/zygisk-detach) to detach YouTube and YT Music from Play Store if you are using magisk modules. 
 
-- 🤖 Automated daily builds (4PM UTC)
-- 📦 arm64-v8a architecture optimized
-- 🔄 ReVanced official patches
-- 📱 YouTube APK + Magisk Module
-- 🎵 YouTube Music APK
+<details><summary><big>Features</big></summary>
+<ul>
+ <li> Supports all present and future ReVanced apps (including projects implementing the same API)</li>
+ <li> Can build Magisk modules and non-root APKs</li>
+ <li> Updated daily with the latest versions of apps and patches</li>
+ <li> Optimizes APKs and modules for size</li>
+ <li> Modules</li>
+    <ul>
+     <li> recompile invalidated odex for faster usage</li>
+     <li> receive updates from Magisk app</li>
+     <li> do not break safetynet or trigger root detections</li>
+     <li> handle installation of the correct version of the stock app and all that</li>
+     <li> support Magisk and KernelSU</li>
+    </ul>
+</ul>
+</details>
 
-## Downloads
+## To include/exclude patches or patch other apps
 
-Get the latest builds from [Releases](https://github.com/Chrispsz/rvcbotbuilds/releases).
+ * Star the repo :eyes:
+ * Use the repo as a [template](https://github.com/new?template_name=revanced-magisk-module&template_owner=j-hc)
+ * Customize [`config.toml`](./config.toml) using [rvmm-config-gen](https://j-hc.github.io/rvmm-config-gen/)
+ * Run the build [workflow](../../actions/workflows/build.yml)
+ * Grab your modules and APKs from [releases](../../releases)
 
-## Installation
+also see here [`CONFIG.md`](./CONFIG.md)
 
-### Non-Root (APK)
-1. Install [GmsCore](https://github.com/ReVanced/GmsCore/releases)
-2. Download APK from releases
-3. Install on your device
+## If you are having trouble with the classic mount method of the modules
+such as,
+- **"Reflash needed"** error after reboots
+- **"Suspicious mount detected"** warnings from root detector apps
 
-### Root (Magisk Module)
-1. Download module zip from releases
-2. Flash in Magisk
-3. Reboot
+You can consider using [rvmm-zygisk-mount](https://github.com/j-hc/rvmm-zygisk-mount)
 
-## Build Locally
-
-### Termux (Android)
-```bash
-bash <(curl -sSf https://raw.githubusercontent.com/Chrispsz/rvcbotbuilds/main/build-termux.sh)
+## Building Locally
+### On Termux
+```console
+bash <(curl -sSf https://raw.githubusercontent.com/j-hc/revanced-magisk-module/main/build-termux.sh)
 ```
 
-### Desktop (Linux)
-```bash
-git clone https://github.com/Chrispsz/rvcbotbuilds
-cd rvcbotbuilds
-./build.sh
+### On Linux
+```console
+$ git clone https://github.com/j-hc/revanced-magisk-module --depth 1
+$ cd revanced-magisk-module
+$ ./build.sh
 ```
-
-## Requirements
-
-- Java 17+
-- jq
-- zip
-- curl
-
-## Credits
-
-- [j-hc/revanced-magisk-module](https://github.com/j-hc/revanced-magisk-module) - Build system
-- [ReVanced](https://github.com/ReVanced) - Patches & CLI
-
-## License
-
-GPL-3.0 License
-
----
-
-Built with ❤️ by [Chrispsz](https://github.com/Chrispsz)
