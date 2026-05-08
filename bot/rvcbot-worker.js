@@ -12,7 +12,7 @@
 
 const TTL_PHONE = 604800;   // 7 dias
 const TTL_YOUTUBE = 1800;   // 30 min
-const TTL_RATELIMIT = 60;   // 1 min por comando
+const TTL_RATELIMIT = 5;    // 5s entre comandos (anti-spam leve)
 const FETCH_TIMEOUT = 12000; // 12s timeout
 const MAX_QUERY_LEN = 80;
 
@@ -72,9 +72,9 @@ async function handleTelegramWebhook(request, env, ctx) {
 
     const ctxObj = { chatId, userId, env, TELEGRAM_API, ctx };
 
-    // Rate limiting
+    // Rate limiting (leve — só pra evitar flood)
     if (!(await checkRateLimit(env, userId))) {
-      await sendMessage(ctxObj, '⏳ Aguarde um momento antes de enviar outro comando\\.');
+      await sendMessage(ctxObj, '⏳ Aguarde uns segundos\\.\\.\\.');
       return new Response('OK');
     }
 
@@ -127,6 +127,9 @@ async function handleTelegramWebhook(request, env, ctx) {
         break;
     }
 
+    // Libera rate limit após comando completar
+    await clearRateLimit(env, userId);
+
     return new Response('OK');
   } catch (error) {
     logError('Webhook error', error);
@@ -135,7 +138,7 @@ async function handleTelegramWebhook(request, env, ctx) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// 🛡️ RATE LIMITING
+// 🛡️ RATE LIMITING (leve, só anti-flood)
 // ═══════════════════════════════════════════════════════════════════
 
 async function checkRateLimit(env, userId) {
@@ -145,6 +148,13 @@ async function checkRateLimit(env, userId) {
   if (existing) return false;
   await env.RVC_BOT_KV.put(key, '1', { expirationTtl: TTL_RATELIMIT });
   return true;
+}
+
+// Limpa rate limit ao completar comando (pra não travar o próximo)
+async function clearRateLimit(env, userId) {
+  if (!env.RVC_BOT_KV) return;
+  const key = `ratelimit:${userId}`;
+  await env.RVC_BOT_KV.delete(key);
 }
 
 // ═══════════════════════════════════════════════════════════════════
