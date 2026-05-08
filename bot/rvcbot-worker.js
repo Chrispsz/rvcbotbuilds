@@ -193,7 +193,7 @@ function sanitizeInput(query) {
 
 function escapeMd(text) {
   if (!text) return '';
-  return text.replace(/([_*\[\]()~`>#+\-=|{}.!])/g, '\\$1');
+  return text.replace(/([_*\[\]()~`>#+\-=|{}.!])/g, (m, c) => '\\' + c);
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -788,18 +788,15 @@ async function handleYoutubeCommand(ctxObj) {
 // Preserva links [text](url), escapa resto
 function githubMdToTelegram(text) {
   if (!text) return '';
-  // Extrair todos os links, substituir por placeholders seguros
   const links = [];
   let result = text.replace(/\[([^\]]*)\]\(([^)]+)\)/g, (match, linkText, url) => {
     links.push({ text: linkText, url });
     return 'LMLINK' + (links.length - 1) + 'LM';
   });
-  // Escapar caracteres MarkdownV2 no texto (exceto nos placeholders)
-  result = result.replace(/([_*\[\]()~`>#+\-=|{}.!])/g, '\\$1');
-  // Restaurar links: placeholders não são afetados pois L/M não são chars especiais
+  result = result.replace(/([_*\[\]()~`>#+\-=|{}.!])/g, (m, c) => '\\' + c);
   result = result.replace(/LMLINK(\d+)LM/g, (_, i) => {
     const link = links[parseInt(i)];
-    const escapedText = link.text.replace(/([_*\[\]()~`>#+\-=|{}.!])/g, '\\$1');
+    const escapedText = link.text.replace(/([_*\[\]()~`>#+\-=|{}.!])/g, (m2, c2) => '\\' + c2);
     return '[' + escapedText + '](' + link.url + ')';
   });
   return result;
@@ -822,19 +819,19 @@ function formatRelease(r) {
       downloads += '📱 *APKs:*\n';
       apks.forEach(a => {
         const size = (a.size / 1024 / 1024).toFixed(1);
-        downloads += '• [' + escapeMd(a.name) + '](' + a.browser_download_url + ') _(' + size + 'MB)_\n';
+        downloads += '• [' + escapeMd(a.name) + '](' + a.browser_download_url + ') _\\(' + size + 'MB\\)_\n';
       });
     }
     if (zips.length) {
       downloads += '🗜️ *Módulos:*\n';
       zips.forEach(a => {
         const size = (a.size / 1024 / 1024).toFixed(1);
-        downloads += '• [' + escapeMd(a.name) + '](' + a.browser_download_url + ') _(' + size + 'MB)_\n';
+        downloads += '• [' + escapeMd(a.name) + '](' + a.browser_download_url + ') _\\(' + size + 'MB\\)_\n';
       });
     }
     others.forEach(a => {
       const size = (a.size / 1024 / 1024).toFixed(1);
-      downloads += '📦 [' + escapeMd(a.name) + '](' + a.browser_download_url + ') _(' + size + 'MB)_\n';
+      downloads += '📦 [' + escapeMd(a.name) + '](' + a.browser_download_url + ') _\\(' + size + 'MB\\)_\n';
     });
   }
 
