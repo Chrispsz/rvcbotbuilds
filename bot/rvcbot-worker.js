@@ -788,16 +788,16 @@ async function handleYoutubeCommand(ctxObj) {
 // Preserva links [text](url), escapa resto
 function githubMdToTelegram(text) {
   if (!text) return '';
-  // Proteger links: [text](url) → placeholder inconfundível
+  // Extrair todos os links, substituir por placeholders seguros
   const links = [];
   let result = text.replace(/\[([^\]]*)\]\(([^)]+)\)/g, (match, linkText, url) => {
     links.push({ text: linkText, url });
-    return '\x00LINK' + (links.length - 1) + '\x00';
+    return 'LMLINK' + (links.length - 1) + 'LM';
   });
-  // Escapar caracteres MarkdownV2 no resto
+  // Escapar caracteres MarkdownV2 no texto (exceto nos placeholders)
   result = result.replace(/([_*\[\]()~`>#+\-=|{}.!])/g, '\\$1');
-  // Restaurar links com escape no texto do link
-  result = result.replace(/\x00LINK(\d+)\x00/g, (_, i) => {
+  // Restaurar links: placeholders não são afetados pois L/M não são chars especiais
+  result = result.replace(/LMLINK(\d+)LM/g, (_, i) => {
     const link = links[parseInt(i)];
     const escapedText = link.text.replace(/([_*\[\]()~`>#+\-=|{}.!])/g, '\\$1');
     return '[' + escapedText + '](' + link.url + ')';
