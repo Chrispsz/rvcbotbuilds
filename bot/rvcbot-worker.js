@@ -784,6 +784,27 @@ async function handleYoutubeCommand(ctxObj) {
   }
 }
 
+// Converte GitHub Markdown → Telegram MarkdownV2
+// Preserva links [text](url), escapa resto
+function githubMdToTelegram(text) {
+  if (!text) return '';
+  // Proteger links: [text](url) → placeholder inconfundível
+  const links = [];
+  let result = text.replace(/\[([^\]]*)\]\(([^)]+)\)/g, (match, linkText, url) => {
+    links.push({ text: linkText, url });
+    return '\x00LINK' + (links.length - 1) + '\x00';
+  });
+  // Escapar caracteres MarkdownV2 no resto
+  result = result.replace(/([_*\[\]()~`>#+\-=|{}.!])/g, '\\$1');
+  // Restaurar links com escape no texto do link
+  result = result.replace(/\x00LINK(\d+)\x00/g, (_, i) => {
+    const link = links[parseInt(i)];
+    const escapedText = link.text.replace(/([_*\[\]()~`>#+\-=|{}.!])/g, '\\$1');
+    return '[' + escapedText + '](' + link.url + ')';
+  });
+  return result;
+}
+
 function formatRelease(r) {
   const date = new Date(r.published_at).toLocaleDateString('pt-BR');
   const body = (r.body || '')
@@ -820,7 +841,7 @@ function formatRelease(r) {
   let msg = '📦 *RVCArise \\- Atualização*\n\n';
   msg += '🔖 *Versão:* `' + escapeMd(r.tag_name) + '`\n';
   msg += '📅 *Data:* ' + escapeMd(date) + '\n';
-  if (body && body !== '_Sem descrição_') msg += '\n📝 *Changelog:*\n' + escapeMd(body) + '\n';
+  if (body && body !== '_Sem descrição_') msg += '\n📝 *Changelog:*\n' + githubMdToTelegram(body) + '\n';
   msg += '\n⬇️ *Downloads:*\n' + (downloads || '_Nenhum arquivo_');
 
   if (msg.length > 4000) {
