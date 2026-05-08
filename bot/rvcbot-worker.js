@@ -1,22 +1,13 @@
 // ═══════════════════════════════════════════════════════════════════
-// 🤖 RVCArise BOT v33.0 (PRODUCTION)
-// Changelog v32→v33:
-//   - FIX: Env vars agora usam parâmetro env do Worker (padrão CF)
-//   - FIX: Prerelease não é mais priorizado no !youtube
-//   - FIX: Markdown escaping para nomes com _ * [ ] etc.
-//   - FIX: Timeout em todos os fetchs (AbortController)
-//   - FIX: Auto-limpeza usa waitUntil corretamente
-//   - ADD: Rate limiting por usuário (KV-based)
-//   - ADD: Input sanitization
-//   - ADD: Exact match bonus no algoritmo de relevância
-//   - ADD: Health check endpoint com status das env vars
-//   - ADD: Retry com backoff no Telegram API
-//   - ADD: !ping para admin testar latência
-//   - IMP: Parser mais resiliente com múltiplos patterns
-//   - IMP: Tradução mais completa e consistente
-//   - IMP: Log de erros estruturado
-//   - IMP: Downloads agrupados por tipo (APKs / Módulos)
-//   - IMP: Mensagens truncadas se > 4096 chars
+// 🤖 RVCArise BOT v34.0 (PRODUCTION)
+// Changelog v33→v34:
+//   - FIX CRITICAL: MarkdownV2 escaping — \- and \. in JS strings
+//     become - and . (backslash eaten by JS), but Telegram requires
+//     \- and \. in MarkdownV2. All strings now use \\- and \\. etc.
+//   - FIX: telegramApiCall now checks for ok:false and logs errors
+//   - FIX: Added MarkdownV2 fallback — if parsing fails, retries as
+//     plain text so the bot ALWAYS responds
+//   - FIX: Rate limit message had unescaped . (also failed silently)
 // ═══════════════════════════════════════════════════════════════════
 
 const TTL_PHONE = 604800;   // 7 dias
@@ -56,7 +47,6 @@ export default {
 
   async scheduled(event, env, ctx) {
     // KV gerencia TTL automaticamente
-    // Pode ser usado para tarefas de manutenção futuras
   },
 };
 
@@ -84,7 +74,7 @@ async function handleTelegramWebhook(request, env, ctx) {
 
     // Rate limiting
     if (!(await checkRateLimit(env, userId))) {
-      await sendMessage(ctxObj, '⏳ Aguarde um momento antes de enviar outro comando\.');
+      await sendMessage(ctxObj, '⏳ Aguarde um momento antes de enviar outro comando\\.');
       return new Response('OK');
     }
 
@@ -101,10 +91,10 @@ async function handleTelegramWebhook(request, env, ctx) {
           if (sanitized) {
             await handlePhoneSearch(ctxObj, sanitized);
           } else {
-            await sendMessage(ctxObj, '⚠️ Query inválida\.'); 
+            await sendMessage(ctxObj, '⚠️ Query inválida\\.');
           }
         } else {
-          await sendMessage(ctxObj, '⚠️ Digite o nome do celular\.\nEx: `!d galaxy s24`');
+          await sendMessage(ctxObj, '⚠️ Digite o nome do celular\\. Ex: `!d galaxy s24`');
         }
         break;
 
@@ -123,16 +113,15 @@ async function handleTelegramWebhook(request, env, ctx) {
         if (userId === Number(env.ADMIN_ID)) {
           await handleResetCache(ctxObj, args);
         } else {
-          await sendMessage(ctxObj, '⛔ Sem permissão\.');
+          await sendMessage(ctxObj, '⛔ Sem permissão\\.');
         }
         break;
 
       case '!ping':
         if (userId === Number(env.ADMIN_ID)) {
           const start = Date.now();
-          const res = await sendMessage(ctxObj, '🏓 Pong\!');
+          await sendMessage(ctxObj, '🏓 Pong\\!');
           const latency = Date.now() - start;
-          // Log para o admin ver no dashboard
           console.log(`[RVCArise] Ping: ${latency}ms`);
         }
         break;
@@ -150,7 +139,7 @@ async function handleTelegramWebhook(request, env, ctx) {
 // ═══════════════════════════════════════════════════════════════════
 
 async function checkRateLimit(env, userId) {
-  if (!env.RVC_BOT_KV) return true; // Fallback se KV não configurado
+  if (!env.RVC_BOT_KV) return true;
   const key = `ratelimit:${userId}`;
   const existing = await env.RVC_BOT_KV.get(key);
   if (existing) return false;
@@ -223,12 +212,11 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = FETCH_TIMEOUT) {
 // ═══════════════════════════════════════════════════════════════════
 
 async function handleHelp(ctx) {
-  const msg = `🤖 *RVCArise Bot*
-
-📱 \`!d <nome>\` \- Especificações
-📦 \`!youtube\` \- Última versão
-🧹 \`!resetcache\` \- Limpar dados
-🏓 \`!ping\` \- Status do bot`;
+  const msg = '🤖 *RVCArise Bot*\n\n' +
+    '📱 `!d <nome>` \\- Especificações\n' +
+    '📦 `!youtube` \\- Última versão\n' +
+    '🧹 `!resetcache` \\- Limpar dados\n' +
+    '🏓 `!ping` \\- Status do bot';
   await sendMessage(ctx, msg);
 }
 
@@ -280,12 +268,10 @@ function calculateRelevance(candidateName, queryWords, originalQuery) {
   let score = 0;
   let matchedWords = 0;
 
-  // Exact match bonus (nome completo bate com a query)
   if (candidateName.toLowerCase() === originalQuery.toLowerCase()) {
     score += 500;
   }
 
-  // Prefix match bonus
   if (candidateName.toLowerCase().startsWith(originalQuery.toLowerCase())) {
     score += 300;
   }
@@ -293,7 +279,6 @@ function calculateRelevance(candidateName, queryWords, originalQuery) {
   queryWords.forEach(q => {
     const qLower = q.toLowerCase();
     if (candidateName.toLowerCase().includes(qLower)) {
-      // Exact word match > substring match
       if (cWords.some(cw => cw === qLower)) {
         score += 120;
       } else {
@@ -305,11 +290,9 @@ function calculateRelevance(candidateName, queryWords, originalQuery) {
 
   if (matchedWords === 0) return 0;
 
-  // Coverage bonus (quanto mais palavras da query match, melhor)
   const coverage = matchedWords / queryWords.length;
   score += Math.floor(coverage * 150);
 
-  // Penalty: modificadores que NÃO estão na query
   const modifiers = [
     'plus', 'pro', 'max', 'ultra', 'lite', 'mini',
     'note', 'edge', 'fe', 'neo', 'prime', 'turbo',
@@ -321,7 +304,6 @@ function calculateRelevance(candidateName, queryWords, originalQuery) {
     }
   });
 
-  // Penalty: diferença de tamanho do nome
   const lengthDiff = Math.abs(cWords.length - queryWords.length);
   score -= lengthDiff * 15;
 
@@ -369,7 +351,6 @@ async function fetchGSMArena(query) {
         if (isBlocked(html, resp.status)) continue;
         debugInfo.finalUrl = finalUrl;
 
-        // Sem resultados
         if (
           html.includes('No phone found') ||
           html.includes('0 results found') ||
@@ -378,7 +359,6 @@ async function fetchGSMArena(query) {
           return { type: 'empty', debug: debugInfo };
         }
 
-        // Redirecionou direto pra página do aparelho
         if (
           !finalUrl.includes('results.php3') &&
           !finalUrl.includes('res.php3')
@@ -388,7 +368,6 @@ async function fetchGSMArena(query) {
           }
         }
 
-        // Lista de candidatos
         const candidates = extractCandidatesSmart(html, qWords, query);
         debugInfo.candidates = candidates.map(c => `${c.name} (Score:${c.score})`);
 
@@ -408,9 +387,7 @@ function extractCandidatesSmart(html, queryWords, originalQuery) {
   const candidates = [];
   const seen = new Set();
 
-  // Pattern 1: Links de resultados normais
   const regex1 = /<a\s+href="([a-z0-9_-]+\.php)"[^>]*>([\s\S]*?)<\/a>/gi;
-  // Pattern 2: Links com data-src (nova estrutura)
   const regex2 = /<a\s+[^>]*href="([a-z0-9_-]+\.php)"[^>]*data-src[^>]*>([\s\S]*?)<\/a>/gi;
 
   for (const regex of [regex1, regex2]) {
@@ -474,20 +451,20 @@ async function handlePhoneSearch(ctxObj, query) {
     }
   }
 
-  const loadMsg = await sendMessage(ctxObj, '🔍 Buscando\.\.');
+  const loadMsg = await sendMessage(ctxObj, '🔍 Buscando\\.\\.\\.');
   const loadId = loadMsg?.result?.message_id;
 
   try {
     const result = await fetchGSMArena(query);
 
     if (result.type === 'empty') {
-      const errId = (await editMessage(ctxObj, loadId, `❌ Aparelho não encontrado: *${escapeMd(query)}*\n_Tente abreviar ou verificar o nome\._`))?.result?.message_id;
+      const errId = (await editMessage(ctxObj, loadId, '❌ Aparelho não encontrado: *' + escapeMd(query) + '*\n_Tente abreviar ou verificar o nome\\._'))?.result?.message_id;
       if (errId) deleteMessageDelayed(ctxObj, errId, 10);
       return;
     }
 
     if (result.type === 'failed') {
-      const errId = (await editMessage(ctxObj, loadId, '❌ Erro ao acessar GSMArena\. Tente novamente em alguns minutos\.'))?.result?.message_id;
+      const errId = (await editMessage(ctxObj, loadId, '❌ Erro ao acessar GSMArena\\. Tente novamente em alguns minutos\\.'))?.result?.message_id;
       if (errId) deleteMessageDelayed(ctxObj, errId, 10);
       return;
     }
@@ -503,7 +480,7 @@ async function handlePhoneSearch(ctxObj, query) {
 
       html = await fetchPhonePage(phoneUrl);
       if (!html) {
-        const errId = (await editMessage(ctxObj, loadId, '❌ Erro ao carregar página do aparelho\.'))?.result?.message_id;
+        const errId = (await editMessage(ctxObj, loadId, '❌ Erro ao carregar página do aparelho\\.'))?.result?.message_id;
         if (errId) deleteMessageDelayed(ctxObj, errId, 10);
         return;
       }
@@ -512,7 +489,7 @@ async function handlePhoneSearch(ctxObj, query) {
     const specs = parseSpecs(html, phoneUrl);
 
     if (!specs.name) {
-      const errId = (await editMessage(ctxObj, loadId, '❌ Dados indisponíveis\.'))?.result?.message_id;
+      const errId = (await editMessage(ctxObj, loadId, '❌ Dados indisponíveis\\.'))?.result?.message_id;
       if (errId) deleteMessageDelayed(ctxObj, errId, 10);
       return;
     }
@@ -528,7 +505,7 @@ async function handlePhoneSearch(ctxObj, query) {
     await sendResult(ctxObj, specs, phoneUrl);
   } catch (error) {
     logError('PhoneSearch error', error);
-    const errId = (await editMessage(ctxObj, loadId, '❌ Erro interno\. Tente novamente\.'))?.result?.message_id;
+    const errId = (await editMessage(ctxObj, loadId, '❌ Erro interno\\. Tente novamente\\.'))?.result?.message_id;
     if (errId) deleteMessageDelayed(ctxObj, errId, 10);
   }
 }
@@ -593,14 +570,12 @@ function parseSpecs(html, url) {
     return null;
   };
 
-  // Nome - múltiplos patterns
   specs.name =
     html.match(/<h1[^>]*class="specs-phone-name-title"[^>]*>([^<]+)/i)?.[1]?.trim() ||
     getSpec('modelname') ||
     html.match(/<span[^>]*class="specs-phone-name-title"[^>]*>([^<]+)/i)?.[1]?.trim() ||
     html.match(/<title>([^<|]+)/i)?.[1]?.replace(/- Full phone specifications/gi, '').trim();
 
-  // Imagem - jpg e png
   specs.image =
     html.match(/(https:\/\/fdn\d?\.gsmarena\.com\/vv\/bigpic\/[a-zA-Z0-9_-]+\.jpg)/i)?.[1] ||
     html.match(/(https:\/\/fdn\d?\.gsmarena\.com\/vv\/bigpic\/[a-zA-Z0-9_-]+\.png)/i)?.[1] ||
@@ -642,7 +617,6 @@ function formatSpecs(s, url) {
   const tr = text => {
     if (!text) return '';
     let t = text
-      // Hardware/Tech
       .replace(/non-removable/gi, 'fixa')
       .replace(/removable/gi, 'removível')
       .replace(/Li-Po|Li-Ion/gi, '')
@@ -656,11 +630,9 @@ function formatSpecs(s, url) {
       .replace(/glass back/gi, 'vidro traseiro')
       .replace(/aluminum frame/gi, 'estrutura de alumínio')
       .replace(/plastic back/gi, 'traseira plástica')
-      // Charging
-      .replace(/(\d+W)( wired)/i, '$1 \(Cabo\)')
+      .replace(/(\d+W)( wired)/i, '$1 \\(Cabo\\)')
       .replace(/(\d+W)( reverse wired)/i, '$1 Reverso')
       .replace(/wireless/gi, 'sem fio')
-      // Meses
       .replace(/January/gi, 'Janeiro')
       .replace(/February/gi, 'Fevereiro')
       .replace(/March/gi, 'Março')
@@ -673,51 +645,48 @@ function formatSpecs(s, url) {
       .replace(/October/gi, 'Outubro')
       .replace(/November/gi, 'Novembro')
       .replace(/December/gi, 'Dezembro')
-      // Cleanup
       .replace(/\s+/g, ' ')
       .trim();
     return t;
   };
 
-  // Limpeza visual do nome
   let displayName = s.name
     .replace(/ - Full phone specifications/g, '')
     .replace(/ Full phone specifications/g, '')
     .trim();
   if (displayName.endsWith(',')) displayName = displayName.slice(0, -1).trim();
 
-  let msg = `📱 *${escapeMd(displayName)}*\n\n`;
+  let msg = '📱 *' + escapeMd(displayName) + '*\n\n';
 
-  if (s.released) msg += `🗓️ ${tr(escapeMd(s.released))}\n`;
-  if (s.body) msg += `⚖️ ${tr(escapeMd(s.body))}\n`;
+  if (s.released) msg += '🗓️ ' + tr(escapeMd(s.released)) + '\n';
+  if (s.body) msg += '⚖️ ' + tr(escapeMd(s.body)) + '\n';
 
-  if (s.display) msg += `\n🖥️ *Tela*\n${tr(escapeMd(s.display))}\n`;
+  if (s.display) msg += '\n🖥️ *Tela*\n' + tr(escapeMd(s.display)) + '\n';
 
-  msg += `\n🧠 *Hardware*\n`;
-  if (s.chipset) msg += `• CPU: ${escapeMd(s.chipset)}\n`;
-  if (s.memory) msg += `• Memória: ${escapeMd(s.memory)}\n`;
-  if (s.os) msg += `• Sistema: ${tr(escapeMd(s.os))}\n`;
+  msg += '\n🧠 *Hardware*\n';
+  if (s.chipset) msg += '• CPU: ' + escapeMd(s.chipset) + '\n';
+  if (s.memory) msg += '• Memória: ' + escapeMd(s.memory) + '\n';
+  if (s.os) msg += '• Sistema: ' + tr(escapeMd(s.os)) + '\n';
 
   if (s.camera || s.selfie) {
-    msg += `\n📸 *Câmeras*\n`;
-    if (s.camera) msg += `• Traseira: ${tr(escapeMd(s.camera))}\n`;
-    if (s.video) msg += `• Vídeo: ${escapeMd(s.video)}\n`;
-    if (s.selfie) msg += `• Frontal: ${tr(escapeMd(s.selfie))}\n`;
+    msg += '\n📸 *Câmeras*\n';
+    if (s.camera) msg += '• Traseira: ' + tr(escapeMd(s.camera)) + '\n';
+    if (s.video) msg += '• Vídeo: ' + escapeMd(s.video) + '\n';
+    if (s.selfie) msg += '• Frontal: ' + tr(escapeMd(s.selfie)) + '\n';
   }
 
   const extras = [];
   if (s.nfc?.toLowerCase().includes('yes')) extras.push('NFC ✅');
   if (s.jack?.toLowerCase().includes('yes')) extras.push('P2 ✅');
-  if (extras.length) msg += `\n📡 ${extras.join(' • ')}\n`;
+  if (extras.length) msg += '\n📡 ' + extras.join(' • ') + '\n';
 
-  if (s.battery) msg += `\n🔋 *Bateria:* ${tr(escapeMd(s.battery))}\n`;
-  if (s.charging) msg += `⚡ ${tr(escapeMd(s.charging))}\n`;
+  if (s.battery) msg += '\n🔋 *Bateria:* ' + tr(escapeMd(s.battery)) + '\n';
+  if (s.charging) msg += '⚡ ' + tr(escapeMd(s.charging)) + '\n';
 
-  msg += `\n🔗 [Ficha completa](${url})`;
+  msg += '\n🔗 [Ficha completa](' + url + ')';
 
-  // Telegram markdown v2 tem limite de 4096 chars
   if (msg.length > 4000) {
-    msg = msg.slice(0, 3990) + '\n\\[\\.\\.\\.\\]';
+    msg = msg.slice(0, 3990) + '\n\\.\\.\\.';
   }
 
   return msg;
@@ -728,7 +697,7 @@ async function sendResult(ctxObj, specs, url) {
 
   if (specs.image) {
     const result = await sendPhoto(ctxObj, specs.image, msg);
-    if (!result.ok) {
+    if (!result?.ok) {
       await sendMessage(ctxObj, msg, { disable_web_page_preview: true });
     }
   } else {
@@ -752,7 +721,7 @@ async function handleYoutubeCommand(ctxObj) {
     }
   }
 
-  const loadMsg = await sendMessage(ctxObj, '🔄 Buscando\.\.');
+  const loadMsg = await sendMessage(ctxObj, '🔄 Buscando\\.\\.\\.');
   const loadId = loadMsg?.result?.message_id;
 
   try {
@@ -771,9 +740,9 @@ async function handleYoutubeCommand(ctxObj) {
     );
 
     if (!resp.ok) {
-      let errMsg = `❌ GitHub erro: ${resp.status}`;
-      if (resp.status === 403) errMsg = '⚠️ Erro 403: Token necessário ou rate limit\.';
-      if (resp.status === 404) errMsg = '⚠️ Repo não encontrado\. Verifique GITHUB\_REPO\.';
+      let errMsg = '❌ GitHub erro: ' + resp.status;
+      if (resp.status === 403) errMsg = '⚠️ Erro 403: Token necessário ou rate limit\\.';
+      if (resp.status === 404) errMsg = '⚠️ Repo não encontrado\\. Verifique GITHUB\\_REPO\\.';
       const errId = (await editMessage(ctxObj, loadId, errMsg))?.result?.message_id;
       if (errId) deleteMessageDelayed(ctxObj, errId, 10);
       return;
@@ -782,12 +751,11 @@ async function handleYoutubeCommand(ctxObj) {
     const data = await resp.json();
 
     if (!Array.isArray(data) || data.length === 0) {
-      const errId = (await editMessage(ctxObj, loadId, '❌ Nenhuma release encontrada\.'))?.result?.message_id;
+      const errId = (await editMessage(ctxObj, loadId, '❌ Nenhuma release encontrada\\.'))?.result?.message_id;
       if (errId) deleteMessageDelayed(ctxObj, errId, 10);
       return;
     }
 
-    // FIX: Priorizar release estável (não prerelease)
     const release = data.find(r => !r.prerelease) || data[0];
 
     // Salvar no cache
@@ -801,7 +769,7 @@ async function handleYoutubeCommand(ctxObj) {
     await sendMessage(ctxObj, formatRelease(release), { disable_web_page_preview: true });
   } catch (e) {
     logError('YoutubeCommand error', e);
-    const errId = (await editMessage(ctxObj, loadId, '❌ Erro ao buscar releases\.'))?.result?.message_id;
+    const errId = (await editMessage(ctxObj, loadId, '❌ Erro ao buscar releases\\.'))?.result?.message_id;
     if (errId) deleteMessageDelayed(ctxObj, errId, 10);
   }
 }
@@ -815,39 +783,38 @@ function formatRelease(r) {
 
   let downloads = '';
   if (r.assets?.length) {
-    // Agrupa por tipo
     const apks = r.assets.filter(a => a.name.endsWith('.apk'));
     const zips = r.assets.filter(a => a.name.endsWith('.zip'));
     const others = r.assets.filter(a => !a.name.endsWith('.apk') && !a.name.endsWith('.zip'));
 
     if (apks.length) {
-      downloads += `📱 *APKs:*\n`;
+      downloads += '📱 *APKs:*\n';
       apks.forEach(a => {
         const size = (a.size / 1024 / 1024).toFixed(1);
-        downloads += `• [${escapeMd(a.name)}](${a.browser_download_url}) _\(${size}MB\)_\n`;
+        downloads += '• [' + escapeMd(a.name) + '](' + a.browser_download_url + ') _(' + size + 'MB)_\n';
       });
     }
     if (zips.length) {
-      downloads += `🗜️ *Módulos:*\n`;
+      downloads += '🗜️ *Módulos:*\n';
       zips.forEach(a => {
         const size = (a.size / 1024 / 1024).toFixed(1);
-        downloads += `• [${escapeMd(a.name)}](${a.browser_download_url}) _\(${size}MB\)_\n`;
+        downloads += '• [' + escapeMd(a.name) + '](' + a.browser_download_url + ') _(' + size + 'MB)_\n';
       });
     }
     others.forEach(a => {
       const size = (a.size / 1024 / 1024).toFixed(1);
-      downloads += `📦 [${escapeMd(a.name)}](${a.browser_download_url}) _\(${size}MB\)_\n`;
+      downloads += '📦 [' + escapeMd(a.name) + '](' + a.browser_download_url + ') _(' + size + 'MB)_\n';
     });
   }
 
-  let msg = `📦 *RVCArise \- Atualização*\n\n`;
-  msg += `🔖 *Versão:* \`${r.tag_name}\`\n`;
-  msg += `📅 *Data:* ${date}\n`;
-  if (body && body !== '_Sem descrição_') msg += `\n📝 *Changelog:*\n${escapeMd(body)}\n`;
-  msg += `\n⬇️ *Downloads:*\n${downloads || '_Nenhum arquivo_'}`;
+  let msg = '📦 *RVCArise \\- Atualização*\n\n';
+  msg += '🔖 *Versão:* `' + escapeMd(r.tag_name) + '`\n';
+  msg += '📅 *Data:* ' + escapeMd(date) + '\n';
+  if (body && body !== '_Sem descrição_') msg += '\n📝 *Changelog:*\n' + escapeMd(body) + '\n';
+  msg += '\n⬇️ *Downloads:*\n' + (downloads || '_Nenhum arquivo_');
 
   if (msg.length > 4000) {
-    msg = msg.slice(0, 3990) + '\n\\[\\.\\.\\.\\]';
+    msg = msg.slice(0, 3990) + '\n\\.\\.\\.';
   }
 
   return msg;
@@ -858,21 +825,21 @@ function formatRelease(r) {
 // ═══════════════════════════════════════════════════════════════════
 
 async function handleDebug(ctxObj, query) {
-  await sendMessage(ctxObj, `🔍 Debug: *${escapeMd(query)}*\nAguarde\.\.\.`);
+  await sendMessage(ctxObj, '🔍 Debug: *' + escapeMd(query) + '*\nAguarde\\.\\.\\.');
   const result = await fetchGSMArena(query);
   const d = result.debug;
 
-  let msg = `🐛 *DEBUG: ${escapeMd(query)}*\n\n`;
-  msg += `🔄 *Tentativas:*\n`;
+  let msg = '🐛 *DEBUG: ' + escapeMd(query) + '*\n\n';
+  msg += '🔄 *Tentativas:*\n';
   for (const a of d.attempts) {
-    if (a.error) msg += `• ❌ ${escapeMd(a.error)}\n`;
-    else msg += `• ${a.url} \#${a.attempt || '?'}: ${a.blocked ? '🚫 Bloqueado' : '✅ OK'} \(${a.htmlLen || 0} chars\)\n`;
+    if (a.error) msg += '• ❌ ' + escapeMd(a.error) + '\n';
+    else msg += '• ' + escapeMd(a.url) + ' \\#' + (a.attempt || '?') + ': ' + (a.blocked ? '🚫 Bloqueado' : '✅ OK') + ' \\(' + (a.htmlLen || 0) + ' chars\\)\n';
   }
-  msg += `\n📊 *Resultado:* ${result.type}\n`;
+  msg += '\n📊 *Resultado:* ' + escapeMd(result.type) + '\n';
   if (d.candidates.length > 0) {
-    msg += `\n📋 *Top Candidatos:*\n`;
+    msg += '\n📋 *Top Candidatos:*\n';
     d.candidates.slice(0, 5).forEach((c, i) => {
-      msg += `${i + 1}\\. ${escapeMd(c)}\n`;
+      msg += (i + 1) + '\\. ' + escapeMd(c) + '\n';
     });
   }
   await sendMessage(ctxObj, msg.slice(0, 4000));
@@ -885,7 +852,7 @@ async function handleDebug(ctxObj, query) {
 async function handleResetCache(ctxObj, query) {
   const KV = ctxObj.env.RVC_BOT_KV;
   if (!KV) {
-    await sendMessage(ctxObj, '❌ KV não configurado\.');
+    await sendMessage(ctxObj, '❌ KV não configurado\\.');
     return;
   }
 
@@ -895,27 +862,27 @@ async function handleResetCache(ctxObj, query) {
   if (!query) {
     const list = await KV.list();
     await Promise.all(list.keys.map(k => KV.delete(k.name)));
-    msg = `✅ ${list.keys.length} itens removidos\.`;
+    msg = '✅ ' + list.keys.length + ' itens removidos\\.';
     deleteAfter = 5;
   } else if (query === 'youtube') {
     await KV.delete('release:latest');
-    msg = '✅ YouTube cache limpo\.';
+    msg = '✅ YouTube cache limpo\\.';
     deleteAfter = 5;
   } else {
     const key = `phone:${query.toLowerCase().replace(/\s+/g, '-')}`;
     await KV.delete(key);
-    msg = '✅ Cache removido\.';
+    msg = '✅ Cache removido\\.';
     deleteAfter = 5;
   }
 
   const res = await sendMessage(ctxObj, msg);
-  if (deleteAfter > 0 && res.result?.message_id) {
+  if (deleteAfter > 0 && res?.result?.message_id) {
     deleteMessageDelayed(ctxObj, res.result.message_id, deleteAfter);
   }
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// 📨 TELEGRAM API (com retry)
+// 📨 TELEGRAM API (com retry + fallback + error logging)
 // ═══════════════════════════════════════════════════════════════════
 
 async function telegramApiCall(url, body, retries = 2) {
@@ -928,7 +895,12 @@ async function telegramApiCall(url, body, retries = 2) {
       });
       const data = await resp.json();
 
-      // Telegram 429 rate limit - respeitar retry_after
+      // Log Telegram API errors (antes eram ignorados silenciosamente)
+      if (!data.ok && data.error_code !== 429) {
+        logError('Telegram API error', { error_code: data.error_code, description: data.description });
+      }
+
+      // Telegram 429 rate limit
       if (data.error_code === 429 && data.parameters?.retry_after) {
         if (i < retries) {
           await new Promise(r => setTimeout(r, data.parameters.retry_after * 1000));
@@ -942,46 +914,87 @@ async function telegramApiCall(url, body, retries = 2) {
         logError('Telegram API call failed', e);
         return { ok: false, error: e.message };
       }
-      // Backoff exponencial: 500ms, 1s
       await new Promise(r => setTimeout(r, Math.pow(2, i) * 500));
     }
   }
 }
 
 async function sendMessage(ctx, text, opts = {}) {
-  return telegramApiCall(`${ctx.TELEGRAM_API}/sendMessage`, {
+  const result = await telegramApiCall(`${ctx.TELEGRAM_API}/sendMessage`, {
     chat_id: ctx.chatId,
     text,
     parse_mode: 'MarkdownV2',
     ...opts,
   });
+
+  // FALLBACK: se MarkdownV2 falhar, envia como texto puro
+  if (!result?.ok && result?.description?.includes("can't parse entities")) {
+    logError('MarkdownV2 failed, retrying as plain text', { original_error: result.description });
+    return telegramApiCall(`${ctx.TELEGRAM_API}/sendMessage`, {
+      chat_id: ctx.chatId,
+      text: text.replace(/\\([_*\[\]()~`>#+\-=|{}.!])/g, '$1')
+                .replace(/[*_~`>#+=|{}!]/g, '')
+                .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1'),
+      ...opts,
+    });
+  }
+
+  return result;
 }
 
 async function editMessage(ctx, msgId, text, opts = {}) {
   if (!msgId) return sendMessage(ctx, text, opts);
-  return telegramApiCall(`${ctx.TELEGRAM_API}/editMessageText`, {
+
+  const result = await telegramApiCall(`${ctx.TELEGRAM_API}/editMessageText`, {
     chat_id: ctx.chatId,
     message_id: msgId,
     text,
     parse_mode: 'MarkdownV2',
     ...opts,
   });
+
+  // FALLBACK: se MarkdownV2 falhar, edita como texto puro
+  if (!result?.ok && result?.description?.includes("can't parse entities")) {
+    return telegramApiCall(`${ctx.TELEGRAM_API}/editMessageText`, {
+      chat_id: ctx.chatId,
+      message_id: msgId,
+      text: text.replace(/\\([_*\[\]()~`>#+\-=|{}.!])/g, '$1')
+                .replace(/[*_~`>#+=|{}!]/g, '')
+                .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1'),
+      ...opts,
+    });
+  }
+
+  return result;
 }
 
 async function sendPhoto(ctx, photo, caption) {
-  return telegramApiCall(`${ctx.TELEGRAM_API}/sendPhoto`, {
+  const result = await telegramApiCall(`${ctx.TELEGRAM_API}/sendPhoto`, {
     chat_id: ctx.chatId,
     photo,
     caption,
     parse_mode: 'MarkdownV2',
   });
+
+  // FALLBACK: se caption falhar, manda foto sem caption + msg separada
+  if (!result?.ok && result?.description?.includes("can't parse entities")) {
+    const photoResult = await telegramApiCall(`${ctx.TELEGRAM_API}/sendPhoto`, {
+      chat_id: ctx.chatId,
+      photo,
+    });
+    if (photoResult?.ok) {
+      return sendMessage(ctx, caption);
+    }
+  }
+
+  return result;
 }
 
 async function deleteMessage(ctx, msgId) {
   return telegramApiCall(`${ctx.TELEGRAM_API}/deleteMessage`, {
     chat_id: ctx.chatId,
     message_id: msgId,
-  }, 0); // Sem retry para delete
+  }, 0);
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -989,5 +1002,5 @@ async function deleteMessage(ctx, msgId) {
 // ═══════════════════════════════════════════════════════════════════
 
 function logError(context, error) {
-  console.error(`[RVCArise] ${context}:`, error?.message || error);
+  console.error(`[RVCArise] ${context}:`, typeof error === 'object' ? JSON.stringify(error) : (error?.message || error));
 }
