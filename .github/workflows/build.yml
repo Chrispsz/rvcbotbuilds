@@ -139,12 +139,12 @@ jobs:
           APKS=${APKS#"$NL"}
 
           BODY="$(sed 's/^\* \*\*/↪ \*\*/g; s/^\* `/↪ \*\*/g; s/`/\*/g; s/^\* /\↪/g; s/\*\*/\*/g; s/###//g; s/^- /↪ /g; /^==/d;' ../build.md)"
-          MSG="*New build!*
+          MSG="*Nova build!*
 
           ${BODY}
 
-          *▼ Download Links:*
-          Modules:
+          *▼ Links de Download:*
+          Módulos:
           ${MODULES}
 
           APKs:

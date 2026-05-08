@@ -8,8 +8,8 @@ source utils.sh
 trap "abort" INT
 
 if [ "${1-}" = "clean" ]; then
-	rm -r "$TEMP_DIR" "$BUILD_DIR" build.md
-	exit 0
+        rm -r "$TEMP_DIR" "$BUILD_DIR" build.md
+        exit 0
 fi
 
 jq --version >/dev/null || abort "\`jq\` is not installed. install it with 'apt install jq' or equivalent"
@@ -25,7 +25,7 @@ toml_prep "${1:-config.toml}" || abort "could not find config file '${1:-config.
 main_config_t=$(toml_get_table_main)
 COMPRESSION_LEVEL=$(toml_get "$main_config_t" compression-level) || COMPRESSION_LEVEL="9"
 if ! PARALLEL_JOBS=$(toml_get "$main_config_t" parallel-jobs); then
-	if [ "$OS" = Android ]; then PARALLEL_JOBS=1; else PARALLEL_JOBS=$(nproc); fi
+        if [ "$OS" = Android ]; then PARALLEL_JOBS=1; else PARALLEL_JOBS=$(nproc); fi
 fi
 REMOVE_RV_INTEGRATIONS_CHECKS=$(toml_get "$main_config_t" remove-rv-integrations-checks) || REMOVE_RV_INTEGRATIONS_CHECKS="true"
 DEF_PATCHES_VER=$(toml_get "$main_config_t" patches-version) || DEF_PATCHES_VER="latest"
@@ -36,21 +36,21 @@ DEF_RV_BRAND=$(toml_get "$main_config_t" rv-brand) || DEF_RV_BRAND="ReVanced"
 mkdir -p "$TEMP_DIR" "$BUILD_DIR"
 
 if [ "${2-}" = "--config-update" ]; then
-	config_update
-	exit 0
+        config_update
+        exit 0
 fi
 
 : >build.md
 ENABLE_MODULE_UPDATE=$(toml_get "$main_config_t" enable-module-update) || ENABLE_MODULE_UPDATE=true
 if [ "$ENABLE_MODULE_UPDATE" = true ] && [ -z "${GITHUB_REPOSITORY-}" ]; then
-	pr "You are building locally. Module updates will not be enabled."
-	ENABLE_MODULE_UPDATE=false
+        pr "You are building locally. Module updates will not be enabled."
+        ENABLE_MODULE_UPDATE=false
 fi
 if ((COMPRESSION_LEVEL > 9)) || ((COMPRESSION_LEVEL < 0)); then abort "compression-level must be within 0-9"; fi
 
 rm -rf module/bin/*/tmp.*
 for file in "$TEMP_DIR"/*/changelog.md; do
-	[ -f "$file" ] && : >"$file"
+        [ -f "$file" ] && : >"$file"
 done
 
 mkdir -p ${MODULE_TEMPLATE_DIR}/bin/arm64 ${MODULE_TEMPLATE_DIR}/bin/arm ${MODULE_TEMPLATE_DIR}/bin/x86 ${MODULE_TEMPLATE_DIR}/bin/x64
@@ -61,112 +61,112 @@ gh_dl "${MODULE_TEMPLATE_DIR}/bin/x64/cmpr" "https://github.com/j-hc/cmpr/releas
 
 idx=0
 for table_name in $(toml_get_table_names); do
-	if [ -z "$table_name" ]; then continue; fi
-	t=$(toml_get_table "$table_name")
-	enabled=$(toml_get "$t" enabled) || enabled=true
-	vtf "$enabled" "enabled"
-	if [ "$enabled" = false ]; then continue; fi
-	if ((idx >= PARALLEL_JOBS)); then
-		wait -n
-		idx=$((idx - 1))
-	fi
+        if [ -z "$table_name" ]; then continue; fi
+        t=$(toml_get_table "$table_name")
+        enabled=$(toml_get "$t" enabled) || enabled=true
+        vtf "$enabled" "enabled"
+        if [ "$enabled" = false ]; then continue; fi
+        if ((idx >= PARALLEL_JOBS)); then
+                wait -n
+                idx=$((idx - 1))
+        fi
 
-	declare -A app_args
-	patches_src=$(toml_get "$t" patches-source) || patches_src=$DEF_PATCHES_SRC
-	patches_ver=$(toml_get "$t" patches-version) || patches_ver=$DEF_PATCHES_VER
-	cli_src=$(toml_get "$t" cli-source) || cli_src=$DEF_CLI_SRC
-	cli_ver=$(toml_get "$t" cli-version) || cli_ver=$DEF_CLI_VER
+        declare -A app_args
+        patches_src=$(toml_get "$t" patches-source) || patches_src=$DEF_PATCHES_SRC
+        patches_ver=$(toml_get "$t" patches-version) || patches_ver=$DEF_PATCHES_VER
+        cli_src=$(toml_get "$t" cli-source) || cli_src=$DEF_CLI_SRC
+        cli_ver=$(toml_get "$t" cli-version) || cli_ver=$DEF_CLI_VER
 
-	if ! PREBUILTS="$(get_prebuilts "$cli_src" "$cli_ver" "$patches_src" "$patches_ver")"; then
-		epr "Could not get prebuilts"
-		continue
-	fi
-	read -r cli_jar patches_jar <<<"$PREBUILTS"
-	app_args[cli]=$cli_jar
-	app_args[ptjar]=$patches_jar
-	app_args[rv_brand]=$(toml_get "$t" rv-brand) || app_args[rv_brand]=$DEF_RV_BRAND
+        if ! PREBUILTS="$(get_prebuilts "$cli_src" "$cli_ver" "$patches_src" "$patches_ver")"; then
+                epr "Could not get prebuilts"
+                continue
+        fi
+        read -r cli_jar patches_jar <<<"$PREBUILTS"
+        app_args[cli]=$cli_jar
+        app_args[ptjar]=$patches_jar
+        app_args[rv_brand]=$(toml_get "$t" rv-brand) || app_args[rv_brand]=$DEF_RV_BRAND
 
-	app_args[excluded_patches]=$(toml_get "$t" excluded-patches) || app_args[excluded_patches]=""
-	if [ -n "${app_args[excluded_patches]}" ] && [[ ${app_args[excluded_patches]} != *'"'* ]]; then abort "patch names inside excluded-patches must be quoted"; fi
-	app_args[included_patches]=$(toml_get "$t" included-patches) || app_args[included_patches]=""
-	if [ -n "${app_args[included_patches]}" ] && [[ ${app_args[included_patches]} != *'"'* ]]; then abort "patch names inside included-patches must be quoted"; fi
-	app_args[exclusive_patches]=$(toml_get "$t" exclusive-patches) && vtf "${app_args[exclusive_patches]}" "exclusive-patches" || app_args[exclusive_patches]=false
-	app_args[version]=$(toml_get "$t" version) || app_args[version]="auto"
-	app_args[app_name]=$(toml_get "$t" app-name) || app_args[app_name]=$table_name
-	app_args[patcher_args]=$(toml_get "$t" patcher-args) || app_args[patcher_args]=""
-	app_args[table]=$table_name
-	app_args[build_mode]=$(toml_get "$t" build-mode) && {
-		if ! isoneof "${app_args[build_mode]}" both apk module; then
-			abort "ERROR: build-mode '${app_args[build_mode]}' is not a valid option for '${table_name}': only 'both', 'apk' or 'module' is allowed"
-		fi
-	} || app_args[build_mode]=apk
-	app_args[include_stock]=$(toml_get "$t" include-stock) && {
-		if ! isoneof "${app_args[include_stock]}" disable merged split; then
-			abort "ERROR: include-stock '${app_args[include_stock]}' is not a valid option for '${table_name}': only 'disable', 'merged' or 'split' is allowed"
-		fi
-	} || app_args[include_stock]=merged
+        app_args[excluded_patches]=$(toml_get "$t" excluded-patches) || app_args[excluded_patches]=""
+        if [ -n "${app_args[excluded_patches]}" ] && [[ ${app_args[excluded_patches]} != *'"'* ]]; then abort "patch names inside excluded-patches must be quoted"; fi
+        app_args[included_patches]=$(toml_get "$t" included-patches) || app_args[included_patches]=""
+        if [ -n "${app_args[included_patches]}" ] && [[ ${app_args[included_patches]} != *'"'* ]]; then abort "patch names inside included-patches must be quoted"; fi
+        app_args[exclusive_patches]=$(toml_get "$t" exclusive-patches) && vtf "${app_args[exclusive_patches]}" "exclusive-patches" || app_args[exclusive_patches]=false
+        app_args[version]=$(toml_get "$t" version) || app_args[version]="auto"
+        app_args[app_name]=$(toml_get "$t" app-name) || app_args[app_name]=$table_name
+        app_args[patcher_args]=$(toml_get "$t" patcher-args) || app_args[patcher_args]=""
+        app_args[table]=$table_name
+        app_args[build_mode]=$(toml_get "$t" build-mode) && {
+                if ! isoneof "${app_args[build_mode]}" both apk module; then
+                        abort "ERROR: build-mode '${app_args[build_mode]}' is not a valid option for '${table_name}': only 'both', 'apk' or 'module' is allowed"
+                fi
+        } || app_args[build_mode]=apk
+        app_args[include_stock]=$(toml_get "$t" include-stock) && {
+                if ! isoneof "${app_args[include_stock]}" disable merged split; then
+                        abort "ERROR: include-stock '${app_args[include_stock]}' is not a valid option for '${table_name}': only 'disable', 'merged' or 'split' is allowed"
+                fi
+        } || app_args[include_stock]=merged
 
-	for dl_from in "${DL_SRCS[@]}"; do
-		if app_args[${dl_from}_dlurl]=$(toml_get "$t" "${dl_from}-dlurl"); then
-			app_args[${dl_from}_dlurl]=${app_args[${dl_from}_dlurl]%/}
-			app_args[${dl_from}_dlurl]=${app_args[${dl_from}_dlurl]%download}
-			app_args[${dl_from}_dlurl]=${app_args[${dl_from}_dlurl]%/}
-			app_args[dl_from]=${dl_from}
-		else
-			app_args[${dl_from}_dlurl]=""
-		fi
-	done
-	if [ -z "${app_args[dl_from]-}" ]; then abort "ERROR: no 'dlurl' option was set for '$table_name'. (${DL_SRCS[*]})"; fi
-	app_args[arch]=$(toml_get "$t" arch) || app_args[arch]="all"
-	if ! isoneof "${app_args[arch]}" "both" "all" "arm64-v8a" "arm-v7a" "x86_64" "x86"; then
-		abort "wrong arch '${app_args[arch]}' for '$table_name'"
-	fi
+        for dl_from in "${DL_SRCS[@]}"; do
+                if app_args[${dl_from}_dlurl]=$(toml_get "$t" "${dl_from}-dlurl"); then
+                        app_args[${dl_from}_dlurl]=${app_args[${dl_from}_dlurl]%/}
+                        app_args[${dl_from}_dlurl]=${app_args[${dl_from}_dlurl]%download}
+                        app_args[${dl_from}_dlurl]=${app_args[${dl_from}_dlurl]%/}
+                        app_args[dl_from]=${dl_from}
+                else
+                        app_args[${dl_from}_dlurl]=""
+                fi
+        done
+        if [ -z "${app_args[dl_from]-}" ]; then abort "ERROR: no 'dlurl' option was set for '$table_name'. (${DL_SRCS[*]})"; fi
+        app_args[arch]=$(toml_get "$t" arch) || app_args[arch]="all"
+        if ! isoneof "${app_args[arch]}" "both" "all" "arm64-v8a" "arm-v7a" "x86_64" "x86"; then
+                abort "wrong arch '${app_args[arch]}' for '$table_name'"
+        fi
 
-	app_args[pkg_name]=$(toml_get "$t" pkg-name) || app_args[pkg_name]=""
-	app_args[dpi]=$(toml_get "$t" dpi) || app_args[dpi]=""
-	table_name_f=${table_name,,}
-	table_name_f=${table_name_f// /-}
-	app_args[module_prop_name]=$(toml_get "$t" module-prop-name) || app_args[module_prop_name]="${table_name_f}-jhc"
+        app_args[pkg_name]=$(toml_get "$t" pkg-name) || app_args[pkg_name]=""
+        app_args[dpi]=$(toml_get "$t" dpi) || app_args[dpi]=""
+        table_name_f=${table_name,,}
+        table_name_f=${table_name_f// /-}
+        app_args[module_prop_name]=$(toml_get "$t" module-prop-name) || app_args[module_prop_name]="${table_name_f}-jhc"
 
-	if [ "${app_args[arch]}" = both ]; then
-		app_args[table]="$table_name (arm64-v8a)"
-		app_args[arch]="arm64-v8a"
-		module_prop_name_b=${app_args[module_prop_name]}
-		app_args[module_prop_name]="${module_prop_name_b}-arm64"
-		idx=$((idx + 1))
-		build_rv "$(declare -p app_args)" &
-		app_args[table]="$table_name (arm-v7a)"
-		app_args[arch]="arm-v7a"
-		app_args[module_prop_name]="${module_prop_name_b}-arm"
-		if ((idx >= PARALLEL_JOBS)); then
-			wait -n
-			idx=$((idx - 1))
-		fi
-		idx=$((idx + 1))
-		build_rv "$(declare -p app_args)" &
-	else
-		if [ "${app_args[arch]}" = "arm64-v8a" ]; then
-			app_args[module_prop_name]="${app_args[module_prop_name]}-arm64"
-		elif [ "${app_args[arch]}" = "arm-v7a" ]; then
-			app_args[module_prop_name]="${app_args[module_prop_name]}-arm"
-		fi
-		idx=$((idx + 1))
-		build_rv "$(declare -p app_args)" &
-	fi
+        if [ "${app_args[arch]}" = both ]; then
+                app_args[table]="$table_name (arm64-v8a)"
+                app_args[arch]="arm64-v8a"
+                module_prop_name_b=${app_args[module_prop_name]}
+                app_args[module_prop_name]="${module_prop_name_b}-arm64"
+                idx=$((idx + 1))
+                build_rv "$(declare -p app_args)" &
+                app_args[table]="$table_name (arm-v7a)"
+                app_args[arch]="arm-v7a"
+                app_args[module_prop_name]="${module_prop_name_b}-arm"
+                if ((idx >= PARALLEL_JOBS)); then
+                        wait -n
+                        idx=$((idx - 1))
+                fi
+                idx=$((idx + 1))
+                build_rv "$(declare -p app_args)" &
+        else
+                if [ "${app_args[arch]}" = "arm64-v8a" ]; then
+                        app_args[module_prop_name]="${app_args[module_prop_name]}-arm64"
+                elif [ "${app_args[arch]}" = "arm-v7a" ]; then
+                        app_args[module_prop_name]="${app_args[module_prop_name]}-arm"
+                fi
+                idx=$((idx + 1))
+                build_rv "$(declare -p app_args)" &
+        fi
 done
 wait
 rm -rf temp/tmp.*
 if [ -z "$(ls -A1 "${BUILD_DIR}")" ]; then abort "All builds failed."; fi
 
-log "\nInstall [Microg](https://github.com/ReVanced/GmsCore/releases) for non-root YouTube and YT Music APKs"
-log "Use [zygisk-detach](https://github.com/j-hc/zygisk-detach) to detach YouTube and YT Music modules from Play Store"
-log "\n[revanced-magisk-module](https://github.com/j-hc/revanced-magisk-module)\n"
+log "\nInstale o [GmsCore](https://github.com/ReVanced/GmsCore/releases) para os APKs do YouTube e YT Music (não-root)"
+log "✅ Detach automático da Play Store já incluído via Zygisk no módulo Magisk"
+log "\n[rvcbotbuilds](https://github.com/Chrispsz/rvcbotbuilds)\n"
 log "$(cat "$TEMP_DIR"/*/changelog.md)"
 
 SKIPPED=$(cat "$TEMP_DIR"/skipped 2>/dev/null || :)
 if [ -n "$SKIPPED" ]; then
-	log "\nSkipped:"
-	log "$SKIPPED"
+        log "\nPulados:"
+        log "$SKIPPED"
 fi
 
 pr "Done"
