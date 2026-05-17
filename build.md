@@ -7,5 +7,5 @@ Instale o [GmsCore](https://github.com/ReVanced/GmsCore/releases) para os APKs d
 [rvcbotbuilds](https://github.com/Chrispsz/rvcbotbuilds)
   
 CLI: MorpheApp/morphe-cli-1.8.1-all.jar  
-Patches: MorpheApp/patches-1.27.0.mpp  
-[Mudanças](https://github.com/MorpheApp/morphe-patches/releases/tag/v1.27.0)  
+Patches: MorpheApp/patches-1.28.0.mpp  
+[Mudanças](https://github.com/MorpheApp/morphe-patches/releases/tag/v1.28.0)  
