@@ -1,4 +1,4 @@
-name: Build Instagram APK
+name: Build RVCBotBuilds
 
 on:
   workflow_dispatch:
@@ -33,29 +33,33 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y jq zip
 
-      - name: Build Instagram only
+      - name: Build all apps
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           chmod +x build.sh utils.sh
           bash build.sh config.toml 2>&1 | tee build.log
 
-      - name: Upload APK artifact
+      - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: instagram-patched
+          name: patched-apks
           path: build/*.apk
           retention-days: 30
 
-      - name: Upload Modules
+      - name: Upload Magisk modules
         uses: actions/upload-artifact@v4
         with:
           name: magisk-modules
           path: build/*.zip
           retention-days: 30
 
-      - name: Build log
+      - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: build-log
-          path: build.md
+          path: |
+            build.md
+            build.log
           retention-days: 7
