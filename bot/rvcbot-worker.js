@@ -1,18 +1,16 @@
 // ═══════════════════════════════════════════════════════════════════
-// 🤖 RVCArise BOT v34.0 (PRODUCTION)
-// Changelog v33→v34:
-//   - FIX CRITICAL: MarkdownV2 escaping — \- and \. in JS strings
-//     become - and . (backslash eaten by JS), but Telegram requires
-//     \- and \. in MarkdownV2. All strings now use \\- and \\. etc.
-//   - FIX: telegramApiCall now checks for ok:false and logs errors
-//   - FIX: Added MarkdownV2 fallback — if parsing fails, retries as
-//     plain text so the bot ALWAYS responds
-//   - FIX: Rate limit message had unescaped . (also failed silently)
+// 🤖 RVCArise BOT v36.0 (PRODUCTION)
+// Changelog v35→v36:
+//   - FIX CRITICAL: TTL_RATELIMIT mudado de 5→60. Cloudflare KV
+//     exige expirationTtl mínimo de 60s. Com 5s, o KV.put()
+//     falhava com "400 Invalid expiration_ttl" e crashava o
+//     Worker inteiro com 500. O clearRateLimit() já limpa a
+//     chave após cada comando, então o TTL é só fallback.
 // ═══════════════════════════════════════════════════════════════════
 
 const TTL_PHONE = 604800;   // 7 dias
 const TTL_YOUTUBE = 1800;   // 30 min
-const TTL_RATELIMIT = 5;    // 5s entre comandos (anti-spam leve)
+const TTL_RATELIMIT = 60;   // mínimo do Cloudflare KV é 60s (clearRateLimit limpa antes)
 const FETCH_TIMEOUT = 12000; // 12s timeout
 const MAX_QUERY_LEN = 80;
 
@@ -819,19 +817,19 @@ function formatRelease(r) {
       downloads += '📱 *APKs:*\n';
       apks.forEach(a => {
         const size = (a.size / 1024 / 1024).toFixed(1);
-        downloads += '• [' + escapeMd(a.name) + '](' + a.browser_download_url + ') _\\(' + size + 'MB\\)_\n';
+        downloads += '• [' + escapeMd(a.name) + '](' + a.browser_download_url + ') _\\(' + escapeMd(size) + 'MB\\)_\n';
       });
     }
     if (zips.length) {
       downloads += '🗜️ *Módulos:*\n';
       zips.forEach(a => {
         const size = (a.size / 1024 / 1024).toFixed(1);
-        downloads += '• [' + escapeMd(a.name) + '](' + a.browser_download_url + ') _\\(' + size + 'MB\\)_\n';
+        downloads += '• [' + escapeMd(a.name) + '](' + a.browser_download_url + ') _\\(' + escapeMd(size) + 'MB\\)_\n';
       });
     }
     others.forEach(a => {
       const size = (a.size / 1024 / 1024).toFixed(1);
-      downloads += '📦 [' + escapeMd(a.name) + '](' + a.browser_download_url + ') _\\(' + size + 'MB\\)_\n';
+      downloads += '📦 [' + escapeMd(a.name) + '](' + a.browser_download_url + ') _\\(' + escapeMd(size) + 'MB\\)_\n';
     });
   }
 
