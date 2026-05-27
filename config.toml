@@ -52,8 +52,18 @@ archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.a
 
 # ============================================
 # Instagram Piko - APK (arm64-v8a)
-# crimera/piko: 46 Instagram patches
-# AMOLED theme, ad block, privacy, downloads
+# crimera/piko: 46 patches — best pre-config
+#
+# 🖤 AMOLED theme (pure black)
+# 📥 Download: posts, reels, stories, highlights, profile pics, audio
+# 👻 Ghost mode: view stories/DMs/live anonymously
+# 🛡️ Privacy: block analytics, disable screenshot detection & typing
+# 🔍 Image quality: 2048px from CDN (vs 1080px default)
+# 🔧 Dev options: unlock internal MetaConfig flags
+# 🧹 Clean feed: hide nav buttons, suggested, ads, reels scrolling
+# 🔗 Links: sanitize tracking, open externally
+# 👤 Profile: follow back indicator, more options
+# 🔒 Media: ephemeral → permanent, view story mentions
 # ============================================
 [Instagram-Piko]
 app-name = "Instagram"
@@ -66,6 +76,7 @@ arch = "arm64-v8a"
 included-patches = """\
   'Amoled theme' \
   'Download media' \
+  'Improve image viewing' \
   'View stories anonymously' \
   'View DMs anonymously' \
   'View live anonymously' \
@@ -75,12 +86,26 @@ included-patches = """\
   'Sanitize share links' \
   'Open links externally' \
   'Follow back indicator' \
-  'Improve image viewing' \
   'Make ephemeral media permanent' \
+  'View story mentions' \
   'Hide navigation buttons' \
+  'Hide suggested content' \
+  'Disable Reels scrolling' \
+  'Disable video autoplay' \
+  'Hide notes tray' \
+  'Hide reshare button' \
+  'Remove empty bottom space' \
+  'Remove build expired popup' \
+  'Copy comment' \
+  'More options on post' \
+  'More options on profile' \
+  'Disable discover people' \
+  'Disable double tap like' \
+  'Customise story timestamp' \
+  'Stories audio autoplay' \
+  'Unlock developer options' \
   """
 excluded-patches = """\
-  'Unlock developer options' \
   'Unlock employee options' \
   'Unlock Plus benefits' \
   """
