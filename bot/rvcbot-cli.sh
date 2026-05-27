@@ -22,9 +22,14 @@
 # Sem set -u para permitir variáveis vazias
 
 # ─── CONFIG ───────────────────────────────────────────────────────
-BOT_TOKEN="8244452933:AAE0qXCpxSUyaW8x_QKbENE3nDwz09oYJAg"
-ADMIN_ID="7566221095"
-WORKER_URL="https://kinera-tg-bot.christovaopereirasilvaa.workers.dev"
+# NEVER hardcode secrets — use environment variables or .env file
+# Copy .env.example to .env and fill in your values
+if [[ -f "$(dirname "$0")/.env" ]]; then
+    source "$(dirname "$0")/.env"
+fi
+BOT_TOKEN="${BOT_TOKEN:?BOT_TOKEN not set — create bot/.env with your token}"
+ADMIN_ID="${ADMIN_ID:?ADMIN_ID not set — create bot/.env with your admin ID}"
+WORKER_URL="${WORKER_URL:-https://kinera-tg-bot.christovaopereirasilvaa.workers.dev}"
 API="https://api.telegram.org/bot${BOT_TOKEN}"
 POLL_TIMEOUT=30
 

@@ -96,36 +96,47 @@ included-patches = "'Theme'"
 patcher-args = "-OdarkThemeBackgroundColor=@android:color/black"
 ```
 
-### Instagram with crimera/piko (46 patches)
+### Instagram with crimera/piko (6 essential patches) + Custom Patches
 
 Instagram uses `crimera/piko` which provides 46 Instagram patches — the most comprehensive source available.
 Researched 7+ repos (piko, brosssh, InstaEclipse, Instafel, ReVanced, anddea, RookieEnough) — **piko wins by far**.
 
-**Pre-configured patches (30 included in config.toml):**
+We include only **6 essential patches** — no bloat, no filler, every patch adds clear value.
 
-| Category | Patches | Why |
-|----------|---------|-----|
-| 🖤 **Theme** | Amoled theme | Pure black for OLED |
-| 👻 **Ghost Mode** | View stories/DMs/live anonymously | See without being seen |
-| 🛡️ **Privacy** | Disable analytics, Disable screenshot detection, Disable typing status | Block Meta tracking |
-| 📥 **Download** | Download media | Save posts, reels, stories, highlights, profile pics, audio |
-| 🔍 **Image Quality** | Improve image viewing | **2048px from CDN** (vs 1080px default) |
-| 🔧 **Dev Options** | Unlock developer options | Access MetaConfig flags (quality, experimental UI, etc.) |
-| 🧹 **Clean Feed** | Hide navigation buttons, Hide suggested content, Hide notes tray, Hide reshare button, Disable Reels scrolling, Disable video autoplay, Remove empty bottom space | Distraction-free |
-| 🔗 **Links** | Sanitize share links, Open links externally | Remove tracking, use real browser |
-| 👤 **Profile** | Follow back indicator, More options on profile, More options on post, Copy comment | Better UX |
-| 🔒 **Media** | Make ephemeral media permanent, View story mentions | Keep view-once media, see hidden mentions |
-| ⏰ **Stories** | Customise story timestamp, Stories audio autoplay, Disable discover people, Disable double tap like, Remove build expired popup | Fine-tuned experience |
+On top of piko, we apply **2 custom Smali patches** (from InstaEclipse research) after ReVanced CLI patching.
+
+**Included piko patches (6 essential):**
+
+| Patch | Category | Why |
+|-------|----------|-----|
+| ⚙️ **Add settings** | Core | Piko Settings hub — toggle all patches on/off |
+| 🖤 **Amoled theme** | Visual | Pure black for OLED — saves battery |
+| 🚫 **Disable ads** | Ads | Remove all ads from feed and stories |
+| 📥 **Download media** | Download | Save posts, reels, stories, highlights, profile pics, audio |
+| 🔍 **Improve image viewing** | Quality | **2048px from CDN** (vs 1080px default) |
+| 👻 **View stories anonymously** | Ghost | See stories without being detected |
+
+**Custom Smali patches (applied after ReVanced CLI):**
+
+| Patch | Source | What it does |
+|-------|--------|--------------|
+| 📸 **Allow Screenshots in DMs** | InstaEclipse | Removes FLAG_SECURE (0x2000) from `Window.setFlags()` — take screenshots in DM conversations that normally block them |
+| 🔍 **MobileConfig Quality Override** | InstaEclipse | Patches default quality values from "medium"→"high" and "standard"→"hd" in MobileConfig fallback strings |
+
+**Total: 6 piko + 2 custom = 8 patches. Zero bloat.**
 
 **Excluded patches (risky/unstable):**
 - Unlock employee options (debugging, may crash)
 - Unlock Plus benefits (server-side, risky)
 
+**Not needed (40 patches removed — redundant/niche/cosmetic):**
+All other 40 piko patches are intentionally excluded as niche, preference-based, cosmetic, or redundant. The 6 included + 2 custom cover all essential functionality.
+
 **About "Improve image viewing":** Forces Instagram to request **2048px images** from the CDN instead of the default 1080px. This is NOT upscaling — Instagram stores originals at up to 2048px, but the app normally requests lower-res versions. The patch intercepts `ExtendedImageUrl` and `SetDPIMetrics` to request the max resolution. Toggle on in Piko Settings after install.
 
-**About "Unlock developer options":** Long-press the home icon to access Instagram's internal developer panel (MetaConfig). This gives access to **hundreds of feature flags** including image quality caps, video encoding, experimental UI, and more. Think of it as a meta-patch that unlocks further customization.
-
 **About "Download media":** Supports downloading feed posts, reels, stories, highlights, profile pictures, DM media, and audio tracks from reels. Has a download dialog with options: download current, download as image, download audio, copy link, open externally, download all (carousel). Configure in Piko Settings.
+
+**About "View stories anonymously":** The #1 most requested Instagram mod feature. Watch stories without appearing in the viewer list. The patch hooks the "story seen" event and silently drops it — the story loads normally from CDN but the server never registers your view. Toggle in Piko Settings.
 
 ### Research: Other Instagram Mod Sources
 

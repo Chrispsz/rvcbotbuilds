@@ -7,3 +7,8 @@ test*
 build.md
 cmpr
 *-temporary-files
+
+# Secrets — NEVER commit
+.env
+.env.*
+!.env.example

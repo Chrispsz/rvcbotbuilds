@@ -1,6 +1,6 @@
 # ============================================
 # RVCBotBuilds - Morphe (arm64-v8a)
-# With Auto-Detach (Zygisk)
+# With Auto-Detach (Zygisk) + Custom Patches
 # ============================================
 
 enable-module-update = true
@@ -52,18 +52,25 @@ archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.a
 
 # ============================================
 # Instagram Piko - APK (arm64-v8a)
-# crimera/piko: 46 patches — best pre-config
+# crimera/piko: 25 patches + 2 custom RVCBotBuilds patches
 #
 # 🖤 AMOLED theme (pure black)
 # 📥 Download: posts, reels, stories, highlights, profile pics, audio
-# 👻 Ghost mode: view stories/DMs/live anonymously
-# 🛡️ Privacy: block analytics, disable screenshot detection & typing
-# 🔍 Image quality: 2048px from CDN (vs 1080px default)
-# 🔧 Dev options: unlock internal MetaConfig flags
-# 🧹 Clean feed: hide nav buttons, suggested, ads, reels scrolling
-# 🔗 Links: sanitize tracking, open externally
-# 👤 Profile: follow back indicator, more options
-# 🔒 Media: ephemeral → permanent, view story mentions
+# 👻 Ghost mode: stories, DMs, lives — all anonymous
+# 🚫 Ads: remove all ads + suggested content
+# 🔍 Image quality: 2048px from CDN + MobileConfig override
+# 📸 Screenshots: FLAG_SECURE removed + screenshot detection disabled
+# 🔧 Settings: Piko Settings hub + Developer options (MetaConfig)
+# 🛡️ Privacy: analytics off, typing hidden, links sanitized
+# 🧹 Clean: hide stories tray, nav buttons, build popup
+#
+# NOT included (10 — niche/cosmetic/annoying):
+#   Change like animation, Customise story timestamp, Disable Reels scrolling,
+#   Disable discover people, Disable double tap like, Disable video autoplay,
+#   Hide notes tray, Hide reshare button, Remove empty bottom space,
+#   Stories audio autoplay
+# EXCLUDED (2 — risky):
+#   Unlock employee options, Unlock Plus benefits
 # ============================================
 [Instagram-Piko]
 app-name = "Instagram"
@@ -74,39 +81,38 @@ rv-brand = "Morphe"
 build-mode = "apk"
 arch = "arm64-v8a"
 included-patches = """\
+  'Add settings' \
   'Amoled theme' \
-  'Download media' \
-  'Improve image viewing' \
-  'View stories anonymously' \
-  'View DMs anonymously' \
-  'View live anonymously' \
+  'Copy comment' \
   'Disable analytics' \
+  'Disable ads' \
   'Disable screenshot detection' \
   'Disable typing status' \
-  'Sanitize share links' \
-  'Open links externally' \
+  'Download media' \
   'Follow back indicator' \
-  'Make ephemeral media permanent' \
-  'View story mentions' \
   'Hide navigation buttons' \
+  'Hide stories tray' \
   'Hide suggested content' \
-  'Disable Reels scrolling' \
-  'Disable video autoplay' \
-  'Hide notes tray' \
-  'Hide reshare button' \
-  'Remove empty bottom space' \
-  'Remove build expired popup' \
-  'Copy comment' \
+  'Improve image viewing' \
+  'Limit feed to following profiles' \
+  'Make ephemeral media permanent' \
   'More options on post' \
   'More options on profile' \
-  'Disable discover people' \
-  'Disable double tap like' \
-  'Customise story timestamp' \
-  'Stories audio autoplay' \
+  'Open links externally' \
+  'Remove build expired popup' \
+  'Sanitize share links' \
   'Unlock developer options' \
+  'View DMs anonymously' \
+  'View live anonymously' \
+  'View stories anonymously' \
+  'View story mentions' \
   """
 excluded-patches = """\
   'Unlock employee options' \
   'Unlock Plus benefits' \
   """
+# Custom Smali patches applied AFTER ReVanced CLI:
+#   📸 Allow Screenshots in DMs — removes FLAG_SECURE from Window.setFlags
+#   🔍 MobileConfig Quality Override — medium→high, standard→hd
+# See: custom-patches/apply-custom-patches.sh
 uptodown-dlurl = "https://instagram.en.uptodown.com/android"

@@ -791,6 +791,15 @@ build_rv() {
                                 epr "Building '${table}' failed!"
                                 return 0
                         fi
+                        # === Apply custom Smali patches (RVCBotBuilds) ===
+                        # These are patches not available in the patches JAR:
+                        #   Instagram: FLAG_SECURE removal, MobileConfig quality
+                        if [ -f "${CWD}/custom-patches/apply-custom-patches.sh" ]; then
+                                pr "Applying RVCBotBuilds custom patches for ${pkg_name}..."
+                                if ! bash "${CWD}/custom-patches/apply-custom-patches.sh" "$patched_apk" "$pkg_name"; then
+                                        wpr "Custom patches failed for ${table}, using ReVanced-only build"
+                                fi
+                        fi
                 fi
                 rm "$stock_apk_to_patch"
                 if [ "$build_mode" = apk ]; then

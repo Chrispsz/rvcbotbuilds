@@ -1,0 +1,10 @@
+name: "Custom CodeQL Configuration"
+
+# Only scan relevant languages
+languages:
+  - javascript
+
+# Ignore bot files (they're not part of the build)
+paths-ignore:
+  - 'bot/rvcbot-worker.js'
+  - 'bot/rvcbot-cli.sh'
