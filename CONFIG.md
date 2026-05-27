@@ -74,38 +74,101 @@ These options are specific to this fork and are not available in the upstream j-
 default-arch = "arm64-v8a"      # default architecture for all apps. default: "arm64-v8a"
 continue-on-error = true        # continue building other apps if one fails. default: true
 
-# RevPack (Combined Module)
-combine-modules = true          # bundle all built modules into one flashable zip. default: false
+# RevPack (Combined Module) — optional
+combine-modules = false         # bundle all built modules into one flashable zip. default: false
 pack-name = "rvcbot-revpack"    # output filename for RevPack (without .zip). default: "rvcbot-revpack"
 pack-apps = ""                  # comma-separated whitelist of apps to include in RevPack. default: "" (all)
 pack-exclude-apps = ""          # comma-separated blacklist of apps to exclude from RevPack. default: "" (none)
 ```
 
-### Instagram with brosssh/morphe-patches
+### AMOLED Theme (YouTube & Music)
 
-Instagram is supported via `brosssh/morphe-patches` which provides 17 patches:
-- Hide ads, Hide Instants, Hide Reels save button, Hide Stories from Home
-- Hide Threads profile button, Hide explore feed, Hide feed content
-- Hide navigation buttons (6 options), Hide notes tray, Hide reshare button
-- Hide suggested content, Limit feed to following profiles
-- Disable Reels scrolling, Disable story auto flipping, Disable video autoplay
-- Bypass signature check, Remove build expired popup
+Both YouTube and Music use Morphe's Theme patch with pure black background (`@android:color/black`)
+for true AMOLED dark mode — saves battery on OLED screens.
 
 ```toml
-[Instagram-Morphe]
+[YouTube-Morphe]
+included-patches = "'Theme'"
+patcher-args = "-OdarkThemeBackgroundColor=@android:color/black"
+
+[Music-Morphe]
+included-patches = "'Theme'"
+patcher-args = "-OdarkThemeBackgroundColor=@android:color/black"
+```
+
+### Instagram with crimera/piko (46 patches)
+
+Instagram uses `crimera/piko` which provides 46 Instagram patches — the most comprehensive source available.
+
+**Pre-configured patches (included by default in config.toml):**
+
+| Category | Patches | Why |
+|----------|---------|-----|
+| 🖤 **Theme** | Amoled theme | Pure black for OLED |
+| 🛡️ **Privacy** | View stories anonymously, View DMs anonymously, View live anonymously | Ghost mode — see without being seen |
+| 🛡️ **Privacy** | Disable analytics, Disable screenshot detection, Disable typing status | Block Meta tracking |
+| 📥 **Download** | Download media | Save posts, reels, stories, highlights |
+| 🧹 **Clean Feed** | Hide navigation buttons, Hide suggested content, Hide ads | Distraction-free |
+| 🔗 **Links** | Sanitize share links, Open links externally | Remove tracking, use real browser |
+| 👤 **Profile** | Follow back indicator, Improve image viewing | Better UX |
+| 🔒 **Media** | Make ephemeral media permanent | Keep view-once media |
+
+**Excluded patches (potentially risky/unstable):**
+- Unlock developer options
+- Unlock employee options
+- Unlock Plus benefits
+
+```toml
+[Instagram-Piko]
 app-name = "Instagram"
-patches-source = "brosssh/morphe-patches"
+patches-source = "crimera/piko"
+patches-version = "dev"
 cli-source = "MorpheApp/morphe-cli"
 rv-brand = "Morphe"
 build-mode = "apk"
 arch = "arm64-v8a"
-excluded-patches = "'Unlock developer options'"
+included-patches = """\
+  'Amoled theme' \
+  'Download media' \
+  'View stories anonymously' \
+  'View DMs anonymously' \
+  'View live anonymously' \
+  'Disable analytics' \
+  'Disable screenshot detection' \
+  'Disable typing status' \
+  'Sanitize share links' \
+  'Open links externally' \
+  'Follow back indicator' \
+  'Improve image viewing' \
+  'Make ephemeral media permanent' \
+  'Hide navigation buttons' \
+  """
+excluded-patches = """\
+  'Unlock developer options' \
+  'Unlock employee options' \
+  'Unlock Plus benefits' \
+  """
 uptodown-dlurl = "https://instagram.en.uptodown.com/android"
 ```
+
+**All 46 piko Instagram patches available:**
+Add settings, Allow user network certificate, Amoled theme, Change like animation,
+Change version code, Copy comment, Customise story ring size, Customise story timestamp,
+Disable Reels scrolling, Disable ads, Disable analytics, Disable comments,
+Disable discover people, Disable double tap like, Disable explore, Disable highlights,
+Disable screenshot detection, Disable stories, Disable story flipping, Disable typing status,
+Disable video autoplay, Download media, Follow back indicator,
+Hide group creation button on sharesheet, Hide navigation buttons, Hide notes tray,
+Hide reshare button, Hide stories tray, Hide suggested content, Improve image viewing,
+Limit feed to following profiles, Make ephemeral media permanent, More options on post,
+More options on profile, Open links externally, Remove build expired popup,
+Remove empty bottom space, Sanitize share links, Stories audio autoplay,
+Unlock Plus benefits, Unlock developer options, Unlock employee options,
+View DMs anonymously, View live anonymously, View stories anonymously, View story mentions
 
 ### RevPack
 
 When `combine-modules = true`, all built Magisk modules are bundled into a single flashable zip.
-This lets you install YouTube + Music + any other module apps in one flash.
+This lets you install multiple root apps in one flash.
 
 The RevPack includes auto-detach for all bundled apps and a per-app install prompt (Vol+/Vol- to choose).
