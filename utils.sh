@@ -54,6 +54,22 @@ abort() {
 }
 java() { env -i java --enable-native-access=ALL-UNNAMED "$@"; }
 
+sanitize_url() {
+        local url="$1"
+        url="${url#${url%%[![:space:]]*}}"
+        url="${url%${url##*[![:space:]]}}"
+        url="${url//$'\r'/}"
+        url="${url//$'\n'/}"
+        url="${url//$'\t'/}"
+        if [ "${url:0:1}" = '"' ] && [ "${url: -1}" = '"' ]; then
+                url="${url:1:${#url}-2}"
+        elif [ "${url:0:1}" = "'" ] && [ "${url: -1}" = "'" ]; then
+                url="${url:1:${#url}-2}"
+        fi
+        url="${url// /%20}"
+        echo "$url"
+}
+
 get_prebuilts() {
         local cli_src=$1 cli_ver=$2 patches_src=$3 patches_ver=$4
         pr "Getting prebuilts (${patches_src%/*})" >&2
@@ -210,27 +226,64 @@ config_update() {
         fi
 }
 
+__UA_LIST__=(
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0"
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15"
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"
+        "Mozilla/5.0 (X11; Linux x86_64; rv:146.0) Gecko/20100101 Firefox/146.0"
+)
+__ACCEPT_LANG_LIST__=(
+        "en-US,en;q=0.9"
+        "en-US,en;q=0.9,pt-BR;q=0.8"
+        "en-GB,en;q=0.9"
+)
+get_random_ua() { echo "${__UA_LIST__[$((RANDOM % ${#__UA_LIST__[@]}))]}"; }
+get_random_accept_lang() { echo "${__ACCEPT_LANG_LIST__[$((RANDOM % ${#__ACCEPT_LANG_LIST__[@]}))]}"; }
+
 _req() {
-        local ip="$1" op="$2"
+        local raw_ip="$1" op="$2"
         shift 2
+        local ip
+        ip="$(sanitize_url "$raw_ip")"
+        if [ -z "$ip" ]; then
+                wpr "Request failed: empty URL"
+                return 1
+        fi
         local dlp="$op"
         if [ "$op" != - ]; then
-                if [ -f "$op" ]; then return; fi
+                if [ -f "$op" ]; then return 0; fi
                 dlp="$(dirname "$op")/tmp.$(basename "$op")"
                 if [ -f "$dlp" ]; then
                         while [ -f "$dlp" ]; do sleep 1; done
-                        return
+                        return 0
                 fi
         fi
-        if ! curl -L -c "$TEMP_DIR/cookie.txt" -b "$TEMP_DIR/cookie.txt" --connect-timeout 10 --retry 1 --fail -s -S "$@" "$ip" -o "$dlp"; then
-                epr "Request failed: $ip"
+        local curl_opts=(
+                "-L" "--http2" "--compressed"
+                "-c" "$TEMP_DIR/cookie.txt" "-b" "$TEMP_DIR/cookie.txt"
+                "--connect-timeout" "10" "--retry" "1" "--fail"
+        )
+        if [ "$op" = "-" ]; then
+                curl_opts+=("-s" "-S")
+        else
+                if [ -t 2 ] || [ "${GITHUB_ACTIONS-}" = "true" ]; then
+                        curl_opts+=("--progress-bar")
+                else
+                        curl_opts+=("-s" "-S")
+                fi
+        fi
+        if ! curl "${curl_opts[@]}" "$@" "$ip" -o "$dlp"; then
+                wpr "Request failed: $raw_ip"
+                [ "$raw_ip" != "$ip" ] && wpr "Sanitized URL: $ip"
+                rm -f "$dlp"
                 return 1
         fi
         if [ "$dlp" != - ]; then
                 mv -f "$dlp" "$op"
         fi
 }
-req() { _req "$1" "$2" -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:108.0) Gecko/20100101 Firefox/108.0"; }
+req() { _req "$1" "$2" -H "User-Agent: $(get_random_ua)" -H "Accept-Language: $(get_random_accept_lang)"; }
 gh_req() { _req "$1" "$2" -H "$GH_HEADER"; }
 gh_dl() {
         if [ ! -f "$1" ]; then

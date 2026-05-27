@@ -64,3 +64,48 @@ module-prop-name = "some-app-module"                       # module prop name.
 dpi = "360-480dpi"                                         # used to select apk variant from apkmirror. default: nodpi
 arch = "arm64-v8a"                                         # 'arm64-v8a', 'arm-v7a', 'all', 'both'. 'both' downloads both arm64-v8a and arm-v7a. default: all
 ```
+
+## RVCBotBuilds Extra Options
+
+These options are specific to this fork and are not available in the upstream j-hc repo:
+
+```toml
+# Global options
+default-arch = "arm64-v8a"      # default architecture for all apps. default: "arm64-v8a"
+continue-on-error = true        # continue building other apps if one fails. default: true
+
+# RevPack (Combined Module)
+combine-modules = true          # bundle all built modules into one flashable zip. default: false
+pack-name = "rvcbot-revpack"    # output filename for RevPack (without .zip). default: "rvcbot-revpack"
+pack-apps = ""                  # comma-separated whitelist of apps to include in RevPack. default: "" (all)
+pack-exclude-apps = ""          # comma-separated blacklist of apps to exclude from RevPack. default: "" (none)
+```
+
+### Instagram with brosssh/morphe-patches
+
+Instagram is supported via `brosssh/morphe-patches` which provides 17 patches:
+- Hide ads, Hide Instants, Hide Reels save button, Hide Stories from Home
+- Hide Threads profile button, Hide explore feed, Hide feed content
+- Hide navigation buttons (6 options), Hide notes tray, Hide reshare button
+- Hide suggested content, Limit feed to following profiles
+- Disable Reels scrolling, Disable story auto flipping, Disable video autoplay
+- Bypass signature check, Remove build expired popup
+
+```toml
+[Instagram-Morphe]
+app-name = "Instagram"
+patches-source = "brosssh/morphe-patches"
+cli-source = "MorpheApp/morphe-cli"
+rv-brand = "Morphe"
+build-mode = "apk"
+arch = "arm64-v8a"
+excluded-patches = "'Unlock developer options'"
+uptodown-dlurl = "https://instagram.en.uptodown.com/android"
+```
+
+### RevPack
+
+When `combine-modules = true`, all built Magisk modules are bundled into a single flashable zip.
+This lets you install YouTube + Music + any other module apps in one flash.
+
+The RevPack includes auto-detach for all bundled apps and a per-app install prompt (Vol+/Vol- to choose).

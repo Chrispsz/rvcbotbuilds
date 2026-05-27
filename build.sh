@@ -33,6 +33,8 @@ DEF_CLI_VER=$(toml_get "$main_config_t" cli-version) || DEF_CLI_VER="latest"
 DEF_PATCHES_SRC=$(toml_get "$main_config_t" patches-source) || DEF_PATCHES_SRC="ReVanced/revanced-patches"
 DEF_CLI_SRC=$(toml_get "$main_config_t" cli-source) || DEF_CLI_SRC="ReVanced/revanced-cli"
 DEF_RV_BRAND=$(toml_get "$main_config_t" rv-brand) || DEF_RV_BRAND="ReVanced"
+DEFAULT_ARCH=$(toml_get "$main_config_t" default-arch) || DEFAULT_ARCH="arm64-v8a"
+CONTINUE_ON_ERROR=$(toml_get "$main_config_t" continue-on-error) || CONTINUE_ON_ERROR="true"
 mkdir -p "$TEMP_DIR" "$BUILD_DIR"
 
 if [ "${2-}" = "--config-update" ]; then
@@ -117,7 +119,7 @@ for table_name in $(toml_get_table_names); do
                 fi
         done
         if [ -z "${app_args[dl_from]-}" ]; then abort "ERROR: no 'dlurl' option was set for '$table_name'. (${DL_SRCS[*]})"; fi
-        app_args[arch]=$(toml_get "$t" arch) || app_args[arch]="all"
+        app_args[arch]=$(toml_get "$t" arch) || app_args[arch]="$DEFAULT_ARCH"
         if ! isoneof "${app_args[arch]}" "both" "all" "arm64-v8a" "arm-v7a" "x86_64" "x86"; then
                 abort "wrong arch '${app_args[arch]}' for '$table_name'"
         fi
@@ -158,8 +160,24 @@ wait
 rm -rf temp/tmp.*
 if [ -z "$(ls -A1 "${BUILD_DIR}")" ]; then abort "All builds failed."; fi
 
+# === RevPack (Combined Module) ===
+COMBINE_MODULES=$(toml_get "$main_config_t" combine-modules) || COMBINE_MODULES="false"
+if [ "$COMBINE_MODULES" = true ]; then
+        PACK_NAME=$(toml_get "$main_config_t" pack-name) || PACK_NAME="rvcbot-revpack"
+        PACK_APPS=$(toml_get "$main_config_t" pack-apps) || PACK_APPS=""
+        PACK_EXCLUDE=$(toml_get "$main_config_t" pack-exclude-apps) || PACK_EXCLUDE=""
+        pr "Building RevPack: ${PACK_NAME}.zip"
+        PACK_APPS="$PACK_APPS" PACK_EXCLUDE="$PACK_EXCLUDE" \
+                ENABLE_MODULE_UPDATE="$ENABLE_MODULE_UPDATE" \
+                GITHUB_REPOSITORY="${GITHUB_REPOSITORY-}" \
+                bash "${CWD}/scripts/utilities/combine-modules.sh" "$PACK_NAME"
+fi
+
 log "\nInstale o [GmsCore](https://github.com/ReVanced/GmsCore/releases) para os APKs do YouTube e YT Music (não-root)"
 log "✅ Detach automático da Play Store já incluído via Zygisk no módulo Magisk"
+if [ "$COMBINE_MODULES" = true ]; then
+        log "📦 RevPack: um unico flash instala todos os apps (YouTube + Music)"
+fi
 log "\n[rvcbotbuilds](https://github.com/Chrispsz/rvcbotbuilds)\n"
 log "$(cat "$TEMP_DIR"/*/changelog.md)"
 
