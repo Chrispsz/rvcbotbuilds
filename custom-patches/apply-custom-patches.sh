@@ -16,6 +16,16 @@ set -euo pipefail
 PATCHED_APK="$1"
 PKG_NAME="$2"
 
+# Self-contained logging (does NOT depend on utils.sh)
+cpr() { echo -e "\033[0;32m[+] ${1}\033[0m"; }
+cepr() { echo >&2 -e "\033[0;31m[-] ${1}\033[0m"; }
+cwpr() { echo >&2 -e "\033[0;33m[!] ${1}\033[0m"; }
+
+# Override pr/epr/wpr if not defined (when sourced from utils.sh)
+if ! declare -f pr >/dev/null 2>&1; then pr() { cpr "$@"; }; fi
+if ! declare -f epr >/dev/null 2>&1; then epr() { cepr "$@"; }; fi
+if ! declare -f wpr >/dev/null 2>&1; then wpr() { cwpr "$@"; }; fi
+
 # ============================================
 # Instagram Custom Patches
 # ============================================

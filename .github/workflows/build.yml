@@ -2,6 +2,11 @@ name: Build RVCBotBuilds
 
 on:
   workflow_dispatch:
+    inputs:
+      build_target:
+        description: 'Which app to build (all, instagram, youtube, music)'
+        required: false
+        default: 'all'
   push:
     branches: [main]
     paths:
@@ -9,6 +14,9 @@ on:
       - 'utils.sh'
       - 'build.sh'
       - 'custom-patches/**'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build:
@@ -36,6 +44,7 @@ jobs:
       - name: Build all apps
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           chmod +x build.sh utils.sh
           bash build.sh config.toml 2>&1 | tee build.log
