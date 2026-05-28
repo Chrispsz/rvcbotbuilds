@@ -53,44 +53,31 @@ uptodown-dlurl = "https://youtube-music.en.uptodown.com/android"
 apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"
 
 # ============================================
-# Instagram Piko — Module (arm64-v8a)
-# crimera/piko v3.5.0-dev.2: 19 patches
+# Instagram Piko — Chrispsz fork (arm64-v8a)
+# Chrispsz/piko: 257 preset flags + JSON override + OTA updater
 #
 # Base: 430.0.0.53.80 (piko officially supported version)
 #
-# Module features (like YouTube ReVanced module):
-#   📦 APK bind mount — patched APK replaces stock at runtime
-#   🔄 OTA updates — Magisk checks updateJson for module updates
-#   ⚙️ MetaConfig inject — mc_overrides.json (257 curated flags) copied to
-#      /data/data/com.instagram.instagram/files/mobileconfig/ on every boot
-#      → Quality max, anti-ads, privacy, developer mode, feature unlocks
-#      → Curated from 960: removed 703 trivial/low-impact flags
-#      → 148 documented flags (quality/privacy/ads/dev/media) ALL preserved
-#      → Dangerous Stories flags (59117, 92643, 69238) excluded
-#      → Survives app updates (re-injected each boot by service.sh)
-#      → OTA: checks GitHub for updated mc_overrides.json on boot
+# Extension features (built into patched APK):
+#   🖤 AMOLED theme (pure black)
+#   📥 Download: posts, reels, stories, highlights, profile pics, audio
+#   🛡️ Privacy: block analytics, disable screenshot detection & typing
+#   🔍 Image quality: 2048px from CDN (vs 1080px default)
+#   🔧 Dev options: unlock internal MetaConfig flags (257 curated)
+#   🧹 Clean feed: hide nav buttons, suggested, ads, reels scrolling
+#   🔗 Links: sanitize tracking, open externally
+#   👤 Profile: follow back indicator, more options
+#   📋 Config: swap mc_overrides.json without root
+#      → /sdcard/Android/media/com.instagram.android/mc_overrides.json
+#      → or import via Piko Settings → Import overrides
+#   🔄 OTA: in-app updater downloads new mod APK from GitHub
 #
-#   No detach needed — patched Instagram APK isn't recognized by Play Store
-#
-# Patches included:
-#   🖤 AMOLED theme · 📥 Download media · 🚫 Disable ads
-#   📸 Screenshot detection off · 👥 Follow back indicator
-#   🔒 Disable typing status · 📥 Download voice message
-#   🔗 Open links externally · 🧹 Remove build popup
-#   🛡️ Disable analytics · 🔧 Add settings + Developer options
-#   📋 Copy comment · ✂️ Sanitize share links · 👁 Improve image viewing
-#   📎 More options on post/profile · 📰 Hide suggested content
-#
-# EXCLUDED (stories crash — piko bug #914/#969):
-#   View story mentions · Hide stories tray · Make ephemeral media permanent
-# EXCLUDED (risky/detectable):
-#   View DMs/live/stories anonymously · Limit feed to following
-# EXCLUDED (dangerous):
-#   Unlock employee options · Unlock Plus benefits · Hide navigation buttons
+# JSON override priority: external storage > internal > hardcoded
+# No detach needed — patched APK isn't recognized by Play Store
 # ============================================
 [Instagram-Piko]
 app-name = "Instagram"
-patches-source = "crimera/piko"
+patches-source = "Chrispsz/piko"
 patches-version = "dev"
 cli-source = "MorpheApp/morphe-cli"
 rv-brand = "Morphe"
@@ -118,17 +105,10 @@ included-patches = """\
   'Remove build expired popup' \
   'Sanitize share links' \
   'Unlock developer options' \
+  'Preset flags' \
   """
 excluded-patches = """\
   'Unlock employee options' \
   'Unlock Plus benefits' \
-  'View DMs anonymously' \
-  'View live anonymously' \
-  'View stories anonymously' \
-  'Limit feed to following profiles' \
-  'Hide navigation buttons' \
-  'View story mentions' \
-  'Hide stories tray' \
-  'Make ephemeral media permanent' \
   """
 uptodown-dlurl = "https://instagram.en.uptodown.com/android"
