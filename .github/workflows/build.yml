@@ -7,33 +7,26 @@ on:
         description: 'Which app to build (all, instagram, youtube, music)'
         required: false
         default: 'all'
-  workflow_call:
-    inputs:
-      build_target:
-        type: string
-        description: 'Which app to build (all, instagram, youtube, music)'
-        required: false
-        default: 'all'
-      filtered_config:
-        type: string
-        description: 'Filtered config JSON for selective builds (from CI check)'
-        required: false
-        default: ''
+  push:
+    branches: [main]
+    paths:
+      - 'config.toml'
+      - 'utils.sh'
+      - 'build.sh'
+      - 'custom-patches/**'
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  JAVA_VERSION: '17'
 
 jobs:
   # ============================================================
-  # Build Instagram (piko patches + custom)
-  # Runs independently from YouTube/Music for faster CI
+  # Build all apps (single job, parallel builds within build.sh)
   # ============================================================
-  build-instagram:
-    if: ${{ inputs.build_target == 'all' || inputs.build_target == 'instagram' || inputs.filtered_config != '' }}
+  build:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,7 +37,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: ${{ env.JAVA_VERSION }}
+          java-version: '17'
 
       - name: Cache prebuilts
         uses: actions/cache@v4
@@ -52,163 +45,33 @@ jobs:
           path: |
             temp/crimera-rv
             temp/morpheapp-rv
-          key: prebuilts-piko-dev-v1
+          key: prebuilts-v1-${{ github.run_id }}
           restore-keys: |
-            prebuilts-piko-dev-
+            prebuilts-v1-
 
-      - name: Install deps (no update for speed)
+      - name: Install deps
         run: sudo apt-get install -y jq zip
 
-      - name: Prepare config (Instagram only)
-        id: prep
-        run: |
-          CONFIG_FILE="config.toml"
-          if [ -n "${{ inputs.filtered_config }}" ]; then
-            echo '${{ inputs.filtered_config }}' > config-ci.json
-            # Filter to only Instagram table
-            jq 'to_entries | map(select(.key == "Instagram-Piko" or (.value | type != "object"))) | from_entries' \
-              config-ci.json > config-instagram.json
-            CONFIG_FILE="config-instagram.json"
-          elif [ "${{ inputs.build_target }}" = "instagram" ]; then
-            # Use build.sh's TOML parser to disable YouTube+Music
-            chmod +x build.sh utils.sh bin/toml/tq-$(uname -m | sed 's/x86_64/x86_64/;s/aarch64/arm64/') 2>/dev/null || true
-            # Fallback: use python to parse TOML
-            python3 -c "
-import json, sys
-# Read config.toml using the bin/toml tool if available, otherwise use toml lib
-try:
-    import tomllib
-    with open('config.toml', 'rb') as f:
-        data = tomllib.load(f)
-    # Disable non-instagram apps
-    for key in list(data.keys()):
-        if isinstance(data[key], dict) and key != 'Instagram-Piko':
-            if 'enabled' in data[key]:
-                data[key]['enabled'] = False
-            else:
-                data[key]['enabled'] = False
-    with open('config-instagram.json', 'w') as f:
-        json.dump(data, f)
-except Exception as e:
-    print(f'Warning: could not parse config: {e}', file=sys.stderr)
-"
-            if [ -f config-instagram.json ]; then
-              CONFIG_FILE="config-instagram.json"
-            fi
-          fi
-          echo "config_file=$CONFIG_FILE" >> $GITHUB_OUTPUT
-
-      - name: Build Instagram
+      - name: Build
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           chmod +x build.sh utils.sh
-          bash build.sh ${{ steps.prep.outputs.config_file }} 2>&1 | tee build.log
+          bash build.sh config.toml 2>&1 | tee build.log
 
-      - name: Upload Instagram APK
+      - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: instagram-piko
-          path: build/instagram-*.apk
-          retention-days: 30
-          if-no-files-found: warn
-
-      - name: Upload build log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: instagram-build-log
-          path: |
-            build.md
-            build.log
-          retention-days: 7
-
-  # ============================================================
-  # Build YouTube + Music (Morphe patches)
-  # Runs independently from Instagram for faster CI
-  # ============================================================
-  build-youtube-music:
-    if: ${{ inputs.build_target == 'all' || inputs.build_target == 'youtube' || inputs.build_target == 'music' || inputs.filtered_config != '' }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: ${{ env.JAVA_VERSION }}
-
-      - name: Cache prebuilts
-        uses: actions/cache@v4
-        with:
-          path: |
-            temp/morpheapp-rv
-          key: prebuilts-morphe-latest-v1
-          restore-keys: |
-            prebuilts-morphe-latest-
-
-      - name: Install deps (no update for speed)
-        run: sudo apt-get install -y jq zip
-
-      - name: Prepare config (YouTube+Music only)
-        id: prep
-        run: |
-          CONFIG_FILE="config.toml"
-          if [ -n "${{ inputs.filtered_config }}" ]; then
-            echo '${{ inputs.filtered_config }}' > config-ci.json
-            # Filter to only YouTube+Music tables
-            jq 'to_entries | map(select(.key == "YouTube-Morphe" or .key == "Music-Morphe" or (.value | type != "object"))) | from_entries' \
-              config-ci.json > config-ytm.json
-            CONFIG_FILE="config-ytm.json"
-          elif [ "${{ inputs.build_target }}" = "youtube" ] || [ "${{ inputs.build_target }}" = "music" ]; then
-            # Disable Instagram
-            python3 -c "
-import json, sys
-try:
-    import tomllib
-    with open('config.toml', 'rb') as f:
-        data = tomllib.load(f)
-    for key in list(data.keys()):
-        if isinstance(data[key], dict) and key == 'Instagram-Piko':
-            data[key]['enabled'] = False
-    with open('config-ytm.json', 'w') as f:
-        json.dump(data, f)
-except Exception as e:
-    print(f'Warning: could not parse config: {e}', file=sys.stderr)
-"
-            if [ -f config-ytm.json ]; then
-              CONFIG_FILE="config-ytm.json"
-            fi
-          fi
-          echo "config_file=$CONFIG_FILE" >> $GITHUB_OUTPUT
-
-      - name: Build YouTube + Music
-        env:
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          chmod +x build.sh utils.sh
-          bash build.sh ${{ steps.prep.outputs.config_file }} 2>&1 | tee build.log
-
-      - name: Upload YouTube+Music APKs
-        uses: actions/upload-artifact@v4
-        with:
-          name: youtube-music-morphe-apks
-          path: build/youtube-*.apk build/music-*.apk
+          name: patched-apks
+          path: build/*.apk
           retention-days: 30
           if-no-files-found: warn
 
       - name: Upload Magisk modules
         uses: actions/upload-artifact@v4
         with:
-          name: youtube-music-morphe-modules
+          name: magisk-modules
           path: build/*.zip
           retention-days: 30
           if-no-files-found: warn
@@ -217,9 +80,8 @@ except Exception as e:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ytm-build-log
+          name: build-log
           path: |
             build.md
             build.log
           retention-days: 7
-
