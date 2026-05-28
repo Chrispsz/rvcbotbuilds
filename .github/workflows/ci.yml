@@ -10,16 +10,18 @@ env:
 
 jobs:
   # ============================================================
-  # Check for updates in piko patches (Instagram)
-  # and Morphe patches (YouTube/Music)
-  # The config_update function in build.sh already handles
-  # checking both patch sources (dev channel for piko, latest for Morphe)
+  # Check for updates:
+  #   - piko patches (dev channel) for Instagram
+  #   - Morphe patches (latest) for YouTube/Music
+  #   - Base APK versions for all apps
+  # Also checks Instagram base version on uptodown
   # ============================================================
   check:
     permissions: write-all
     runs-on: ubuntu-latest
     outputs:
       SHOULD_BUILD: ${{ steps.should_build.outputs.SHOULD_BUILD }}
+      UPDATED_APPS: ${{ steps.should_build.outputs.UPDATED_APPS }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,6 +38,7 @@ jobs:
           if ! git checkout origin/update build.md 2>/dev/null; then
             echo "first time building!"
             echo "SHOULD_BUILD=1" >> $GITHUB_OUTPUT
+            echo "UPDATED_APPS=all" >> $GITHUB_OUTPUT
             exit 0
           fi
 
@@ -50,9 +53,40 @@ jobs:
             echo "Updates detected!"
             echo "'$UPDATE_CFG'"
             echo "SHOULD_BUILD=1" >> $GITHUB_OUTPUT
+            echo "UPDATED_APPS=$(echo "$UPDATE_CFG" | jq -r 'to_entries | map(select(.value | type == "object")) | map(.key) | join(",")')" >> $GITHUB_OUTPUT
           else
-            echo "No updates found."
+            echo "No patch updates found."
+          fi
+
+          # Also check Instagram base version on uptodown
+          # The config has version = "430.0.0.53.80" pinned, so check if a newer
+          # version is available that piko officially supports
+          echo ""
+          echo "=== Checking Instagram base version ==="
+          CURRENT_IG_VER=$(grep '^version = ' config.toml | head -1 | tr -d '"' | awk '{print $3}')
+          echo "Current pinned version: $CURRENT_IG_VER"
+
+          # Get latest Instagram version from uptodown
+          IG_VERSIONS=$(curl -sL "https://instagram.en.uptodown.com/android/versions" 2>/dev/null | \
+            grep -oP '(?<=version">)[\d.]+(?:\.\d+)+' | head -5) || true
+
+          if [ -n "$IG_VERSIONS" ]; then
+            LATEST_IG=$(echo "$IG_VERSIONS" | head -1)
+            echo "Latest on uptodown: $LATEST_IG"
+            if [ "$LATEST_IG" != "$CURRENT_IG_VER" ]; then
+              echo "⚠️  Instagram base update available: $CURRENT_IG_VER → $LATEST_IG"
+              echo "  (Will not auto-update — piko must add support first)"
+            else
+              echo "✅ Instagram base is up to date"
+            fi
+          else
+            echo "Could not check Instagram version on uptodown"
+          fi
+
+          # Only build if patches updated (base version stays pinned until piko supports it)
+          if [ "$(grep -c 'SHOULD_BUILD=1' $GITHUB_OUTPUT 2>/dev/null)" -eq 0 ]; then
             echo "SHOULD_BUILD=0" >> $GITHUB_OUTPUT
+            echo "UPDATED_APPS=" >> $GITHUB_OUTPUT
           fi
 
       - name: Check patches versions (info)
@@ -62,12 +96,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "=== Piko patches (Instagram) ==="
-          curl -sL -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/crimera/piko/releases?per_page=3" | \
-            jq -r '.[] | "  \(.tag_name) — \(.published_at[:10]) — \(.name)"' | head -3
+          curl -sL -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/crimera/piko/releases?per_page=5" | \
+            jq -r '.[] | "  \(.tag_name) — \(.published_at[:10]) — \(.name)"' | head -5
           echo ""
           echo "=== Morphe patches (YouTube/Music) ==="
-          curl -sL -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/MorpheApp/morphe-patches/releases?per_page=3" | \
-            jq -r '.[] | "  \(.tag_name) — \(.published_at[:10]) — \(.name)"' | head -3
+          curl -sL -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/MorpheApp/morphe-patches/releases?per_page=5" | \
+            jq -r '.[] | "  \(.tag_name) — \(.published_at[:10]) — \(.name)"' | head -5
 
       - name: Clear older runs
         env:
@@ -82,6 +116,8 @@ jobs:
     needs: check
     if: ${{ needs.check.outputs.SHOULD_BUILD == '1' }}
     uses: ./.github/workflows/build.yml
+    with:
+      build_target: 'all'
     secrets: inherit
 
   # ============================================================

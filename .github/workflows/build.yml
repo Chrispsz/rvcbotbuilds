@@ -7,6 +7,10 @@ on:
         description: 'Which app to build (all, instagram, youtube, music)'
         required: false
         default: 'all'
+      create_release:
+        description: 'Create GitHub Release? (true/false)'
+        required: false
+        default: 'false'
   push:
     branches: [main]
     paths:
@@ -14,13 +18,19 @@ on:
       - 'utils.sh'
       - 'build.sh'
       - 'custom-patches/**'
+  workflow_call:
+    inputs:
+      build_target:
+        type: string
+        default: 'all'
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   # ============================================================
-  # Build all apps (single job, parallel builds within build.sh)
+  # Build apps based on target selection
+  # build_target: all | instagram | youtube | music
   # ============================================================
   build:
     runs-on: ubuntu-latest
@@ -50,7 +60,39 @@ jobs:
             prebuilts-v1-
 
       - name: Install deps
-        run: sudo apt-get install -y jq zip
+        run: sudo apt-get install -y jq zip python3
+
+      - name: Select build target
+        id: target
+        run: |
+          TARGET="${{ inputs.build_target || 'all' }}"
+          echo "target=$TARGET" >> $GITHUB_OUTPUT
+          echo "Build target: $TARGET"
+
+          if [ "$TARGET" != "all" ]; then
+            echo "Disabling non-target apps..."
+            # Disable all apps first
+            sed -i '/^\[YouTube-Morphe\]/,/^\[Music-Morphe\]/{ s/^enabled = true/enabled = false/ }' config.toml
+            sed -i '/^\[Music-Morphe\]/,/^\[Instagram-Piko\]/{ s/^enabled = true/enabled = false/ }' config.toml
+            sed -i '/^\[Instagram-Piko\]/,$/{ s/^enabled = true/enabled = false/ }' config.toml
+
+            # Re-enable only the target
+            case "$TARGET" in
+              youtube)
+                sed -i '/^\[YouTube-Morphe\]/,/^\[Music-Morphe\]/{ s/^enabled = false/enabled = true/ }' config.toml
+                ;;
+              music)
+                sed -i '/^\[Music-Morphe\]/,/^\[Instagram-Piko\]/{ s/^enabled = false/enabled = true/ }' config.toml
+                ;;
+              instagram)
+                sed -i '/^\[Instagram-Piko\]/,$/{ s/^enabled = false/enabled = true/ }' config.toml
+                ;;
+            esac
+          fi
+
+          echo ""
+          echo "=== Active config ==="
+          grep -E '^\[.*\]|^enabled' config.toml
 
       - name: Build
         env:
@@ -85,3 +127,17 @@ jobs:
             build.md
             build.log
           retention-days: 7
+
+      - name: Create GitHub Release
+        if: inputs.create_release == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "build-${{ steps.target.outputs.target }}-$(date +'%Y%m%d-%H%M')"
+          name: "RVCBotBuilds ${{ steps.target.outputs.target }} $(date +'%Y-%m-%d')"
+          body_path: build.md
+          prerelease: true
+          files: |
+            build/*.apk
+            build/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

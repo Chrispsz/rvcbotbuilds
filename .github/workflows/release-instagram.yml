@@ -1,0 +1,204 @@
+name: Release Instagram Mod
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_tag:
+        description: 'Release tag (e.g. v430.0.0.53.80-piko3.5.0-dev.2)'
+        required: false
+        default: ''
+      prerelease:
+        description: 'Mark as pre-release? (true/false)'
+        required: false
+        default: 'true'
+      create_release:
+        description: 'Create GitHub Release? (true/false)'
+        required: false
+        default: 'true'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  # ============================================================
+  # Build Instagram only — optimized for speed
+  # Disables YouTube/Music to cut build time by ~60%
+  # ============================================================
+  build-instagram:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Cache prebuilts
+        uses: actions/cache@v4
+        with:
+          path: |
+            temp/crimera-rv
+          key: piko-prebuilts-v1-${{ github.run_id }}
+          restore-keys: |
+            piko-prebuilts-v1-
+
+      - name: Install deps
+        run: sudo apt-get install -y jq zip python3
+
+      - name: Prepare Instagram-only config
+        run: |
+          # Disable YouTube and Music to build only Instagram
+          # This saves ~60% of build time
+          echo "Disabling YouTube and Music in config.toml..."
+          sed -i 's/^\[YouTube-Morphe\]/[YouTube-Morphe]/' config.toml
+          sed -i '/^\[YouTube-Morphe\]/,/^\[Music-Morphe\]/{ s/^enabled = true/enabled = false/ }' config.toml
+          sed -i '/^\[Music-Morphe\]/,/^\[Instagram-Piko\]/{ s/^enabled = true/enabled = false/ }' config.toml
+
+          echo ""
+          echo "=== Active config ==="
+          grep -E '^\[.*\]|^enabled' config.toml
+
+      - name: Build Instagram
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          chmod +x build.sh utils.sh
+          echo "=== Starting Instagram-only build ==="
+          bash build.sh config.toml 2>&1 | tee build.log
+          echo "=== Build complete ==="
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: instagram-piko-apk
+          path: build/*.apk
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: |
+            build.md
+            build.log
+          retention-days: 7
+
+      - name: Generate release tag
+        id: release_info
+        if: inputs.create_release == 'true'
+        run: |
+          # Auto-generate tag if not provided
+          if [ -n "${{ inputs.version_tag }}" ]; then
+            TAG="${{ inputs.version_tag }}"
+          else
+            # Extract version from the APK filename
+            APK=$(ls build/instagram-*.apk 2>/dev/null | head -1)
+            if [ -n "$APK" ]; then
+              # filename: instagram-morphe-v430.0.0.53.80-arm64-v8a.apk
+              VER=$(basename "$APK" | grep -oP 'v[\d.]+')
+              TAG="instagram-${VER}-piko"
+            else
+              TAG="instagram-$(date +'%Y%m%d-%H%M')"
+            fi
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Release tag: $TAG"
+
+          # Generate release notes from build.md
+          {
+            echo "## Instagram Piko Mod"
+            echo ""
+            echo "### Patches Applied (piko v3.5.0-dev.2 + custom)"
+            echo ""
+            echo "#### Included (21 piko + 2 custom)"
+            echo "| # | Patch | Description |"
+            echo "|---|-------|-------------|"
+            echo "| 1 | Add settings | Piko Settings hub |"
+            echo "| 2 | Amoled theme | Pure black theme |"
+            echo "| 3 | Copy comment | Copy any comment text |"
+            echo "| 4 | Disable analytics | Turn off data collection |"
+            echo "| 5 | Disable ads | Remove all ads |"
+            echo "| 6 | Disable screenshot detection | Bypass screenshot alerts |"
+            echo "| 7 | Disable typing status | Hide typing indicator |"
+            echo "| 8 | Download media | Download posts, reels, stories, highlights, profile pics, audio |"
+            echo "| 9 | Download voice message | Save voice messages |"
+            echo "| 10 | Follow back indicator | See who follows you back |"
+            echo "| 11 | Hide stories tray | Remove stories bar |"
+            echo "| 12 | Hide suggested content | Remove suggested posts/ads |"
+            echo "| 13 | Improve image viewing | Max quality image viewing |"
+            echo "| 14 | Make ephemeral media permanent | View-once messages stay |"
+            echo "| 15 | More options on post | Extra post actions |"
+            echo "| 16 | More options on profile | Extra profile actions |"
+            echo "| 17 | Open links externally | Open links outside app |"
+            echo "| 18 | Remove build expired popup | Disable expiry popup |"
+            echo "| 19 | Sanitize share links | Clean tracking params from shared links |"
+            echo "| 20 | Unlock developer options | Access dev settings |"
+            echo "| 21 | View story mentions | See story mentions |"
+            echo ""
+            echo "#### Custom Patches (RVCBotBuilds binary patches)"
+            echo "| # | Patch | Method |"
+            echo "|---|-------|--------|"
+            echo "| 22 | Allow Screenshots in DMs | FLAG_SECURE removal (binary dex patch) |"
+            echo "| 23 | MobileConfig Quality Override | medium→high, standard→hd (binary string patch) |"
+            echo ""
+            echo "#### Excluded (risky/detectable)"
+            echo "- View DMs anonymously (ghost mode — ban risk)"
+            echo "- View live anonymously (detection risk)"
+            echo "- View stories anonymously (high detection risk)"
+            echo "- Unlock employee options (internal Meta tools)"
+            echo "- Unlock Plus benefits (TOS violation)"
+            echo "- Limit feed to following profiles (breaks feed)"
+            echo "- Hide navigation buttons (breaks UI)"
+            echo ""
+            if [ -f build.md ]; then
+              echo "### Build Info"
+              echo '```'
+              cat build.md
+              echo '```'
+            fi
+          } > release-notes.md
+
+      - name: Create GitHub Release
+        if: inputs.create_release == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_info.outputs.tag }}
+          name: "Instagram Piko Mod ${{ steps.release_info.outputs.tag }}"
+          body_path: release-notes.md
+          prerelease: ${{ inputs.prerelease == 'true' }}
+          files: |
+            build/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build summary
+        if: always()
+        run: |
+          echo "## 📸 Instagram Piko Mod Build" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if ls build/*.apk 2>/dev/null; then
+            for apk in build/*.apk; do
+              SIZE=$(du -h "$apk" | cut -f1)
+              echo "- ✅ \`$(basename $apk)\` ($SIZE)" >> $GITHUB_STEP_SUMMARY
+            done
+          else
+            echo "- ❌ No APK built" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Config" >> $GITHUB_STEP_SUMMARY
+          echo "- Base: 430.0.0.53.80" >> $GITHUB_STEP_SUMMARY
+          echo "- Patches: crimera/piko v3.5.0-dev.2" >> $GITHUB_STEP_SUMMARY
+          echo "- Custom: FLAG_SECURE removal + Quality Override" >> $GITHUB_STEP_SUMMARY
+          echo "- Arch: arm64-v8a" >> $GITHUB_STEP_SUMMARY
+          echo "- Mode: APK (non-root)" >> $GITHUB_STEP_SUMMARY
