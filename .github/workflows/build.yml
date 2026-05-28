@@ -1,23 +1,12 @@
-name: Build RVCBotBuilds
+name: 🔨 Build All
 
 on:
   workflow_dispatch:
     inputs:
       build_target:
-        description: 'Which app to build (all, instagram, youtube, music)'
+        description: 'Target (all, instagram, youtube, music)'
         required: false
         default: 'all'
-      create_release:
-        description: 'Create GitHub Release? (true/false)'
-        required: false
-        default: 'false'
-  push:
-    branches: [main]
-    paths:
-      - 'config.toml'
-      - 'utils.sh'
-      - 'build.sh'
-      - 'custom-patches/**'
   workflow_call:
     inputs:
       build_target:
@@ -43,12 +32,11 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Restore keystores from secrets
+      - name: Restore keystores
         run: |
           echo "${{ secrets.KS_KEYSTORE_B64 }}" | base64 -d > ks.keystore
           echo "${{ secrets.KS_P12_KEYSTORE_B64 }}" | base64 -d > ks-p12.keystore
           chmod 644 ks.keystore ks-p12.keystore
-          echo "Keystores restored from secrets"
 
       - name: Cache prebuilts
         uses: actions/cache@v4
@@ -57,19 +45,16 @@ jobs:
             temp/crimera-rv
             temp/morpheapp-rv
           key: prebuilts-v1-${{ github.run_id }}
-          restore-keys: |
-            prebuilts-v1-
+          restore-keys: prebuilts-v1-
 
       - name: Install deps
         run: sudo apt-get install -y jq zip python3
 
-      # NOTE: parallel-jobs is configured in config.toml (currently 2), not here
       - name: Select build target
         id: target
         run: |
           set_app_enabled() {
             local section="$1" state="$2"
-            # Uses awk to find the exact section and set enabled within it
             awk -v sec="[$section]" -v val="enabled = $state" '
               $0 == sec { in_sec=1; print; next }
               in_sec && /^enabled = / { print val; in_sec=0; next }
@@ -80,22 +65,18 @@ jobs:
 
           TARGET="${{ inputs.build_target || 'all' }}"
           echo "target=$TARGET" >> $GITHUB_OUTPUT
-          echo "Build target: $TARGET"
 
           if [ "$TARGET" != "all" ]; then
-            echo "Disabling all apps..."
             set_app_enabled "YouTube-Morphe" false
             set_app_enabled "Music-Morphe" false
             set_app_enabled "Instagram-Piko" false
-
             case "$TARGET" in
-              youtube)  set_app_enabled "YouTube-Morphe" true ;;
-              music)    set_app_enabled "Music-Morphe" true ;;
+              youtube)   set_app_enabled "YouTube-Morphe" true ;;
+              music)     set_app_enabled "Music-Morphe" true ;;
               instagram) set_app_enabled "Instagram-Piko" true ;;
             esac
           fi
 
-          echo ""
           echo "=== Active config ==="
           grep -E '^\[.*\]|^enabled' config.toml
 
@@ -107,7 +88,7 @@ jobs:
           chmod +x build.sh utils.sh
           bash build.sh config.toml 2>&1 | tee build.log
 
-      - name: Upload APK artifacts
+      - name: Upload APKs
         uses: actions/upload-artifact@v7
         with:
           name: patched-apks
@@ -115,7 +96,7 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
-      - name: Upload Magisk modules
+      - name: Upload modules
         uses: actions/upload-artifact@v7
         with:
           name: magisk-modules
@@ -133,20 +114,6 @@ jobs:
             build.log
           retention-days: 7
 
-      - name: Create GitHub Release
-        if: inputs.create_release == 'true'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: "build-${{ steps.target.outputs.target }}-$(date +'%Y%m%d-%H%M')"
-          name: "RVCBotBuilds ${{ steps.target.outputs.target }} $(date +'%Y-%m-%d')"
-          body_path: build.md
-          prerelease: true
-          files: |
-            build/*.apk
-            build/*.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Cleanup keystores
+      - name: Cleanup
         if: always()
         run: rm -f ks.keystore ks-p12.keystore

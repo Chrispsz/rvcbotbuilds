@@ -1,26 +1,23 @@
-name: Release Instagram Mod
+name: 📸 Build Instagram Mod
 
 on:
   workflow_dispatch:
     inputs:
-      version_tag:
-        description: 'Release tag (e.g. v430.0.0.53.80-piko3.5.0-dev.2)'
-        required: false
-        default: ''
       prerelease:
-        description: 'Mark as pre-release? (true/false)'
+        description: 'Pre-release? (true/false)'
         required: false
-        default: 'true'
-      create_release:
-        description: 'Create GitHub Release? (true/false)'
-        required: false
-        default: 'true'
+        default: 'false'
+  workflow_call:
+    inputs:
+      prerelease:
+        type: string
+        default: 'false'
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  build-instagram:
+  build:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -35,21 +32,18 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Restore keystores from secrets
+      - name: Restore keystores
         run: |
           echo "${{ secrets.KS_KEYSTORE_B64 }}" | base64 -d > ks.keystore
           echo "${{ secrets.KS_P12_KEYSTORE_B64 }}" | base64 -d > ks-p12.keystore
           chmod 644 ks.keystore ks-p12.keystore
-          echo "Keystores restored from secrets"
 
       - name: Cache prebuilts
         uses: actions/cache@v4
         with:
-          path: |
-            temp/crimera-rv
+          path: temp/crimera-rv
           key: piko-prebuilts-v1-${{ github.run_id }}
-          restore-keys: |
-            piko-prebuilts-v1-
+          restore-keys: piko-prebuilts-v1-
 
       - name: Install deps
         run: sudo apt-get install -y jq zip python3
@@ -65,11 +59,8 @@ jobs:
               { print }
             ' config.toml > config.toml.tmp && mv config.toml.tmp config.toml
           }
-
-          # Disable YouTube and Music
           set_app_enabled "YouTube-Morphe" false
           set_app_enabled "Music-Morphe" false
-
           echo "=== Active config ==="
           grep -E '^\[.*\]|^enabled' config.toml
 
@@ -79,14 +70,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           chmod +x build.sh utils.sh
-          echo "=== Starting Instagram-only build ==="
           bash build.sh config.toml 2>&1 | tee build.log
-          echo "=== Build complete ==="
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v7
         with:
-          name: instagram-piko-apk
+          name: instagram-mod-apk
           path: build/*.apk
           retention-days: 90
           if-no-files-found: error
@@ -101,33 +90,27 @@ jobs:
             build.log
           retention-days: 7
 
-      - name: Generate release tag and notes
-        id: release_info
-        if: inputs.create_release == 'true'
+      - name: Create GitHub Release
+        id: release
         run: |
-          # Auto-generate tag if not provided
-          if [ -n "${{ inputs.version_tag }}" ]; then
-            TAG="${{ inputs.version_tag }}"
-          else
-            APK=$(ls build/instagram-*.apk 2>/dev/null | head -1)
-            if [ -n "$APK" ]; then
-              # Extract version: filename is instagram-morphe-v430.0.0.53.80-arm64-v8a.apk
-              # Match the version between -v and -arm64 (or -arm)
-              VER=$(basename "$APK" | sed -n 's/.*-v\([0-9][0-9.]*\)-arm.*/\1/p')
-              if [ -n "$VER" ]; then
-                TAG="v${VER}-piko3.5.0-dev.2"
-              else
-                TAG="instagram-$(date +'%Y%m%d-%H%M')"
-              fi
-            else
-              TAG="instagram-$(date +'%Y%m%d-%H%M')"
-            fi
+          APK=$(ls build/instagram-*.apk 2>/dev/null | head -1)
+          if [ -z "$APK" ]; then
+            echo "No APK found, skipping release"
+            echo "created=false" >> $GITHUB_OUTPUT
+            exit 0
           fi
+
+          # Extract version from APK filename
+          VER=$(basename "$APK" | sed -n 's/.*-v\([0-9][0-9.]*\)-arm.*/\1/p')
+          if [ -z "$VER" ]; then
+            VER=$(date +'%Y%m%d')
+          fi
+          TAG="v${VER}-mod"
           echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=$VER" >> $GITHUB_OUTPUT
           echo "Release tag: $TAG"
 
-          # Extract included patches dynamically from config.toml
-          # Use the multiline string between triple-quotes, split by single-quote delimiters
+          # Build release notes
           INCLUDED_PATCHES=$(awk '
             /^\[Instagram-Piko\]/{found=1}
             found && /^included-patches/{capturing=1; next}
@@ -136,7 +119,6 @@ jobs:
             capturing{gsub(/'\''/, "", $0); gsub(/\\/, "", $0); gsub(/^ +| +$/, "", $0); if($0!="") print}
           ' config.toml)
 
-          # Extract excluded patches dynamically from config.toml
           EXCLUDED_PATCHES=$(awk '
             /^\[Instagram-Piko\]/{found=1}
             found && /^excluded-patches/{capturing=1; next}
@@ -147,13 +129,23 @@ jobs:
 
           PATCH_COUNT=$(echo "$INCLUDED_PATCHES" | wc -l)
 
-          # Generate release notes
           {
-            echo "## 📸 Instagram Piko Mod"
+            echo "## 📸 Instagram Mod v${VER}"
             echo ""
-            echo "### Patches Applied"
+            echo "### ✨ Features"
+            echo "- 🖤 AMOLED theme (pure black)"
+            echo "- 📥 Download: posts, reels, stories, highlights, profile pics, audio"
+            echo "- 🛡️ Privacy: block analytics, disable screenshot detection & typing"
+            echo "- 🔍 Image quality: 2048px from CDN"
+            echo "- 🔧 Dev options: unlock internal MetaConfig flags (257 curated)"
+            echo "- 🧹 Clean feed: hide nav buttons, suggested, ads, reels scrolling"
+            echo "- 🔗 Links: sanitize tracking, open externally"
+            echo "- 👤 Profile: follow back indicator, more options"
+            echo "- 📋 Config: swap mc_overrides.json without root"
+            echo "- 🔄 OTA: in-app updater downloads new mod APK from GitHub"
+            echo "- 🇧🇷 Full Portuguese (BR) translation"
             echo ""
-            echo "**${PATCH_COUNT} piko patches + 2 custom RVCBotBuilds patches**"
+            echo "### Patches (${PATCH_COUNT} applied)"
             echo ""
             echo "| # | Patch |"
             echo "|---|-------|"
@@ -164,14 +156,7 @@ jobs:
               i=$((i + 1))
             done <<< "$INCLUDED_PATCHES"
             echo ""
-            echo "### Custom Patches (RVCBotBuilds binary patches)"
-            echo ""
-            echo "| # | Patch | Method | Effect |"
-            echo "|---|-------|--------|--------|"
-            echo "| $i | Allow Screenshots in DMs | FLAG_SECURE removal | Screenshot em DMs liberado |"
-            echo "| $((i+1)) | MobileConfig Quality Override | medium→high, standard→hd | Qualidade maximizada |"
-            echo ""
-            echo "<details><summary>Patches excluídos (risky/detectable)</summary>"
+            echo "<details><summary>Excluded patches</summary>"
             echo ""
             while IFS= read -r patch; do
               [ -z "$patch" ] && continue
@@ -180,41 +165,46 @@ jobs:
             echo ""
             echo "</details>"
             echo ""
+            echo "### Config Override"
+            echo "Priority: external JSON > internal JSON > hardcoded (257 flags)"
+            echo "\`/sdcard/Android/media/com.instagram.android/mc_overrides.json\`"
+            echo ""
             if [ -f build.md ]; then
-              echo "### Build Info"
+              echo "<details><summary>Build info</summary>"
+              echo ""
               echo '```'
               cat build.md
               echo '```'
+              echo "</details>"
             fi
           } > release-notes.md
 
-      - name: Create GitHub Release
-        if: inputs.create_release == 'true'
+          # Delete old release with same tag if exists
+          OLD_RELEASE_ID=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$TAG" | \
+            jq -r '.id // empty' 2>/dev/null || true)
+          if [ -n "$OLD_RELEASE_ID" ]; then
+            echo "Deleting old release $OLD_RELEASE_ID for tag $TAG"
+            curl -s -X DELETE -H "Authorization: token $GITHUB_TOKEN" \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/$OLD_RELEASE_ID" || true
+            curl -s -X DELETE -H "Authorization: token $GITHUB_TOKEN" \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/git/refs/tags/$TAG" || true
+          fi
+
+          echo "created=true" >> $GITHUB_OUTPUT
+
+      - name: Publish Release
+        if: steps.release.outputs.created == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.release_info.outputs.tag }}
-          name: "📸 Instagram Piko Mod ${{ steps.release_info.outputs.tag }}"
+          tag_name: ${{ steps.release.outputs.tag }}
+          name: "📸 Instagram Mod ${{ steps.release.outputs.tag }}"
           body_path: release-notes.md
           prerelease: ${{ inputs.prerelease == 'true' }}
-          files: |
-            build/*.apk
+          files: build/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build summary
-        if: always()
-        run: |
-          echo "## 📸 Instagram Piko Mod Build" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if ls build/*.apk 2>/dev/null; then
-            for apk in build/*.apk; do
-              SIZE=$(du -h "$apk" | cut -f1)
-              echo "- ✅ \`$(basename $apk)\` ($SIZE)" >> $GITHUB_STEP_SUMMARY
-            done
-          else
-            echo "- ❌ No APK built" >> $GITHUB_STEP_SUMMARY
-          fi
-
-      - name: Cleanup keystores
+      - name: Cleanup
         if: always()
         run: rm -f ks.keystore ks-p12.keystore

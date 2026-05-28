@@ -1,7 +1,12 @@
-name: CI — Auto-detect patches & base updates
+name: 🔄 Sync & Build
 
 on:
   workflow_dispatch:
+    inputs:
+      force_build:
+        description: 'Force build even without updates? (true/false)'
+        required: false
+        default: 'false'
   schedule:
     - cron: "0 16 * * *"   # Daily at 16:00 UTC (13:00 BRT)
 
@@ -9,45 +14,70 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  check:
+  # ===========================================
+  # Step 1: Check if upstream has updates
+  # ===========================================
+  check-updates:
     permissions: write-all
     runs-on: ubuntu-latest
     outputs:
-      SHOULD_BUILD: ${{ steps.should_build.outputs.SHOULD_BUILD }}
+      SHOULD_BUILD: ${{ steps.check.outputs.SHOULD_BUILD }}
+      PIKO_UPDATED: ${{ steps.check.outputs.PIKO_UPDATED }}
+      MORPHE_UPDATED: ${{ steps.check.outputs.MORPHE_UPDATED }}
+      IG_BASE_UPDATED: ${{ steps.check.outputs.IG_BASE_UPDATED }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - name: Should build?
-        id: should_build
-        shell: bash
+      - name: Check for updates
+        id: check
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if ! git checkout origin/update build.md 2>/dev/null; then
-            echo "First time building!"
-            echo "SHOULD_BUILD=1" >> $GITHUB_OUTPUT
-            exit 0
+          SHOULD_BUILD=0
+          PIKO_UPDATED=0
+          MORPHE_UPDATED=0
+          IG_BASE_UPDATED=0
+
+          # Check if this is a forced build
+          if [ "${{ inputs.force_build }}" = "true" ]; then
+            echo "Force build requested"
+            SHOULD_BUILD=1
           fi
 
-          # Ensure build.md exists for config_update
-          if [ ! -f build.md ] || [ ! -s build.md ]; then
-            echo "build.md missing or empty — treating as first build"
-            echo "SHOULD_BUILD=1" >> $GITHUB_OUTPUT
-            exit 0
-          fi
+          # Check piko patches version
+          echo "=== Checking piko patches ==="
+          CURRENT_PIKO=$(awk '/^\[Instagram-Piko\]/{found=1} found && /^patches-version = /{gsub(/"/, ""); print $3; exit}' config.toml)
+          echo "Current piko version in config: $CURRENT_PIKO"
 
-          chmod +x build.sh utils.sh
-          UPDATE_CFG=$(./build.sh config.toml --config-update)
-          if [ "$UPDATE_CFG" ]; then
-            echo "Updates detected!"
-            echo "'$UPDATE_CFG'"
-            echo "SHOULD_BUILD=1" >> $GITHUB_OUTPUT
+          LATEST_PIKO_TAG=$(curl -sL "https://api.github.com/repos/crimera/piko/releases?per_page=1" | jq -r '.[0].tag_name // empty' 2>/dev/null || echo "")
+          echo "Latest piko release: $LATEST_PIKO_TAG"
+
+          # Get current version from build.md
+          if git checkout origin/update build.md 2>/dev/null && [ -f build.md ]; then
+            LAST_BUILT_PIKO=$(grep -oP 'piko\s+\K[\w.-]+' build.md | head -1 || echo "")
+            echo "Last built piko version: $LAST_BUILT_PIKO"
           else
-            echo "No patch updates found."
+            LAST_BUILT_PIKO=""
+            echo "No previous build.md found — first build"
+            SHOULD_BUILD=1
           fi
+
+          if [ -n "$LATEST_PIKO_TAG" ] && [ "$LATEST_PIKO_TAG" != "$LAST_BUILT_PIKO" ]; then
+            echo "⚠️  Piko update detected: $LAST_BUILT_PIKO → $LATEST_PIKO_TAG"
+            PIKO_UPDATED=1
+            SHOULD_BUILD=1
+          else
+            echo "✅ Piko is up to date"
+          fi
+
+          # Check Morphe patches
+          echo ""
+          echo "=== Checking Morphe patches ==="
+          LATEST_MORPHE=$(curl -sL "https://api.github.com/repos/MorpheApp/morphe-patches/releases?per_page=1" | jq -r '.[0].tag_name // empty' 2>/dev/null || echo "")
+          echo "Latest morphe release: $LATEST_MORPHE"
 
           # Check Instagram base version on uptodown
           echo ""
@@ -62,61 +92,132 @@ jobs:
             LATEST_IG=$(echo "$IG_VERSIONS" | head -1)
             echo "Latest on uptodown: $LATEST_IG"
             if [ "$LATEST_IG" != "$CURRENT_IG_VER" ]; then
-              echo "⚠️  Instagram base update available: $CURRENT_IG_VER → $LATEST_IG"
-              echo "  (Will not auto-update — piko must add support first)"
+              echo "⚠️  Instagram base update: $CURRENT_IG_VER → $LATEST_IG"
+              echo "  (Won't auto-update — piko must support it first)"
+              IG_BASE_UPDATED=1
             else
               echo "✅ Instagram base is up to date"
             fi
           fi
 
-          # Only build if patches updated
-          if [ "$(grep -c 'SHOULD_BUILD=1' $GITHUB_OUTPUT 2>/dev/null)" -eq 0 ]; then
-            echo "SHOULD_BUILD=0" >> $GITHUB_OUTPUT
+          # Use build.sh config-update check for Morphe
+          if [ -f build.sh ]; then
+            chmod +x build.sh utils.sh
+            UPDATE_CFG=$(./build.sh config.toml --config-update 2>/dev/null || true)
+            if [ -n "$UPDATE_CFG" ]; then
+              echo "⚠️  Config updates detected: $UPDATE_CFG"
+              MORPHE_UPDATED=1
+              SHOULD_BUILD=1
+            else
+              echo "✅ Morphe patches are up to date"
+            fi
           fi
 
-      - name: Check patches versions
-        if: steps.should_build.outputs.SHOULD_BUILD == '1'
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "=== Piko patches (Instagram) ==="
-          curl -sL -H "Authorization: token $GITHUB_TOKEN" \
-            "https://api.github.com/repos/crimera/piko/releases?per_page=3" | \
-            jq -r '.[] | "  \(.tag_name) — \(.published_at[:10]) — \(.name)"' | head -3
           echo ""
-          echo "=== Morphe patches (YouTube/Music) ==="
-          curl -sL -H "Authorization: token $GITHUB_TOKEN" \
-            "https://api.github.com/repos/MorpheApp/morphe-patches/releases?per_page=3" | \
-            jq -r '.[] | "  \(.tag_name) — \(.published_at[:10]) — \(.name)"' | head -3
+          echo "=== Summary ==="
+          echo "Piko updated: $PIKO_UPDATED"
+          echo "Morphe updated: $MORPHE_UPDATED"
+          echo "IG base updated: $IG_BASE_UPDATED"
+          echo "Should build: $SHOULD_BUILD"
 
-      - name: Clear older runs
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          echo "SHOULD_BUILD=$SHOULD_BUILD" >> $GITHUB_OUTPUT
+          echo "PIKO_UPDATED=$PIKO_UPDATED" >> $GITHUB_OUTPUT
+          echo "MORPHE_UPDATED=$MORPHE_UPDATED" >> $GITHUB_OUTPUT
+          echo "IG_BASE_UPDATED=$IG_BASE_UPDATED" >> $GITHUB_OUTPUT
+
+  # ===========================================
+  # Step 2: Sync piko fork + apply overlay
+  # ===========================================
+  sync-piko:
+    needs: check-updates
+    if: needs.check-updates.outputs.PIKO_UPDATED == '1'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout rvcbotbuilds
+        uses: actions/checkout@v6
+
+      - name: Checkout piko fork
+        uses: actions/checkout@v6
+        with:
+          repository: Chrispsz/piko
+          ref: main
+          path: piko-fork
+          fetch-depth: 0
+
+      - name: Add upstream remote
+        working-directory: piko-fork
         run: |
-          gh run list -L400 --json databaseId -q '.[].databaseId' | tail -n+10 | xargs -IID gh api "repos/$GITHUB_REPOSITORY/actions/runs/ID" -X DELETE || :
+          git remote add upstream https://github.com/crimera/piko.git
+          git fetch upstream main --depth=50
 
-  build:
-    needs: check
-    if: ${{ needs.check.outputs.SHOULD_BUILD == '1' }}
+      - name: Merge upstream (keeping our changes)
+        working-directory: piko-fork
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Try merge with our changes taking priority
+          git merge upstream/main --no-edit -X ours || {
+            echo "⚠️  Merge conflicts detected, resolving with ours strategy"
+            git diff --name-only --diff-filter=U | while read file; do
+              echo "  Resolving conflict in $file (keeping ours)"
+              git checkout --ours "$file"
+              git add "$file"
+            done
+            git commit --no-edit || true
+          }
+
+      - name: Apply immutable overlay
+        run: |
+          chmod +x overlay/apply-overlay.sh
+          bash overlay/apply-overlay.sh piko-fork
+
+          cd piko-fork
+          git diff --stat
+          git add -A
+          git diff --cached --quiet || git commit -m "chore: reapply immutable overlay after upstream sync"
+          git push
+
+  # ===========================================
+  # Step 3: Build Instagram (if needed)
+  # ===========================================
+  build-instagram:
+    needs: [check-updates, sync-piko]
+    if: needs.check-updates.outputs.SHOULD_BUILD == '1'
+    uses: ./.github/workflows/release-instagram.yml
+    with:
+      prerelease: 'false'
+    secrets: inherit
+
+  # ===========================================
+  # Step 4: Build YouTube/Music (if Morphe updated)
+  # ===========================================
+  build-youtube-music:
+    needs: check-updates
+    if: needs.check-updates.outputs.MORPHE_UPDATED == '1'
     uses: ./.github/workflows/build.yml
     with:
       build_target: 'all'
     secrets: inherit
 
+  # ===========================================
+  # Step 5: Post-build cleanup
+  # ===========================================
   post-build:
-    needs: [check, build]
-    if: ${{ always() && needs.check.outputs.SHOULD_BUILD == '1' }}
+    needs: [check-updates, build-instagram]
+    if: always() && needs.check-updates.outputs.SHOULD_BUILD == '1'
     runs-on: ubuntu-latest
     permissions: write-all
     steps:
       - name: Checkout update branch
         uses: actions/checkout@v6
         with:
-          fetch-depth: 0
           ref: update
+          fetch-depth: 0
 
-      - name: Download build metadata
+      - name: Download build log
         uses: actions/download-artifact@v4
         with:
           name: build-log
@@ -132,3 +233,21 @@ jobs:
             git diff --cached --quiet || git commit -m "chore: update build.md [skip ci]"
             git push
           fi
+
+      - name: Clean old workflow runs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Keep only last 5 runs per workflow
+          for wf_id in $(curl -s -H "Authorization: token $GH_TOKEN" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows" | \
+            jq -r '.workflows[].id'); do
+            runs=$(curl -s -H "Authorization: token $GH_TOKEN" \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/$wf_id/runs?per_page=100" | \
+              jq -r '[.workflow_runs[] | select(.conclusion != "in_progress")] | sort_by(.created_at) | reverse | .[5:] | .[].id')
+            for run_id in $runs; do
+              curl -s -X DELETE -H "Authorization: token $GH_TOKEN" \
+                "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$run_id" || true
+            done
+          done
+          echo "Old runs cleaned"

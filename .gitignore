@@ -6,17 +6,17 @@
 build.md
 build.log
 
-# Custom patch temp files
+# Patch temp
 *-binpatch/
 
-# Keystore files (now stored as GitHub Secrets)
+# Keystores (stored as GitHub Secrets)
 ks.keystore
 ks-p12.keystore
+*.jks
 
-# Environment files
+# Environment
 .env
 .env.*
-!.env.example
 
 # IDE
 .vscode/
@@ -29,9 +29,9 @@ Thumbs.db
 # Logs
 /logs
 
-# Test
-test*
-
-# Temporary
+# Temp
 *-temporary-files
 cmpr
+
+# Piko checkout (CI uses this)
+/piko-fork

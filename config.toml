@@ -1,22 +1,18 @@
 # ============================================
-# RVCBotBuilds - Morphe (arm64-v8a)
-# With Auto-Detach (Zygisk)
+# RVCBotBuilds — Instagram Mod
+# arm64-v8a | Morphe patches | Piko fork
 # ============================================
 
 enable-module-update = true
-parallel-jobs = 2  # 2 is safer for GitHub Actions (7GB RAM limit); 3 can OOM with large APKs
+parallel-jobs = 2
 compression-level = 9
 riplib = true
 remove-rv-integrations-checks = true
 continue-on-error = true
-
-# === Architecture ===
 default-arch = "arm64-v8a"
 
 # ============================================
-# YouTube Morphe - APK + Module (arm64-v8a)
-# AMOLED dark theme (pure black)
-# Auto-Detach blocks Play Store updates
+# YouTube Morphe — APK + Module
 # ============================================
 [YouTube-Morphe]
 enabled = true
@@ -34,8 +30,7 @@ uptodown-dlurl = "https://youtube.en.uptodown.com/android"
 apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"
 
 # ============================================
-# Music Morphe - APK + Module (arm64-v8a)
-# AMOLED dark theme (pure black)
+# Music Morphe — APK + Module
 # ============================================
 [Music-Morphe]
 enabled = true
@@ -53,27 +48,18 @@ uptodown-dlurl = "https://youtube-music.en.uptodown.com/android"
 apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"
 
 # ============================================
-# Instagram Piko — Chrispsz fork (arm64-v8a)
-# Chrispsz/piko: 257 preset flags + JSON override + OTA updater
+# Instagram Mod — Chrispsz/piko fork
 #
-# Base: 430.0.0.53.80 (piko officially supported version)
-#
-# Extension features (built into patched APK):
-#   🖤 AMOLED theme (pure black)
-#   📥 Download: posts, reels, stories, highlights, profile pics, audio
-#   🛡️ Privacy: block analytics, disable screenshot detection & typing
-#   🔍 Image quality: 2048px from CDN (vs 1080px default)
-#   🔧 Dev options: unlock internal MetaConfig flags (257 curated)
-#   🧹 Clean feed: hide nav buttons, suggested, ads, reels scrolling
-#   🔗 Links: sanitize tracking, open externally
-#   👤 Profile: follow back indicator, more options
-#   📋 Config: swap mc_overrides.json without root
-#      → /sdcard/Android/media/com.instagram.android/mc_overrides.json
-#      → or import via Piko Settings → Import overrides
-#   🔄 OTA: in-app updater downloads new mod APK from GitHub
-#
-# JSON override priority: external storage > internal > hardcoded
-# No detach needed — patched APK isn't recognized by Play Store
+# Custom modifications (immutable overlay):
+#   🔧 HookFlags: 257 preset MetaConfig flags
+#   📋 JSON override: mc_overrides.json (no root)
+#   🔄 OTA: in-app APK updater from GitHub
+#   🏷️ Rebrand: Piko → Mod (all strings)
+#   🇧🇷 PT-BR translation complete
+#   🖤 AMOLED theme
+#   📥 Download media
+#   🛡️ Privacy patches
+#   🔗 Link sanitization
 # ============================================
 [Instagram-Piko]
 app-name = "Instagram"
