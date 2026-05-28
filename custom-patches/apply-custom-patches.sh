@@ -12,6 +12,17 @@
 # and is used by design — direct DEX byte manipulation requires
 # no decompile/recompile step and works reliably on large APKs.
 #
+# CRITICAL: After modifying DEX bytes, we MUST recalculate the DEX
+# header checksums (SHA-1 signature + Adler32 checksum). Without this,
+# Android's dex2oat verifier rejects the DEX at install time with
+# "App not installed" error.
+#
+# DEX header layout:
+#   Offset  0: magic (8 bytes)
+#   Offset  8: checksum (4 bytes, Adler32 of bytes 12..end)
+#   Offset 12: signature (20 bytes, SHA-1 of bytes 32..end)
+#   Offset 32: file_size (4 bytes)
+#
 # Usage: apply-custom-patches.sh <patched_apk> <pkg_name>
 # ============================================
 
@@ -87,10 +98,13 @@ apply_instagram_patches() {
                 quality_result=$(patch_quality_strings "$tmp_extract/$dex")
                 patched=$((patched + quality_result))
 
-                # Update the dex in the APK if any patches applied
-                # Use absolute paths and cd into extract dir so zip stores
-                # the dex with the correct relative path inside the APK
+                # Recalculate DEX checksums if any patches applied
+                # This is CRITICAL — without valid checksums, Android rejects the DEX
                 if [ "$flag_secure_result" -gt 0 ] || [ "$quality_result" -gt 0 ]; then
+                        recalculate_dex_checksums "$tmp_extract/$dex"
+                        # Update the dex in the APK
+                        # Use absolute paths and cd into extract dir so zip stores
+                        # the dex with the correct relative path inside the APK
                         (cd "$tmp_extract" && zip -0 "$apk" "$dex") || {
                                 epr "Custom patches: Failed to update $dex in APK"
                         }
@@ -98,12 +112,16 @@ apply_instagram_patches() {
         done
 
         # Re-sign the APK (binary patches invalidate the signature)
+        # Must use --v1-signing-enabled true for APKs targeting older Android
         pr "Custom patches: Re-signing APK..."
         if ! java -jar "$CPT_APKSIGNER" sign \
                 --ks "${CPT_CWD}/ks-p12.keystore" \
                 --ks-pass pass:123456789 \
                 --key-pass pass:123456789 \
                 --ks-key-alias jhc \
+                --v1-signing-enabled true \
+                --v2-signing-enabled true \
+                --v3-signing-enabled true \
                 "$apk" 2>&1; then
                 epr "Custom patches: Failed to re-sign APK"
                 rm -rf "$tmp_extract" 2>/dev/null || :
@@ -112,6 +130,43 @@ apply_instagram_patches() {
 
         rm -rf "$tmp_extract"
         pr "Custom patches: Applied $patched binary modifications successfully"
+}
+
+# ============================================
+# DEX Checksum Recalculation (CRITICAL)
+# ============================================
+# After modifying DEX bytes, we MUST update:
+#   1. SHA-1 signature at offset 12 (over bytes 32..end)
+#   2. Adler32 checksum at offset 8 (over bytes 12..end)
+# Without this, Android's dex2oat rejects the DEX → "App not installed"
+recalculate_dex_checksums() {
+        local dex_file="$1"
+
+        python3 -c "
+import hashlib, struct, zlib, sys
+
+with open('$dex_file', 'rb') as f:
+    data = bytearray(f.read())
+
+# Verify DEX magic
+if data[:4] != b'dex\n':
+    sys.stderr.write('WARNING: Not a valid DEX file: $dex_file\n')
+    sys.exit(0)
+
+# Step 1: Recalculate SHA-1 signature (bytes 32..end → written at offset 12)
+sha1 = hashlib.sha1(data[32:]).digest()
+data[12:32] = sha1
+
+# Step 2: Recalculate Adler32 checksum (bytes 12..end → written at offset 8)
+# DEX uses standard zlib Adler32
+checksum = zlib.adler32(bytes(data[12:])) & 0xFFFFFFFF
+struct.pack_into('<I', data, 8, checksum)
+
+with open('$dex_file', 'wb') as f:
+    f.write(data)
+" 2>/dev/null || {
+                cwpr "Custom patches: Failed to recalculate DEX checksums for $(basename "$dex_file")"
+        }
 }
 
 # ============================================
