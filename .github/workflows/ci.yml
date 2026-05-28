@@ -1,16 +1,25 @@
-name: CI
+name: CI — Auto-detect patches & base updates
+
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 16 * * *"
+    - cron: "0 16 * * *"   # Daily at 16:00 UTC (13:00 BRT)
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  # ============================================================
+  # Check for updates in piko patches (Instagram)
+  # and Morphe patches (YouTube/Music)
+  # ============================================================
   check:
     permissions: write-all
     runs-on: ubuntu-latest
+    outputs:
+      SHOULD_BUILD: ${{ steps.should_build.outputs.SHOULD_BUILD }}
+      BUILD_TARGET: ${{ steps.should_build.outputs.BUILD_TARGET }}
+      FILTERED_CONFIG: ${{ steps.should_build.outputs.FILTERED_CONFIG }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,18 +32,69 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if ! git checkout origin/update build.md; then
+          # Check if this is first build (no build.md on update branch)
+          if ! git checkout origin/update build.md 2>/dev/null; then
             echo "first time building!"
             echo "SHOULD_BUILD=1" >> $GITHUB_OUTPUT
-          else
-            UPDATE_CFG=$(./build.sh config.toml --config-update)
-            if [ "$UPDATE_CFG" ]; then
-              echo "'$UPDATE_CFG'"
-              echo "SHOULD_BUILD=1" >> $GITHUB_OUTPUT
-            else
-              echo "SHOULD_BUILD=0" >> $GITHUB_OUTPUT
-            fi
+            echo "BUILD_TARGET=all" >> $GITHUB_OUTPUT
+            exit 0
           fi
+
+          # Use the standard config_update mechanism
+          # This checks piko patches (dev channel), Morphe patches (latest),
+          # and base APK versions
+          UPDATE_CFG=$(./build.sh config.toml --config-update)
+          if [ "$UPDATE_CFG" ]; then
+            echo "Updates detected!"
+            echo "'$UPDATE_CFG'"
+            echo "SHOULD_BUILD=1" >> $GITHUB_OUTPUT
+
+            # Determine which apps need rebuilding
+            # Parse the update config to find which tables changed
+            TARGET="all"
+            if command -v jq &>/dev/null; then
+              # Check which apps are in the filtered config
+              TABLES=$(echo "$UPDATE_CFG" | jq -r 'to_entries[] | select(.value | type == "object") | .key')
+              HAS_IG=false
+              HAS_YT=false
+              for t in $TABLES; do
+                case "$t" in
+                  *Instagram*) HAS_IG=true ;;
+                  *YouTube*|*Music*) HAS_YT=true ;;
+                esac
+              done
+              if $HAS_IG && ! $HAS_YT; then
+                TARGET="instagram"
+              elif $HAS_YT && ! $HAS_IG; then
+                TARGET="youtube"
+              fi
+            fi
+
+            echo "BUILD_TARGET=$TARGET" >> $GITHUB_OUTPUT
+
+            # Pass filtered config for selective builds
+            FILTERED=$(echo "$UPDATE_CFG" | jq -c .)
+            echo "FILTERED_CONFIG=$FILTERED" >> $GITHUB_OUTPUT
+          else
+            echo "No updates found."
+            echo "SHOULD_BUILD=0" >> $GITHUB_OUTPUT
+            echo "BUILD_TARGET=none" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check piko patches version (info)
+        if: steps.should_build.outputs.SHOULD_BUILD == '1'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "=== Piko patches (Instagram) ==="
+          PIKO_REL=$(curl -sL -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/crimera/piko/releases?per_page=3")
+          echo "$PIKO_REL" | jq -r '.[] | "  \(.tag_name) — \(.published_at[:10]) — \(.name)"' | head -3
+
+          echo ""
+          echo "=== Morphe patches (YouTube/Music) ==="
+          MORPHE_REL=$(curl -sL -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/MorpheApp/morphe-patches/releases?per_page=3")
+          echo "$MORPHE_REL" | jq -r '.[] | "  \(.tag_name) — \(.published_at[:10]) — \(.name)"' | head -3
 
       - name: Clear older runs
         env:
@@ -42,12 +102,57 @@ jobs:
         run: |
           gh run list -L400 --json databaseId -q '.[].databaseId' | tail -n+10 | xargs -IID gh api "repos/$GITHUB_REPOSITORY/actions/runs/ID" -X DELETE || :
 
-    outputs:
-      SHOULD_BUILD: ${{ steps.should_build.outputs.SHOULD_BUILD }}
-
-  build:
-    permissions: write-all
+  # ============================================================
+  # Build Instagram (only if piko patches updated)
+  # ============================================================
+  build-instagram:
     needs: check
+    if: ${{ needs.check.outputs.SHOULD_BUILD == '1' && (needs.check.outputs.BUILD_TARGET == 'all' || needs.check.outputs.BUILD_TARGET == 'instagram') }}
     uses: ./.github/workflows/build.yml
-    if: ${{ needs.check.outputs.SHOULD_BUILD == 1 }}
+    with:
+      build_target: instagram
+      config_toml: ${{ needs.check.outputs.FILTERED_CONFIG }}
     secrets: inherit
+
+  # ============================================================
+  # Build YouTube + Music (only if Morphe patches updated)
+  # ============================================================
+  build-youtube-music:
+    needs: check
+    if: ${{ needs.check.outputs.SHOULD_BUILD == '1' && (needs.check.outputs.BUILD_TARGET == 'all' || needs.check.outputs.BUILD_TARGET == 'youtube') }}
+    uses: ./.github/workflows/build.yml
+    with:
+      build_target: youtube
+      config_toml: ${{ needs.check.outputs.FILTERED_CONFIG }}
+    secrets: inherit
+
+  # ============================================================
+  # Post-build: update branch
+  # ============================================================
+  post-build:
+    needs: [check, build-instagram, build-youtube-music]
+    if: ${{ always() && needs.check.outputs.SHOULD_BUILD == '1' }}
+    runs-on: ubuntu-latest
+    permissions: write-all
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: update
+
+      - name: Download build metadata
+        uses: actions/download-artifact@v4
+        with:
+          pattern: '*-build-log'
+          merge-multiple: true
+
+      - name: Update build.md
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -f build.md ]; then
+            git add build.md
+            git diff --cached --quiet || git commit -m "chore: update build.md [skip ci]"
+            git push
+          fi

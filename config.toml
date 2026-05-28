@@ -4,7 +4,7 @@
 # ============================================
 
 enable-module-update = true
-parallel-jobs = 1
+parallel-jobs = 3
 compression-level = 9
 riplib = true
 remove-rv-integrations-checks = true
@@ -54,10 +54,10 @@ apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"
 
 # ============================================
 # Instagram Piko - APK (arm64-v8a)
-# crimera/piko v3.5.0-dev: 21 patches + FLAG_SECURE custom
+# crimera/piko v3.5.0-dev.2: 19 patches + FLAG_SECURE custom
 #
-# Base: 430.0.0.53.80 (piko recommended version)
-# Patches: dev channel (latest fixes for Download media, ghost mode, etc.)
+# Base: 430.0.0.53.80 (piko officially supported version)
+# Patches: dev channel (v3.5.0-dev.2 — fixes Download media, profile, mentions)
 #
 # 🖤 AMOLED theme (pure black)
 # 📥 Download: posts, reels, stories, highlights, profile pics, audio, voice messages
@@ -65,19 +65,24 @@ apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"
 # 📸 Screenshots: FLAG_SECURE removed + screenshot detection disabled
 # 🔧 Settings: Piko Settings hub + Developer options
 # 🛡️ Privacy: analytics off, typing hidden, links sanitized
-# 🧹 Clean: hide stories tray, nav buttons, build popup
+# 🧹 Clean: hide stories tray, build popup
 #
-# REMOVED (risky/detectable/unnecessary):
+# v3.5.0-dev.1 fixes (May 23, 2026):
+#   ✅ Download media — fixed audio extraction logic
+#   ✅ More options on profile — improved entity extractor, moved to action bar
+#   ✅ View story mentions — improved logic
+#   ✅ Base 430.0.0.53.80 — now officially supported
+#   ✨ Download voice message — new patch
+#   ✨ Download video variants — built into Download media
+#
+# EXCLUDED (risky/detectable/unnecessary):
 #   View DMs anonymously — Instagram can detect ghost mode in DMs (ban risk)
 #   View live anonymously — Same detection risk
 #   View stories anonymously — High detection risk, Meta actively monitors
-#   View story mentions — Cascading dependency, buggy
 #   Limit feed to following profiles — Breaks feed algorithm, missing content
 #   Make ephemeral media permanent — View-once messages staying = detection risk
 #   Follow back indicator — Minor, unreliable across versions
 #   Hide navigation buttons — Can break UI, confusing UX
-#   More options on profile — Buggy on many versions
-#   Sanitize share links — Low value (just removes tracking params)
 #
 # EXCLUDED (dangerous):
 #   Unlock employee options — Exposes internal Meta tools
@@ -103,14 +108,17 @@ included-patches = """\
   'Disable screenshot detection' \
   'Disable typing status' \
   'Download media' \
+  'Download voice message' \
   'Hide stories tray' \
   'Hide suggested content' \
   'Improve image viewing' \
   'More options on post' \
+  'More options on profile' \
   'Open links externally' \
   'Remove build expired popup' \
   'Sanitize share links' \
   'Unlock developer options' \
+  'View story mentions' \
   """
 excluded-patches = """\
   'Unlock employee options' \
@@ -118,12 +126,10 @@ excluded-patches = """\
   'View DMs anonymously' \
   'View live anonymously' \
   'View stories anonymously' \
-  'View story mentions' \
   'Limit feed to following profiles' \
   'Make ephemeral media permanent' \
   'Follow back indicator' \
   'Hide navigation buttons' \
-  'More options on profile' \
   """
 # Custom Smali patch applied AFTER ReVanced CLI:
 #   📸 Allow Screenshots in DMs — removes FLAG_SECURE from Window.setFlags
