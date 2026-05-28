@@ -19,6 +19,7 @@ default-arch = "arm64-v8a"
 # Auto-Detach blocks Play Store updates
 # ============================================
 [YouTube-Morphe]
+enabled = false
 app-name = "YouTube"
 patches-source = "MorpheApp/morphe-patches"
 patches-version = "latest"
@@ -37,6 +38,7 @@ apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"
 # AMOLED dark theme (pure black)
 # ============================================
 [Music-Morphe]
+enabled = false
 app-name = "Music"
 patches-source = "MorpheApp/morphe-patches"
 patches-version = "latest"
