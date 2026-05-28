@@ -81,6 +81,7 @@ rv-brand = "Morphe"
 build-mode = "apk"
 version = "latest"
 exclusive-patches = true
+patcher-args = "--continue-on-error"
 arch = "arm64-v8a"
 included-patches = """\
   'Add settings' \
