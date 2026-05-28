@@ -63,29 +63,35 @@ jobs:
       - name: Install deps
         run: sudo apt-get install -y jq zip python3
 
+      # NOTE: parallel-jobs is configured in config.toml (currently 2), not here
       - name: Select build target
         id: target
         run: |
+          set_app_enabled() {
+            local section="$1" state="$2"
+            # Uses awk to find the exact section and set enabled within it
+            awk -v sec="[$section]" -v val="enabled = $state" '
+              $0 == sec { in_sec=1; print; next }
+              in_sec && /^enabled = / { print val; in_sec=0; next }
+              in_sec && /^\[/ { in_sec=0 }
+              { print }
+            ' config.toml > config.toml.tmp && mv config.toml.tmp config.toml
+          }
+
           TARGET="${{ inputs.build_target || 'all' }}"
           echo "target=$TARGET" >> $GITHUB_OUTPUT
           echo "Build target: $TARGET"
 
           if [ "$TARGET" != "all" ]; then
-            echo "Disabling non-target apps..."
-            sed -i '/^\[YouTube-Morphe\]/,/^\[Music-Morphe\]/{ s/^enabled = true/enabled = false/ }' config.toml
-            sed -i '/^\[Music-Morphe\]/,/^\[Instagram-Piko\]/{ s/^enabled = true/enabled = false/ }' config.toml
-            sed -i '/^\[Instagram-Piko\]/,$/{ s/^enabled = true/enabled = false/ }' config.toml
+            echo "Disabling all apps..."
+            set_app_enabled "YouTube-Morphe" false
+            set_app_enabled "Music-Morphe" false
+            set_app_enabled "Instagram-Piko" false
 
             case "$TARGET" in
-              youtube)
-                sed -i '/^\[YouTube-Morphe\]/,/^\[Music-Morphe\]/{ s/^enabled = false/enabled = true/ }' config.toml
-                ;;
-              music)
-                sed -i '/^\[Music-Morphe\]/,/^\[Instagram-Piko\]/{ s/^enabled = false/enabled = true/ }' config.toml
-                ;;
-              instagram)
-                sed -i '/^\[Instagram-Piko\]/,$/{ s/^enabled = false/enabled = true/ }' config.toml
-                ;;
+              youtube)  set_app_enabled "YouTube-Morphe" true ;;
+              music)    set_app_enabled "Music-Morphe" true ;;
+              instagram) set_app_enabled "Instagram-Piko" true ;;
             esac
           fi
 

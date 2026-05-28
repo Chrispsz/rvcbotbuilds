@@ -9,13 +9,8 @@
 # We implement them as binary DEX modifications — no decompile needed.
 #
 # Strategy: Binary dex patching is FAST (seconds, not minutes)
-# and doesn't require apkeditor decompile/recompile which fails
-# on large APKs like Instagram v430+.
-#
-# Future roadmap: Migrate to proper Morphe .mpp patches
-# using the morphe-patches-template framework. This would make
-# them apply at the same speed as piko patches (STRIP_FAST mode)
-# and show up in the ReVanced settings UI.
+# and is used by design — direct DEX byte manipulation requires
+# no decompile/recompile step and works reliably on large APKs.
 #
 # Usage: apply-custom-patches.sh <patched_apk> <pkg_name>
 # ============================================
@@ -39,6 +34,18 @@ cwpr() { echo >&2 -e "\033[0;33m[!] ${1}\033[0m"; }
 if ! declare -f pr >/dev/null 2>&1; then pr() { cpr "$@"; }; fi
 if ! declare -f epr >/dev/null 2>&1; then epr() { cepr "$@"; }; fi
 if ! declare -f wpr >/dev/null 2>&1; then wpr() { cwpr "$@"; }; fi
+
+# ============================================
+# Pre-flight safety checks
+# ============================================
+if [ ! -f "$PATCHED_APK" ]; then
+        epr "Custom patches: APK file not found: $PATCHED_APK"
+        exit 1
+fi
+if [ ! -r "$PATCHED_APK" ]; then
+        epr "Custom patches: APK file not readable: $PATCHED_APK"
+        exit 1
+fi
 
 # ============================================
 # Instagram Custom Patches (binary approach)
@@ -161,13 +168,14 @@ print(count)
 # MobileConfig Quality Override (binary string replacement)
 # ============================================
 # Replaces quality string constants in DEX string table:
-#   "medium" → "high" (6→4 chars, safe — DEX strings are null-terminated)
-#   "standard" → "hd\x00\x00\x00\x00\x00\x00" (8→2+padding, safe)
+#   "medium" → "high" (6→4 chars + null padding, safe)
+#   "standard" → "hd" (8→2 chars + null padding, safe)
 #
-# IMPORTANT: We only replace EXACT string matches in the DEX string table.
-# The DEX format stores strings as MUTF-8 with a length prefix, so replacing
-# a shorter string with a longer one is dangerous. We ensure replacements
-# are the same length or shorter (padding with null bytes).
+# SAFETY: Only operates on DEX files that contain quality-related
+# context strings (upload_quality, MobileConfig, image_quality,
+# video_quality, quality_tier). Unrelated DEX files are skipped
+# to avoid false-positive replacements in strings like "medium_font"
+# or "standard_layout" that happen to contain "medium"/"standard".
 patch_quality_strings() {
         local dex_file="$1"
 
@@ -179,6 +187,21 @@ import struct, sys
 
 with open('$dex_file', 'rb') as f:
     data = bytearray(f.read())
+
+# --- Context gate: only patch DEX files that are quality-related ---
+context_strings = [
+    b'upload_quality',
+    b'MobileConfig',
+    b'image_quality',
+    b'video_quality',
+    b'quality_tier',
+]
+
+is_quality_dex = any(ctx in data for ctx in context_strings)
+if not is_quality_dex:
+    sys.stderr.write('Quality override — skipping $(basename "$dex_file"): no quality context strings found\n')
+    print('0', end='')
+    sys.exit(0)
 
 count = 0
 
@@ -215,7 +238,7 @@ if count > 0:
         f.write(data)
 
 print(count)
-" 2>/dev/null) || result=0
+") || result=0
 
         # Validate result is a number
         if ! [[ "${result:-0}" =~ ^[0-9]+$ ]]; then

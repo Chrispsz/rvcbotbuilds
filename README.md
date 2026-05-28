@@ -126,7 +126,7 @@ Fork do [j-hc/revanced-magisk-module](https://github.com/j-hc/revanced-magisk-mo
 | Patch | Método | Efeito |
 |-------|--------|--------|
 | 📸 **Allow Screenshots in DMs** | FLAG_SECURE removal (binary dex patch) | Screenshot liberado em DMs — 531 ocorrências em 17 DEX files |
-| 🔍 **MobileConfig Quality Override** | medium→high, standard→hd (binary string patch) | Qualidade de mídia maximizada — 338 substituições em 15 DEX files |
+| 🔍 **MobileConfig Quality Override** | medium→high, standard→hd (context-gated binary patch) | Qualidade maximizada — só patch DEX com contexto de qualidade |
 
 ### ❌ Excluded (risky/detectable)
 

@@ -32,6 +32,13 @@ jobs:
             exit 0
           fi
 
+          # Ensure build.md exists for config_update
+          if [ ! -f build.md ] || [ ! -s build.md ]; then
+            echo "build.md missing or empty — treating as first build"
+            echo "SHOULD_BUILD=1" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
           chmod +x build.sh utils.sh
           UPDATE_CFG=$(./build.sh config.toml --config-update)
           if [ "$UPDATE_CFG" ]; then
@@ -45,7 +52,7 @@ jobs:
           # Check Instagram base version on uptodown
           echo ""
           echo "=== Checking Instagram base version ==="
-          CURRENT_IG_VER=$(grep '^version = ' config.toml | head -1 | tr -d '"' | awk '{print $3}')
+          CURRENT_IG_VER=$(awk '/^\[Instagram-Piko\]/{found=1} found && /^version = /{gsub(/"/, ""); print $3; exit}' config.toml)
           echo "Current pinned version: $CURRENT_IG_VER"
 
           IG_VERSIONS=$(curl -sL "https://instagram.en.uptodown.com/android/versions" 2>/dev/null | \

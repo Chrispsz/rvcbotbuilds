@@ -56,9 +56,19 @@ jobs:
 
       - name: Prepare Instagram-only config
         run: |
-          # Disable YouTube and Music to build only Instagram
-          sed -i '/^\[YouTube-Morphe\]/,/^\[Music-Morphe\]/{ s/^enabled = true/enabled = false/ }' config.toml
-          sed -i '/^\[Music-Morphe\]/,/^\[Instagram-Piko\]/{ s/^enabled = true/enabled = false/ }' config.toml
+          set_app_enabled() {
+            local section="$1" state="$2"
+            awk -v sec="[$section]" -v val="enabled = $state" '
+              $0 == sec { in_sec=1; print; next }
+              in_sec && /^enabled = / { print val; in_sec=0; next }
+              in_sec && /^\[/ { in_sec=0 }
+              { print }
+            ' config.toml > config.toml.tmp && mv config.toml.tmp config.toml
+          }
+
+          # Disable YouTube and Music
+          set_app_enabled "YouTube-Morphe" false
+          set_app_enabled "Music-Morphe" false
 
           echo "=== Active config ==="
           grep -E '^\[.*\]|^enabled' config.toml
@@ -110,54 +120,44 @@ jobs:
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "Release tag: $TAG"
 
-          # Generate release notes from build.md + patch list
+          # Extract included patches dynamically from config.toml
+          INCLUDED_PATCHES=$(awk "/^\\[Instagram-Piko\\]/,/\\[/{if(/included-patches/) {sub(/.*included-patches *= */,\"\"); gsub(/'\"'\"'/,\"'\"); print; exit}}" config.toml | tr "'" '\n' | sed '/^$/d' | grep -v '\\\\')
+
+          # Extract excluded patches dynamically from config.toml
+          EXCLUDED_PATCHES=$(awk "/^\\[Instagram-Piko\\]/,/\\[/{if(/excluded-patches/) {sub(/.*excluded-patches *= */,\"\"); gsub(/'\"'\"'/,\"'\"); print; exit}}" config.toml | tr "'" '\n' | sed '/^$/d' | grep -v '\\\\')
+
+          PATCH_COUNT=$(echo "$INCLUDED_PATCHES" | wc -l)
+
+          # Generate release notes
           {
             echo "## 📸 Instagram Piko Mod"
             echo ""
             echo "### Patches Applied"
             echo ""
-            echo "**21 piko patches (crimera/piko v3.5.0-dev.2) + 2 custom RVCBotBuilds patches**"
+            echo "**${PATCH_COUNT} piko patches + 2 custom RVCBotBuilds patches**"
             echo ""
-            echo "| # | Patch | Category |"
-            echo "|---|-------|----------|"
-            echo "| 1 | Add settings | 🔧 Settings |"
-            echo "| 2 | Amoled theme | 🖤 Theme |"
-            echo "| 3 | Copy comment | 👤 Profile |"
-            echo "| 4 | Disable analytics | 🛡️ Privacy |"
-            echo "| 5 | Disable ads | 🚫 Ads |"
-            echo "| 6 | Disable screenshot detection | 🛡️ Privacy |"
-            echo "| 7 | Disable typing status | 🛡️ Privacy |"
-            echo "| 8 | Download media | 📥 Download |"
-            echo "| 9 | Download voice message | 📥 Download |"
-            echo "| 10 | Follow back indicator | 👤 Profile |"
-            echo "| 11 | Hide stories tray | 🧹 Clean |"
-            echo "| 12 | Hide suggested content | 🚫 Ads |"
-            echo "| 13 | Improve image viewing | 🔍 Quality |"
-            echo "| 14 | Make ephemeral media permanent | 🔒 Media |"
-            echo "| 15 | More options on post | 👤 Profile |"
-            echo "| 16 | More options on profile | 👤 Profile |"
-            echo "| 17 | Open links externally | 🔗 Links |"
-            echo "| 18 | Remove build expired popup | 🧹 Clean |"
-            echo "| 19 | Sanitize share links | 🔗 Links |"
-            echo "| 20 | Unlock developer options | 🔧 Settings |"
-            echo "| 21 | View story mentions | 🔒 Media |"
+            echo "| # | Patch |"
+            echo "|---|-------|"
+            i=1
+            while IFS= read -r patch; do
+              [ -z "$patch" ] && continue
+              echo "| $i | $patch |"
+              i=$((i + 1))
+            done <<< "$INCLUDED_PATCHES"
             echo ""
             echo "### Custom Patches (RVCBotBuilds binary patches)"
             echo ""
             echo "| # | Patch | Method | Effect |"
             echo "|---|-------|--------|--------|"
-            echo "| 22 | Allow Screenshots in DMs | FLAG_SECURE removal (binary dex patch) | Screenshot em DMs liberado |"
-            echo "| 23 | MobileConfig Quality Override | medium→high, standard→hd (binary string patch) | Qualidade de mídia maximizada |"
+            echo "| $i | Allow Screenshots in DMs | FLAG_SECURE removal | Screenshot em DMs liberado |"
+            echo "| $((i+1)) | MobileConfig Quality Override | medium→high, standard→hd | Qualidade maximizada |"
             echo ""
             echo "<details><summary>Patches excluídos (risky/detectable)</summary>"
             echo ""
-            echo "- View DMs anonymously — Ghost mode em DMs (Instagram pode detectar, risco de ban)"
-            echo "- View live anonymously — Mesmo risco de detecção"
-            echo "- View stories anonymously — Alto risco de detecção, Meta monitora"
-            echo "- Unlock employee options — Expõe ferramentas internas da Meta"
-            echo "- Unlock Plus benefits — Violação de TOS, detectável"
-            echo "- Limit feed to following profiles — Quebra algoritmo do feed"
-            echo "- Hide navigation buttons — Pode quebrar UI, UX confuso"
+            while IFS= read -r patch; do
+              [ -z "$patch" ] && continue
+              echo "- $patch"
+            done <<< "$EXCLUDED_PATCHES"
             echo ""
             echo "</details>"
             echo ""

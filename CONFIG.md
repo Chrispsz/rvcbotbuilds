@@ -133,18 +133,21 @@ uptodown-dlurl = "https://instagram.en.uptodown.com/android"
 
 RVCBotBuilds applies custom binary patches AFTER the ReVanced CLI finishes patching. These are patches not available in crimera/piko but found in other mods (InstaEclipse, Instafel).
 
+Binary dex patching is used by design — direct DEX byte manipulation requires no decompile/recompile step and works reliably on large APKs.
+
 ### How Binary Patching Works
 
-1. Extract DEX files from the patched APK
-2. Use python3 to scan and modify bytes directly (no decompile needed)
-3. Update the modified DEX files in the APK
-4. Re-sign the APK (binary patches invalidate the signature)
+1. Pre-flight check: verify APK exists and is readable
+2. Extract DEX files from the patched APK
+3. Use python3 to scan and modify bytes directly (no decompile needed)
+4. Update the modified DEX files in the APK
+5. Re-sign the APK (binary patches invalidate the signature)
 
-**Advantages:** Fast (seconds vs minutes for apkeditor), no decompile/recompile failures on large APKs.
+**Advantages:** Fast (seconds per DEX), no decompile/recompile step, works on any APK size.
 
 **Current binary patches:**
-- `FLAG_SECURE removal`: Scans for `const/16 vN, 0x2000` opcodes (0x13 + register + LE 0x2000) and replaces with 0x0000
-- `Quality Override`: Scans for `medium` and `standard` byte strings and replaces with `high\x00\x00` and `hd\x00\x00\x00\x00\x00\x00`
+- `FLAG_SECURE removal`: Scans for `const/16 vN, 0x2000` opcodes (0x13 + register + LE 0x2000) and replaces with 0x0000. Applied to ALL DEX files.
+- `Quality Override` *(context-gated)*: Scans for `medium` and `standard` byte strings and replaces with `high\x00\x00` and `hd\x00\x00\x00\x00\x00\x00`. **Only operates on DEX files that contain quality-related context strings** (`upload_quality`, `MobileConfig`, `image_quality`, `video_quality`, `quality_tier`) to avoid false-positive replacements in unrelated strings (e.g., `medium_font`, `standard_layout`).
 
 See [`custom-patches/apply-custom-patches.sh`](./custom-patches/apply-custom-patches.sh) for implementation.
 

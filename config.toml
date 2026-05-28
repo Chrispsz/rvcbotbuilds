@@ -4,7 +4,7 @@
 # ============================================
 
 enable-module-update = true
-parallel-jobs = 3
+parallel-jobs = 2  # 2 is safer for GitHub Actions (7GB RAM limit); 3 can OOM with large APKs
 compression-level = 9
 riplib = true
 remove-rv-integrations-checks = true
@@ -123,9 +123,8 @@ excluded-patches = """\
   'Limit feed to following profiles' \
   'Hide navigation buttons' \
   """
-# Custom patch applied AFTER ReVanced CLI:
-#   📸 Allow Screenshots in DMs — removes FLAG_SECURE from Window.setFlags
-#   Applied via binary dex patching (fast, no decompile needed)
-# Future: will be a proper Morphe .mpp patch (RVCBotBuilds Patches)
+# Custom patches applied AFTER ReVanced CLI (binary dex — fast, no decompile):
+#   📸 Allow Screenshots in DMs — removes FLAG_SECURE (0x2000→0x0000)
+#   🔍 MobileConfig Quality Override — medium→high, standard→hd (context-gated)
 # See: custom-patches/apply-custom-patches.sh
 uptodown-dlurl = "https://instagram.en.uptodown.com/android"
