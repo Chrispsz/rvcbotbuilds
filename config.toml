@@ -1,6 +1,6 @@
 # ============================================
 # RVCBotBuilds - Morphe (arm64-v8a)
-# With Auto-Detach (Zygisk) + Custom Patches
+# With Auto-Detach (Zygisk)
 # ============================================
 
 enable-module-update = true
@@ -28,7 +28,7 @@ rv-brand = "Morphe"
 build-mode = "both"
 arch = "arm64-v8a"
 included-patches = "'Theme'"
-excluded-patches = "'Custom branding'"
+excluded-patches = "'Custom branding' 'SponsorBlock' 'Return YouTube Dislike' 'Hide player overlay buttons'"
 patcher-args = "-OdarkThemeBackgroundColor=@android:color/black"
 uptodown-dlurl = "https://youtube.en.uptodown.com/android"
 apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"
@@ -47,14 +47,14 @@ rv-brand = "Morphe"
 build-mode = "both"
 arch = "arm64-v8a"
 included-patches = "'Theme'"
-excluded-patches = "'Custom branding'"
+excluded-patches = "'Custom branding' 'Enable debug logging' 'SponsorBlock'"
 patcher-args = "-OdarkThemeBackgroundColor=@android:color/black"
 uptodown-dlurl = "https://youtube-music.en.uptodown.com/android"
 apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"
 
 # ============================================
 # Instagram Piko - APK (arm64-v8a)
-# crimera/piko v3.5.0-dev.2: 21 patches + FLAG_SECURE custom
+# crimera/piko v3.5.0-dev.2: 21 patches
 #
 # Base: 430.0.0.53.80 (piko officially supported version)
 # Patches: dev channel (v3.5.0-dev.2)
@@ -62,7 +62,7 @@ apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"
 # 🖤 AMOLED theme (pure black)
 # 📥 Download: posts, reels, stories, highlights, profile pics, audio, voice messages, video variants
 # 🚫 Ads: remove all ads + suggested content
-# 📸 Screenshots: FLAG_SECURE removed + screenshot detection disabled
+# 📸 Screenshots: screenshot detection disabled
 # 👥 Follow back: see who follows you back
 # 🔒 Ephemeral media: view-once messages stay permanent
 # 🔧 Settings: Piko Settings hub + Developer options
@@ -86,7 +86,7 @@ patches-source = "crimera/piko"
 patches-version = "dev"
 cli-source = "MorpheApp/morphe-cli"
 rv-brand = "Morphe"
-build-mode = "apk"
+build-mode = "both"
 version = "430.0.0.53.80"
 exclusive-patches = true
 patcher-args = "--continue-on-error"
@@ -123,8 +123,4 @@ excluded-patches = """\
   'Limit feed to following profiles' \
   'Hide navigation buttons' \
   """
-# Custom patches applied AFTER ReVanced CLI (binary dex — fast, no decompile):
-#   📸 Allow Screenshots in DMs — removes FLAG_SECURE (0x2000→0x0000)
-#   🔍 MobileConfig Quality Override — medium→high, standard→hd (context-gated)
-# See: custom-patches/apply-custom-patches.sh
 uptodown-dlurl = "https://instagram.en.uptodown.com/android"

@@ -791,20 +791,34 @@ build_rv() {
                                 epr "Building '${table}' failed!"
                                 return 0
                         fi
-                        # === Apply custom Smali patches (RVCBotBuilds) ===
-                        # These are patches not available in the patches JAR:
-                        #   Instagram: FLAG_SECURE removal, MobileConfig quality
-                        if [ -f "${CWD}/custom-patches/apply-custom-patches.sh" ]; then
-                                pr "Applying RVCBotBuilds custom patches for ${pkg_name}..."
-                                if ! bash "${CWD}/custom-patches/apply-custom-patches.sh" "$patched_apk" "$pkg_name"; then
-                                        wpr "Custom patches failed for ${table}, using ReVanced-only build"
-                                fi
-                        fi
+                        # Custom binary patches removed — binary DEX patching is too
+                        # fragile (breaks DEX string table structure, causes false positives).
+                        # Use proper ReVanced/Morphe Kotlin patches instead.
                 fi
                 rm "$stock_apk_to_patch"
                 if [ "$build_mode" = apk ]; then
                         if [ "${NORB:-}" != true ] || { [ ! -f "$patched_apk" ] && [ ! -f "$apk_output" ]; }; then
-                                mv -f "$patched_apk" "$apk_output"
+                                # === APK alignment fix ===
+                                # zip -d (riplib) breaks ZIP alignment which causes
+                                # "App not installed" on Android 11+ (resources.arsc must be
+                                # stored uncompressed and 4-byte aligned).
+                                # Re-signing with apksigner also realigns the APK properly.
+                                pr "Re-signing APK for proper alignment and v1+v2+v3 signing..."
+                                if java -jar "$APKSIGNER" sign \
+                                        --ks ks-p12.keystore \
+                                        --ks-pass pass:123456789 \
+                                        --key-pass pass:123456789 \
+                                        --ks-key-alias jhc \
+                                        --v1-signing-enabled true \
+                                        --v2-signing-enabled true \
+                                        --v3-signing-enabled true \
+                                        --out "$apk_output" \
+                                        "$patched_apk" 2>/dev/null; then
+                                        pr "APK re-signed successfully with full signing schemes"
+                                else
+                                        wpr "Re-signing failed, using patched APK as-is"
+                                        mv -f "$patched_apk" "$apk_output"
+                                fi
                         fi
                         pr "Built ${table} (non-root): '${apk_output}'"
                         continue
