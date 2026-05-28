@@ -54,34 +54,43 @@ apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"
 
 # ============================================
 # Instagram Piko - APK (arm64-v8a)
-# crimera/piko: 25 patches + 2 custom RVCBotBuilds patches
+# crimera/piko v3.5.0-dev: 21 patches + FLAG_SECURE custom
+#
+# Base: 430.0.0.53.80 (piko recommended version)
+# Patches: dev channel (latest fixes for Download media, ghost mode, etc.)
 #
 # 🖤 AMOLED theme (pure black)
-# 📥 Download: posts, reels, stories, highlights, profile pics, audio
-# 👻 Ghost mode: stories, DMs, lives — all anonymous
+# 📥 Download: posts, reels, stories, highlights, profile pics, audio, voice messages
 # 🚫 Ads: remove all ads + suggested content
-# 🔍 Image quality: 2048px from CDN + MobileConfig override
 # 📸 Screenshots: FLAG_SECURE removed + screenshot detection disabled
-# 🔧 Settings: Piko Settings hub + Developer options (MetaConfig)
+# 🔧 Settings: Piko Settings hub + Developer options
 # 🛡️ Privacy: analytics off, typing hidden, links sanitized
 # 🧹 Clean: hide stories tray, nav buttons, build popup
 #
-# NOT included (10 — niche/cosmetic/annoying):
-#   Change like animation, Customise story timestamp, Disable Reels scrolling,
-#   Disable discover people, Disable double tap like, Disable video autoplay,
-#   Hide notes tray, Hide reshare button, Remove empty bottom space,
-#   Stories audio autoplay
-# EXCLUDED (2 — risky):
-#   Unlock employee options, Unlock Plus benefits
+# REMOVED (risky/detectable/unnecessary):
+#   View DMs anonymously — Instagram can detect ghost mode in DMs (ban risk)
+#   View live anonymously — Same detection risk
+#   View stories anonymously — High detection risk, Meta actively monitors
+#   View story mentions — Cascading dependency, buggy
+#   Limit feed to following profiles — Breaks feed algorithm, missing content
+#   Make ephemeral media permanent — View-once messages staying = detection risk
+#   Follow back indicator — Minor, unreliable across versions
+#   Hide navigation buttons — Can break UI, confusing UX
+#   More options on profile — Buggy on many versions
+#   Sanitize share links — Low value (just removes tracking params)
+#
+# EXCLUDED (dangerous):
+#   Unlock employee options — Exposes internal Meta tools
+#   Unlock Plus benefits — TOS violation, detectable
 # ============================================
 [Instagram-Piko]
 app-name = "Instagram"
 patches-source = "crimera/piko"
-patches-version = "latest"
+patches-version = "dev"
 cli-source = "MorpheApp/morphe-cli"
 rv-brand = "Morphe"
 build-mode = "apk"
-version = "latest"
+version = "430.0.0.53.80"
 exclusive-patches = true
 patcher-args = "--continue-on-error"
 arch = "arm64-v8a"
@@ -93,36 +102,30 @@ included-patches = """\
   'Disable ads' \
   'Disable screenshot detection' \
   'Disable typing status' \
-  'Follow back indicator' \
-  'Hide navigation buttons' \
+  'Download media' \
   'Hide stories tray' \
   'Hide suggested content' \
   'Improve image viewing' \
-  'Limit feed to following profiles' \
-  'Make ephemeral media permanent' \
   'More options on post' \
   'Open links externally' \
   'Remove build expired popup' \
+  'Sanitize share links' \
   'Unlock developer options' \
-  'View DMs anonymously' \
-  'View live anonymously' \
-  'View stories anonymously' \
   """
 excluded-patches = """\
   'Unlock employee options' \
   'Unlock Plus benefits' \
-  'Download media' \
-  'More options on profile' \
-  'Sanitize share links' \
+  'View DMs anonymously' \
+  'View live anonymously' \
+  'View stories anonymously' \
   'View story mentions' \
+  'Limit feed to following profiles' \
+  'Make ephemeral media permanent' \
+  'Follow back indicator' \
+  'Hide navigation buttons' \
+  'More options on profile' \
   """
-# NOTE: 4 patches moved to excluded (broken on Instagram v432+):
-#   Download media — IndexOutOfBoundsException in MediaDataEntity
-#   More options on profile — NoSuchElementException in UserDataEntity
-#   Sanitize share links — NullPointerException in PermalinkResponseJsonParser
-#   View story mentions — depends on failed UserDataEntity (same as More options on profile)
-# Custom Smali patches applied AFTER ReVanced CLI:
+# Custom Smali patch applied AFTER ReVanced CLI:
 #   📸 Allow Screenshots in DMs — removes FLAG_SECURE from Window.setFlags
-#   🔍 MobileConfig Quality Override — medium→high, standard→hd
 # See: custom-patches/apply-custom-patches.sh
 uptodown-dlurl = "https://instagram.en.uptodown.com/android"
