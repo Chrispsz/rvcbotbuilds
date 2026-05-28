@@ -54,39 +54,31 @@ apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"
 
 # ============================================
 # Instagram Piko - APK (arm64-v8a)
-# crimera/piko v3.5.0-dev.2: 19 patches + FLAG_SECURE custom
+# crimera/piko v3.5.0-dev.2: 21 patches + FLAG_SECURE custom
 #
 # Base: 430.0.0.53.80 (piko officially supported version)
-# Patches: dev channel (v3.5.0-dev.2 — fixes Download media, profile, mentions)
+# Patches: dev channel (v3.5.0-dev.2)
 #
 # 🖤 AMOLED theme (pure black)
-# 📥 Download: posts, reels, stories, highlights, profile pics, audio, voice messages
+# 📥 Download: posts, reels, stories, highlights, profile pics, audio, voice messages, video variants
 # 🚫 Ads: remove all ads + suggested content
 # 📸 Screenshots: FLAG_SECURE removed + screenshot detection disabled
+# 👥 Follow back: see who follows you back
+# 🔒 Ephemeral media: view-once messages stay permanent
 # 🔧 Settings: Piko Settings hub + Developer options
 # 🛡️ Privacy: analytics off, typing hidden, links sanitized
 # 🧹 Clean: hide stories tray, build popup
 #
-# v3.5.0-dev.1 fixes (May 23, 2026):
-#   ✅ Download media — fixed audio extraction logic
-#   ✅ More options on profile — improved entity extractor, moved to action bar
-#   ✅ View story mentions — improved logic
-#   ✅ Base 430.0.0.53.80 — now officially supported
-#   ✨ Download voice message — new patch
-#   ✨ Download video variants — built into Download media
-#
-# EXCLUDED (risky/detectable/unnecessary):
-#   View DMs anonymously — Instagram can detect ghost mode in DMs (ban risk)
+# EXCLUDED (risky/detectable):
+#   View DMs anonymously — Ghost mode in DMs (Instagram can detect, ban risk)
 #   View live anonymously — Same detection risk
-#   View stories anonymously — High detection risk, Meta actively monitors
-#   Limit feed to following profiles — Breaks feed algorithm, missing content
-#   Make ephemeral media permanent — View-once messages staying = detection risk
-#   Follow back indicator — Minor, unreliable across versions
-#   Hide navigation buttons — Can break UI, confusing UX
+#   View stories anonymously — High detection risk, Meta monitors
+#   Limit feed to following profiles — Breaks feed algorithm
 #
 # EXCLUDED (dangerous):
 #   Unlock employee options — Exposes internal Meta tools
 #   Unlock Plus benefits — TOS violation, detectable
+#   Hide navigation buttons — Can break UI, confusing UX
 # ============================================
 [Instagram-Piko]
 app-name = "Instagram"
@@ -109,9 +101,11 @@ included-patches = """\
   'Disable typing status' \
   'Download media' \
   'Download voice message' \
+  'Follow back indicator' \
   'Hide stories tray' \
   'Hide suggested content' \
   'Improve image viewing' \
+  'Make ephemeral media permanent' \
   'More options on post' \
   'More options on profile' \
   'Open links externally' \
@@ -127,11 +121,11 @@ excluded-patches = """\
   'View live anonymously' \
   'View stories anonymously' \
   'Limit feed to following profiles' \
-  'Make ephemeral media permanent' \
-  'Follow back indicator' \
   'Hide navigation buttons' \
   """
-# Custom Smali patch applied AFTER ReVanced CLI:
+# Custom patch applied AFTER ReVanced CLI:
 #   📸 Allow Screenshots in DMs — removes FLAG_SECURE from Window.setFlags
+#   Applied via binary dex patching (fast, no decompile needed)
+# Future: will be a proper Morphe .mpp patch (RVCBotBuilds Patches)
 # See: custom-patches/apply-custom-patches.sh
 uptodown-dlurl = "https://instagram.en.uptodown.com/android"
