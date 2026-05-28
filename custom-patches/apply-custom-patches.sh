@@ -109,9 +109,11 @@ apply_instagram_patches() {
 #   Opcode 0x13 (const/16) + register + 0x00 0x20 (0x2000 LE)
 patch_flag_secure_binary() {
         local dex_file="$1"
-        local count=0
 
         # Use python3 for precise binary replacement
+        # Only stdout (the count number) is captured by caller
+        # Log messages go to stderr to avoid polluting $()
+        local result
         result=$(python3 -c "
 import struct, sys
 
@@ -138,11 +140,15 @@ if count > 0:
 print(count)
 " 2>/dev/null) || result=0
 
-        count=${result:-0}
-        if [ "$count" -gt 0 ]; then
-                pr "Custom patches: FLAG_SECURE — patched $count occurrences in $(basename "$dex_file")"
+        # Validate result is a number
+        if ! [[ "${result:-0}" =~ ^[0-9]+$ ]]; then
+                echo "0"
+                return
         fi
-        echo "$count"
+        if [ "$result" -gt 0 ]; then
+                pr "Custom patches: FLAG_SECURE — patched $result occurrences in $(basename "$dex_file")" >&2
+        fi
+        echo "$result"
 }
 
 # ============================================
@@ -158,8 +164,10 @@ print(count)
 # are the same length or shorter (padding with null bytes).
 patch_quality_strings() {
         local dex_file="$1"
-        local count=0
 
+        # Only stdout (the count number) is captured by caller
+        # Log messages go to stderr to avoid polluting $()
+        local result
         result=$(python3 -c "
 import struct, sys
 
@@ -203,11 +211,15 @@ if count > 0:
 print(count)
 " 2>/dev/null) || result=0
 
-        count=${result:-0}
-        if [ "$count" -gt 0 ]; then
-                pr "Custom patches: Quality override — patched $count strings in $(basename "$dex_file")"
+        # Validate result is a number
+        if ! [[ "${result:-0}" =~ ^[0-9]+$ ]]; then
+                echo "0"
+                return
         fi
-        echo "$count"
+        if [ "$result" -gt 0 ]; then
+                pr "Custom patches: Quality override — patched $result strings in $(basename "$dex_file")" >&2
+        fi
+        echo "$result"
 }
 
 # ============================================
