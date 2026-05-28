@@ -335,58 +335,60 @@ jobs:
           DATE_TAG="v$(date +'%Y.%m.%d')"
           echo "tag=$DATE_TAG" >> $GITHUB_OUTPUT
 
+          IG_STATUS="⏭️ Unchanged"
+          IG_DETAIL="Carried from previous release"
+          if [ "${{ needs.build-instagram.result }}" = "success" ]; then
+            IG_STATUS="🔨 Rebuilt"
+            IG_DETAIL="Piko ${{ needs.check-updates.outputs.PIKO_VERSION }} · Base ${{ needs.check-updates.outputs.IG_VERSION || '—' }}"
+          fi
+
+          YT_STATUS="⏭️ Unchanged"
+          YT_DETAIL="Carried from previous release"
+          if [ "${{ needs.build-youtube.result }}" = "success" ]; then
+            YT_STATUS="🔨 Rebuilt"
+            YT_DETAIL="Morphe ${{ needs.check-updates.outputs.MORPHE_VERSION }} · Base ${{ needs.check-updates.outputs.YT_VERSION || '—' }}"
+          fi
+
+          MU_STATUS="⏭️ Unchanged"
+          MU_DETAIL="Carried from previous release"
+          if [ "${{ needs.build-youtube.result }}" = "success" ]; then
+            MU_STATUS="🔨 Rebuilt"
+            MU_DETAIL="Morphe ${{ needs.check-updates.outputs.MORPHE_VERSION }}"
+          fi
+
           {
-            echo "## 📦 Mod Builds — $(date +'%d/%m/%Y')"
+            echo "# RVCArise — $(date +'%d/%m/%Y')"
             echo ""
-
-            # Instagram section
-            if [ "${{ needs.build-instagram.result }}" = "success" ]; then
-              echo "### 📸 Instagram Mod — 🔨 REBUILT"
-              echo "- Piko patches: ${{ needs.check-updates.outputs.PIKO_VERSION }}"
-              echo "- Base: ${{ needs.check-updates.outputs.IG_VERSION || 'unchanged' }}"
-            else
-              echo "### 📸 Instagram Mod — ⏭️ Unchanged"
-              echo "- Carried from previous release"
-            fi
-            echo ""
-            echo "Features: AMOLED, Download media, Privacy, 257 flags, JSON override, OTA, PT-BR"
-            echo ""
-
-            # YouTube section
-            if [ "${{ needs.build-youtube.result }}" = "success" ]; then
-              echo "### 📺 YouTube Mod — 🔨 REBUILT"
-              echo "- Morphe patches: ${{ needs.check-updates.outputs.MORPHE_VERSION }}"
-              echo "- Base: ${{ needs.check-updates.outputs.YT_VERSION || 'unchanged' }}"
-              echo "- Includes: **APK + Magisk Module**"
-            else
-              echo "### 📺 YouTube Mod — ⏭️ Unchanged"
-              echo "- Carried from previous release (APK + Magisk Module)"
-            fi
-            echo ""
-            echo "Features: AMOLED theme, SponsorBlock removed, clean player"
-            echo ""
-
-            # Music section
-            if [ "${{ needs.build-youtube.result }}" = "success" ]; then
-              echo "### 🎵 Music Mod — 🔨 REBUILT"
-            else
-              echo "### 🎵 Music Mod — ⏭️ Unchanged"
-              echo "- Carried from previous release"
-            fi
-            echo ""
-            echo "Features: AMOLED theme, clean player"
+            echo "| App | Status | Patches |"
+            echo "|:----|:------:|:--------|"
+            echo "| 📸 Instagram | ${IG_STATUS} | ${IG_DETAIL} |"
+            echo "| 📺 YouTube | ${YT_STATUS} | ${YT_DETAIL} |"
+            echo "| 🎵 Music | ${MU_STATUS} | ${MU_DETAIL} |"
             echo ""
             echo "---"
             echo ""
-            echo "### 🔧 Smart CI"
+            echo "## 📸 Instagram"
+            echo "AMOLED · Download media · Privacy · 257 MetaConfig flags · JSON override (no-root) · OTA updater · PT-BR"
+            echo ""
+            echo "## 📺 YouTube"
+            echo "AMOLED · Clean player · No SponsorBlock · **APK + Magisk Module**"
+            echo ""
+            echo "## 🎵 Music"
+            echo "AMOLED · Clean player · APK only"
+            echo ""
+            echo "---"
+            echo ""
+            echo "<details><summary>🔧 Smart CI</summary>"
+            echo ""
             echo "- Only apps with upstream changes are rebuilt"
-            echo "- Previous assets are carried forward for unchanged apps"
+            echo "- Previous assets carried forward for unchanged apps"
             echo "- YouTube Magisk module included in every release"
-            echo "- Triggered daily at 13:00 BRT or manually"
+            echo "- Scheduled: daily at 13:00 BRT"
+            echo ""
+            echo "</details>"
 
           } > release-notes.md
 
-          echo "=== Release notes ==="
           cat release-notes.md
 
       - name: Delete previous latest release
