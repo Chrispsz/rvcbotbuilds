@@ -24,7 +24,7 @@ jobs:
       UPDATED_APPS: ${{ steps.should_build.outputs.UPDATED_APPS }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -130,7 +130,7 @@ jobs:
     permissions: write-all
     steps:
       - name: Checkout update branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: update
