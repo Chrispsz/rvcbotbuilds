@@ -1,1 +1,11 @@
 blank_issues_enabled: false
+contact_links:
+  - name: Telegram
+    url: https://t.me/rvc_magisk
+    about: Suporte e discussão no Telegram
+  - name: Piko Patches Issues
+    url: https://github.com/crimera/piko/issues
+    about: Bugs de patches do Instagram — reporte no repo do piko
+  - name: Morphe Patches Issues
+    url: https://github.com/MorpheApp/morphe-patches/issues
+    about: Bugs de patches do YouTube/Music — reporte no repo do Morphe

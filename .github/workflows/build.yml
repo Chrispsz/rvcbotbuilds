@@ -28,10 +28,6 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  # ============================================================
-  # Build apps based on target selection
-  # build_target: all | instagram | youtube | music
-  # ============================================================
   build:
     runs-on: ubuntu-latest
     permissions:
@@ -40,14 +36,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
 
       - name: Setup Java 17
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
+
+      - name: Restore keystores from secrets
+        run: |
+          echo "${{ secrets.KS_KEYSTORE_B64 }}" | base64 -d > ks.keystore
+          echo "${{ secrets.KS_P12_KEYSTORE_B64 }}" | base64 -d > ks-p12.keystore
+          chmod 644 ks.keystore ks-p12.keystore
+          echo "Keystores restored from secrets"
 
       - name: Cache prebuilts
         uses: actions/cache@v4
@@ -71,12 +72,10 @@ jobs:
 
           if [ "$TARGET" != "all" ]; then
             echo "Disabling non-target apps..."
-            # Disable all apps first
             sed -i '/^\[YouTube-Morphe\]/,/^\[Music-Morphe\]/{ s/^enabled = true/enabled = false/ }' config.toml
             sed -i '/^\[Music-Morphe\]/,/^\[Instagram-Piko\]/{ s/^enabled = true/enabled = false/ }' config.toml
             sed -i '/^\[Instagram-Piko\]/,$/{ s/^enabled = true/enabled = false/ }' config.toml
 
-            # Re-enable only the target
             case "$TARGET" in
               youtube)
                 sed -i '/^\[YouTube-Morphe\]/,/^\[Music-Morphe\]/{ s/^enabled = false/enabled = true/ }' config.toml
@@ -141,3 +140,7 @@ jobs:
             build/*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cleanup keystores
+        if: always()
+        run: rm -f ks.keystore ks-p12.keystore

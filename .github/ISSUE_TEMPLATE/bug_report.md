@@ -1,13 +1,38 @@
 ---
 name: Bug report
-about: Bug report
-title: ''
-labels: ''
+about: Reporte um bug do RVCBotBuilds
+title: '[BUG] '
+labels: bug
 assignees: ''
-
 ---
 
-**DO NOT REPORT REVANCED STUFF IN THIS REPO**  
-if you delete these lines and proceed to report revanced stuff like **patch bugs** or **patch requests**, you will be **blocked** from this repo
+## App afetado
+- [ ] Instagram
+- [ ] YouTube
+- [ ] Music
+- [ ] Build system (CI/CD)
+- [ ] Outro: ___
 
-Use issues only to report bugs of the rvmm builder or the modules
+## Versão
+- App: 
+- Versão base: 
+- Patches: 
+
+## Descrição do bug
+Descreva o problema claramente.
+
+## Passos para reproduzir
+1. 
+2. 
+3. 
+
+## Comportamento esperado
+O que deveria acontecer?
+
+## Screenshots / Logs
+Se aplicável, cole logs ou screenshots.
+
+## Ambiente
+- Device: 
+- Android: 
+- Root: Magisk / KernelSU / Nenhum

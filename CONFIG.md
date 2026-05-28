@@ -1,144 +1,198 @@
-# Config
+# RVCBotBuilds Config Guide
 
-Adding another revanced app is as easy as this:
+## Quick Start
+
+1. ⭐ Star the repo
+2. Fork or use as [template](https://github.com/Chrispsz/rvcbotbuilds/generate)
+3. Customize [`config.toml`](./config.toml)
+4. Run the [build workflow](../../actions/workflows/build.yml) or [Instagram release](../../actions/workflows/release-instagram.yml)
+5. Download from [releases](../../releases)
+
+---
+
+## Apps
+
+### 📸 Instagram (crimera/piko v3.5.0-dev.2)
+
+Instagram uses `crimera/piko` with `exclusive-patches = true` — only explicitly included patches are applied. We include 21 of 46 available patches, plus 2 custom RVCBotBuilds binary patches.
+
+**Included patches (21):**
+
+| Category | Patches |
+|----------|---------|
+| 🖤 **Theme** | Amoled theme |
+| 🛡️ **Privacy** | Disable analytics, Disable screenshot detection, Disable typing status |
+| 📥 **Download** | Download media, Download voice message |
+| 🚫 **Ads** | Disable ads, Hide suggested content |
+| 🔍 **Quality** | Improve image viewing (2048px from CDN) |
+| 👤 **Profile** | Copy comment, Follow back indicator, More options on post, More options on profile |
+| 🔧 **Settings** | Add settings, Unlock developer options |
+| 🔒 **Media** | Make ephemeral media permanent, View story mentions |
+| 🔗 **Links** | Open links externally, Sanitize share links |
+| 🧹 **Clean** | Hide stories tray, Remove build expired popup |
+
+**Custom RVCBotBuilds patches (2 binary patches):**
+- **Allow Screenshots in DMs** — removes `FLAG_SECURE` (0x2000) from Window.setFlags() calls via binary dex patching. Allows taking screenshots in DM conversations.
+- **MobileConfig Quality Override** — replaces quality string constants in DEX string table: `medium` → `high`, `standard` → `hd`. Maximizes image/video quality from server-side config.
+
+**Excluded patches (7 — risky/detectable):**
+- `View DMs anonymously` — Ghost mode in DMs, Instagram can detect
+- `View live anonymously` — Same detection risk
+- `View stories anonymously` — High detection risk, Meta monitors
+- `Unlock employee options` — Exposes internal Meta tools, can crash
+- `Unlock Plus benefits` — TOS violation, detectable
+- `Limit feed to following profiles` — Breaks feed algorithm
+- `Hide navigation buttons` — Can break UI
+
+### 🎬 YouTube (MorpheApp/morphe-patches)
+
+YouTube uses Morphe patches with AMOLED dark theme (pure black `@android:color/black`).
+- Build mode: both (APK + Magisk module)
+- Auto-detach via Zygisk blocks Play Store updates
+- Requires [GmsCore](https://github.com/ReVanced/GmsCore/releases) for non-root
+
+### 🎵 Music (MorpheApp/morphe-patches)
+
+Same as YouTube — Morphe patches with AMOLED theme.
+- Build mode: both (APK + Magisk module)
+
+---
+
+## Config Reference
+
+### Global Options
+
 ```toml
-[Some-App]
-apkmirror-dlurl = "https://www.apkmirror.com/apk/inc/app"
-# or uptodown-dlurl = "https://app.en.uptodown.com/android"
+enable-module-update = true     # Enable Magisk module updates. default: true
+parallel-jobs = 3               # Cores for parallel patching. default: $(nproc)
+compression-level = 9           # Module zip compression (0-9). default: 9
+riplib = true                   # Rip lib files for smaller modules. default: true
+remove-rv-integrations-checks = true  # Remove revanced-integrations checks. default: true
+continue-on-error = true        # Continue if one app fails. default: true
+default-arch = "arm64-v8a"      # Default architecture for all apps. default: "arm64-v8a"
 ```
 
-> [!WARNING]
-> When a patch name itself contains a single quote, double it inside the string (e.g. 'Hide ''Get Music Premium''').
-
-## More about other options:
-
-There exists an example below with all defaults shown and all the keys explicitly set.  
-**All keys are optional** (except download urls) and are assigned to their default values if not set explicitly.  
+### Per-App Options
 
 ```toml
-parallel-jobs = 1                    # amount of cores to use for parallel patching, if not set $(nproc) is used
-compression-level = 9                # module zip compression level
-remove-rv-integrations-checks = true # remove checks from the revanced integrations
-dpi = "nodpi anydpi 120-640dpi"      # dpi packages to be searched in order. default: "nodpi anydpi"
+[App-Name]
+app-name = "App"                  # Display name. default: table name
+enabled = true                    # Build this app. default: true
+patches-source = "org/repo"       # Patches GitHub repo. default: "ReVanced/revanced-patches"
+patches-version = "latest"        # "latest", "dev", or version tag. default: "latest"
+cli-source = "org/repo"           # CLI GitHub repo. default: "ReVanced/revanced-cli"
+rv-brand = "Brand"                # Brand name for output. default: "ReVanced"
+build-mode = "apk"                # "apk", "module", or "both". default: "apk"
+version = "auto"                  # "auto", "latest", "beta", or version string. default: "auto"
+exclusive-patches = false         # Only apply explicitly included patches. default: false
+arch = "arm64-v8a"                # "arm64-v8a", "arm-v7a", "x86_64", "x86", "all", "both". default: "all"
 
-patches-source = "revanced/revanced-patches" # where to fetch patches bundle from. default: "revanced/revanced-patches"
-cli-source = "ReVanced/revanced-cli"             # where to fetch cli from. default: "ReVanced/revanced-cli"
-# options like cli-source can also set per app
-rv-brand = "ReVanced Extended" # rebrand from 'ReVanced' to something different. default: "ReVanced"
-
-patches-version = "v2.160.0" # 'latest', 'dev', or a version number. default: "latest"
-cli-version = "v5.0.0"       # 'latest', 'dev', or a version number. default: "latest"
-
-[Some-App]
-app-name = "SomeApp" # if set, release name becomes SomeApp instead of Some-App. default is same as table name, which is 'Some-App' here.
-enabled = true       # whether to build the app. default: true
-build-mode = "apk"   # 'both', 'apk' or 'module'. default: apk
-
-# 'auto' option gets the latest possible version supported by all the included patches
-# 'latest' gets the latest stable without checking patches support. 'beta' gets the latest beta/alpha
-# whitespace seperated list of patches to exclude. default: ""
-version = "auto"     # 'auto', 'latest', 'beta' or a version number (e.g. '17.40.41'). default: auto
-
-# optional args to be passed to cli. can be used to set patch options
-# multiline strings in the config is supported
-patcher-args = """\
-  -OdarkThemeBackgroundColor=#FF0F0F0F \
-  -Oanother-option=value \
+included-patches = """\
+  'Patch Name 1' \
+  'Patch Name 2' \
   """
 
 excluded-patches = """\
-  'Some Patch' \
-  'Some Other Patch' \
+  'Patch Name 3' \
   """
 
-included-patches = "'Some Patch'"                          # whitespace seperated list of non-default patches to include. default: ""
-include-stock = "merged"                                   # 'merged', 'split' or 'disable'. default: merged
-exclusive-patches = false                                  # exclude all patches by default. default: false
+patcher-args = "--continue-on-error"  # Extra args for the patcher CLI
 
-apkmirror-dlurl = "https://www.apkmirror.com/apk/inc/app"
-uptodown-dlurl = "https://spotify.en.uptodown.com/android"
-# direct download url. the url must have point to an apk file with name format shown in this example
-direct-dlurl = "https://website/com.google.android.youtube-20.40.45-all.apk"
-
-module-prop-name = "some-app-module"                       # module prop name.
-dpi = "360-480dpi"                                         # used to select apk variant from apkmirror. default: nodpi
-arch = "arm64-v8a"                                         # 'arm64-v8a', 'arm-v7a', 'all', 'both'. 'both' downloads both arm64-v8a and arm-v7a. default: all
+# Download sources (at least one required, tried in order: direct → uptodown → archive → apkmirror)
+uptodown-dlurl = "https://app.en.uptodown.com/android"
+apkmirror-dlurl = "https://www.apkmirror.com/apk/dev/app"
+direct-dlurl = "https://example.com/app-1.0.apk"
 ```
 
-## RVCBotBuilds Extra Options
-
-These options are specific to this fork and are not available in the upstream j-hc repo:
+### Instagram-Specific Config
 
 ```toml
-# Global options
-default-arch = "arm64-v8a"      # default architecture for all apps. default: "arm64-v8a"
-continue-on-error = true        # continue building other apps if one fails. default: true
-
-# RevPack (Combined Module) — optional
-combine-modules = false         # bundle all built modules into one flashable zip. default: false
-pack-name = "rvcbot-revpack"    # output filename for RevPack (without .zip). default: "rvcbot-revpack"
-pack-apps = ""                  # comma-separated whitelist of apps to include in RevPack. default: "" (all)
-pack-exclude-apps = ""          # comma-separated blacklist of apps to exclude from RevPack. default: "" (none)
+[Instagram-Piko]
+app-name = "Instagram"
+patches-source = "crimera/piko"
+patches-version = "dev"            # Uses latest dev release from piko
+cli-source = "MorpheApp/morphe-cli"
+rv-brand = "Morphe"
+build-mode = "apk"
+version = "430.0.0.53.80"          # Pinned version (piko officially supported)
+exclusive-patches = true            # Only explicitly included patches
+patcher-args = "--continue-on-error"
+arch = "arm64-v8a"
+uptodown-dlurl = "https://instagram.en.uptodown.com/android"
 ```
 
-### AMOLED Theme (YouTube & Music)
+> **Why `patches-version = "dev"`?** The dev channel includes fixes for newer Instagram versions before they're released as stable. We use v3.5.0-dev.2 which adds official support for v430.
 
-Both YouTube and Music use Morphe's Theme patch with pure black background (`@android:color/black`)
-for true AMOLED dark mode — saves battery on OLED screens.
+> **Why `exclusive-patches = true`?** With 46 available patches, we want fine control over which ones apply. This prevents unexpected patches from being included.
 
-```toml
-[YouTube-Morphe]
-included-patches = "'Theme'"
-patcher-args = "-OdarkThemeBackgroundColor=@android:color/black"
+> **Why pin `version = "430.0.0.53.80"`?** This is the version officially supported by piko v3.5.0-dev.2. Auto-detect may pick an unsupported version that breaks patches.
 
-[Music-Morphe]
-included-patches = "'Theme'"
-patcher-args = "-OdarkThemeBackgroundColor=@android:color/black"
+---
+
+## Custom Patches
+
+RVCBotBuilds applies custom binary patches AFTER the ReVanced CLI finishes patching. These are patches not available in crimera/piko but found in other mods (InstaEclipse, Instafel).
+
+### How Binary Patching Works
+
+1. Extract DEX files from the patched APK
+2. Use python3 to scan and modify bytes directly (no decompile needed)
+3. Update the modified DEX files in the APK
+4. Re-sign the APK (binary patches invalidate the signature)
+
+**Advantages:** Fast (seconds vs minutes for apkeditor), no decompile/recompile failures on large APKs.
+
+**Current binary patches:**
+- `FLAG_SECURE removal`: Scans for `const/16 vN, 0x2000` opcodes (0x13 + register + LE 0x2000) and replaces with 0x0000
+- `Quality Override`: Scans for `medium` and `standard` byte strings and replaces with `high\x00\x00` and `hd\x00\x00\x00\x00\x00\x00`
+
+See [`custom-patches/apply-custom-patches.sh`](./custom-patches/apply-custom-patches.sh) for implementation.
+
+---
+
+## Workflows
+
+| Workflow | Trigger | Purpose |
+|----------|---------|---------|
+| `build.yml` | Manual / Push to main | Build all or specific apps |
+| `release-instagram.yml` | Manual | Instagram-only build + GitHub Release |
+| `ci.yml` | Daily 13:00 BRT / Manual | Auto-detect patch/base updates |
+
+### Build Targets
+
+When using `build.yml` or `ci.yml`, you can specify which app to build:
+
+| Target | Apps Built | Approx. Time |
+|--------|-----------|-------------|
+| `all` | Instagram + YouTube + Music | ~15 min |
+| `instagram` | Instagram only | ~5 min |
+| `youtube` | YouTube only | ~8 min |
+| `music` | Music only | ~5 min |
+
+---
+
+## Building Locally
+
+### On Linux
+
+```bash
+git clone https://github.com/Chrispsz/rvcbotbuilds --depth 1
+cd rvcbotbuilds
+# Place keystores in the root directory
+./build.sh
 ```
 
-### Instagram with crimera/piko (6 essential patches) + Custom Patches
+### On Termux
 
-Instagram uses `crimera/piko` which provides 46 Instagram patches — the most comprehensive source available.
-Researched 7+ repos (piko, brosssh, InstaEclipse, Instafel, ReVanced, anddea, RookieEnough) — **piko wins by far**.
+```bash
+bash <(curl -sSf https://raw.githubusercontent.com/Chrispsz/rvcbotbuilds/main/build-termux.sh)
+```
 
-We include only **6 essential patches** — no bloat, no filler, every patch adds clear value.
+> **Note:** Keystores (`ks.keystore`, `ks-p12.keystore`) are NOT included in the repo for security. They are stored as GitHub Secrets and restored during CI builds. For local builds, you need your own keystores.
 
-On top of piko, we apply **2 custom Smali patches** (from InstaEclipse research) after ReVanced CLI patching.
+---
 
-**Included piko patches (6 essential):**
-
-| Patch | Category | Why |
-|-------|----------|-----|
-| ⚙️ **Add settings** | Core | Piko Settings hub — toggle all patches on/off |
-| 🖤 **Amoled theme** | Visual | Pure black for OLED — saves battery |
-| 🚫 **Disable ads** | Ads | Remove all ads from feed and stories |
-| 📥 **Download media** | Download | Save posts, reels, stories, highlights, profile pics, audio |
-| 🔍 **Improve image viewing** | Quality | **2048px from CDN** (vs 1080px default) |
-| 👻 **View stories anonymously** | Ghost | See stories without being detected |
-
-**Custom Smali patches (applied after ReVanced CLI):**
-
-| Patch | Source | What it does |
-|-------|--------|--------------|
-| 📸 **Allow Screenshots in DMs** | InstaEclipse | Removes FLAG_SECURE (0x2000) from `Window.setFlags()` — take screenshots in DM conversations that normally block them |
-| 🔍 **MobileConfig Quality Override** | InstaEclipse | Patches default quality values from "medium"→"high" and "standard"→"hd" in MobileConfig fallback strings |
-
-**Total: 6 piko + 2 custom = 8 patches. Zero bloat.**
-
-**Excluded patches (risky/unstable):**
-- Unlock employee options (debugging, may crash)
-- Unlock Plus benefits (server-side, risky)
-
-**Not needed (40 patches removed — redundant/niche/cosmetic):**
-All other 40 piko patches are intentionally excluded as niche, preference-based, cosmetic, or redundant. The 6 included + 2 custom cover all essential functionality.
-
-**About "Improve image viewing":** Forces Instagram to request **2048px images** from the CDN instead of the default 1080px. This is NOT upscaling — Instagram stores originals at up to 2048px, but the app normally requests lower-res versions. The patch intercepts `ExtendedImageUrl` and `SetDPIMetrics` to request the max resolution. Toggle on in Piko Settings after install.
-
-**About "Download media":** Supports downloading feed posts, reels, stories, highlights, profile pictures, DM media, and audio tracks from reels. Has a download dialog with options: download current, download as image, download audio, copy link, open externally, download all (carousel). Configure in Piko Settings.
-
-**About "View stories anonymously":** The #1 most requested Instagram mod feature. Watch stories without appearing in the viewer list. The patch hooks the "story seen" event and silently drops it — the story loads normally from CDN but the server never registers your view. Toggle in Piko Settings.
-
-### Research: Other Instagram Mod Sources
+## Research: Instagram Patch Sources
 
 | Repo | IG Patches | AMOLED | Privacy | Download | Image Quality | Dev Options |
 |------|-----------|--------|---------|----------|---------------|-------------|
@@ -148,44 +202,7 @@ All other 40 piko patches are intentionally excluded as niche, preference-based,
 | Instafel (custom patcher) | 12 | ✅ (from piko) | ❌ | ❌ | ❌ | ✅ |
 | ReVanced official | ~2 | ❌ | ❌ | ❌ | ❌ | ❌ |
 
-**InstaEclipse** (LSPosed module) has unique features not in piko:
-- **Allow Screenshots in DMs** — strips `FLAG_SECURE` from windows (no piko equivalent)
-- **DM Mark-as-Read Button** — temporarily disables ghost mode to mark as read (no piko equivalent)
-- **MobileConfig overrides** — bulk override ~100 server-side config flags for image quality
-- However: requires root + LSPosed, project is discontinued (merging into Purrfect)
-
-**Instafel** (custom Smali patcher) has unique features:
-- **Unlock Dev Options** with cascading reference search (version-resilient)
-- **Feature Flag Browser** via injected app UI
-- However: no downloads, no ghost mode, no image quality — focuses on Alpha testing
-
-**Feasibility of creating new Morphe patches from these:**
-- 🟢 **Allow Screenshots in DMs** — Easy Smali patch, just mask out FLAG_SECURE flag
-- 🟢 **MobileConfig Override Injection** — Override `mc_overrides.json` loading to merge custom quality flags
-- 🟡 **Disable Feed entirely** — Medium, needs calling-code modification
-- 🔴 **DM Mark-as-Read Button** — Requires runtime UI injection, not practical in Smali
-
-### All 46 piko Instagram patches
-
-Add settings, Allow user network certificate, **Amoled theme**, **Change like animation** (26 animations!),
-Change version code, **Copy comment**, **Customise story ring size** (float, default 70.0f), **Customise story timestamp** (default/detailed/timeleft),
-**Disable Reels scrolling**, **Disable ads**, **Disable analytics**, **Disable comments**,
-**Disable discover people**, **Disable double tap like**, **Disable explore**, Disable highlights,
-**Disable screenshot detection**, Disable stories, Disable story flipping, **Disable typing status**,
-**Disable video autoplay**, **Download media** (posts+reels+stories+highlights+profile+DM+audio), **Follow back indicator**,
-Hide group creation button on sharesheet, **Hide navigation buttons**, **Hide notes tray**,
-**Hide reshare button**, Hide stories tray, **Hide suggested content**, **Improve image viewing** (2048px),
-**Limit feed to following profiles**, **Make ephemeral media permanent**, **More options on post** (long-press: copy desc, download, etc),
-**More options on profile** (copy handle, download DP, etc), **Open links externally**, **Remove build expired popup**,
-**Remove empty bottom space**, **Sanitize share links**, **Stories audio autoplay**,
-Unlock Plus benefits, **Unlock developer options** (long-press home → MetaConfig), Unlock employee options,
-**View DMs anonymously**, **View live anonymously**, **View stories anonymously**, **View story mentions** (reveals hidden @tags)
-
-**Bold** = included in our config.toml. Patches not bolded are available but excluded or not needed.
-
-### RevPack
-
-When `combine-modules = true`, all built Magisk modules are bundled into a single flashable zip.
-This lets you install multiple root apps in one flash.
-
-The RevPack includes auto-detach for all bundled apps and a per-app install prompt (Vol+/Vol- to choose).
+**InstaEclipse** unique features (not in piko):
+- Allow Screenshots in DMs → ✅ We implement this as a binary patch
+- MobileConfig overrides → ✅ We implement this as a binary patch
+- DM Mark-as-Read Button → ❌ Requires runtime UI injection

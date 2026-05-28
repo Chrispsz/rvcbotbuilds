@@ -1,14 +1,37 @@
+# Build outputs
 *.apk
 *.zip
-/temp
 /build
-test*
-/logs
+/temp
 build.md
-cmpr
-*-temporary-files
+build.log
 
-# Secrets — NEVER commit
+# Custom patch temp files
+*-binpatch/
+
+# Keystore files (now stored as GitHub Secrets)
+ks.keystore
+ks-p12.keystore
+
+# Environment files
 .env
 .env.*
 !.env.example
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+/logs
+
+# Test
+test*
+
+# Temporary
+*-temporary-files
+cmpr
