@@ -1,17 +1,7 @@
-name: 🔨 Build All
+name: 📸 Build Instagram Mod
 
 on:
-  workflow_dispatch:
-    inputs:
-      build_target:
-        description: 'Target (all, instagram, youtube, music)'
-        required: false
-        default: 'all'
   workflow_call:
-    inputs:
-      build_target:
-        type: string
-        default: 'all'
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -20,7 +10,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
 
     steps:
       - name: Checkout
@@ -41,17 +31,14 @@ jobs:
       - name: Cache prebuilts
         uses: actions/cache@v4
         with:
-          path: |
-            temp/crimera-rv
-            temp/morpheapp-rv
-          key: prebuilts-v1-${{ github.run_id }}
-          restore-keys: prebuilts-v1-
+          path: temp/crimera-rv
+          key: piko-prebuilts-v1-${{ github.run_id }}
+          restore-keys: piko-prebuilts-v1-
 
       - name: Install deps
         run: sudo apt-get install -y jq zip python3
 
-      - name: Select build target
-        id: target
+      - name: Prepare Instagram-only config
         run: |
           set_app_enabled() {
             local section="$1" state="$2"
@@ -62,25 +49,12 @@ jobs:
               { print }
             ' config.toml > config.toml.tmp && mv config.toml.tmp config.toml
           }
-
-          TARGET="${{ inputs.build_target || 'all' }}"
-          echo "target=$TARGET" >> $GITHUB_OUTPUT
-
-          if [ "$TARGET" != "all" ]; then
-            set_app_enabled "YouTube-Morphe" false
-            set_app_enabled "Music-Morphe" false
-            set_app_enabled "Instagram-Piko" false
-            case "$TARGET" in
-              youtube)   set_app_enabled "YouTube-Morphe" true ;;
-              music)     set_app_enabled "Music-Morphe" true ;;
-              instagram) set_app_enabled "Instagram-Piko" true ;;
-            esac
-          fi
-
+          set_app_enabled "YouTube-Morphe" false
+          set_app_enabled "Music-Morphe" false
           echo "=== Active config ==="
           grep -E '^\[.*\]|^enabled' config.toml
 
-      - name: Build
+      - name: Build Instagram
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -88,31 +62,13 @@ jobs:
           chmod +x build.sh utils.sh
           bash build.sh config.toml 2>&1 | tee build.log
 
-      - name: Upload APKs
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v7
         with:
-          name: patched-apks
+          name: instagram-mod-apk
           path: build/*.apk
-          retention-days: 30
-          if-no-files-found: warn
-
-      - name: Upload modules
-        uses: actions/upload-artifact@v7
-        with:
-          name: magisk-modules
-          path: build/*.zip
-          retention-days: 30
-          if-no-files-found: warn
-
-      - name: Upload build log
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: build-log
-          path: |
-            build.md
-            build.log
-          retention-days: 7
+          retention-days: 5
+          if-no-files-found: error
 
       - name: Cleanup
         if: always()

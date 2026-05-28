@@ -116,6 +116,7 @@ public class OtaUpdater {
             if (assetsIndex == -1) return null;
             String searchStr = "browser_download_url";
             int searchStart = assetsIndex;
+            String fallback = null;
             while (true) {
                 int urlKeyIndex = json.indexOf(searchStr, searchStart);
                 if (urlKeyIndex == -1) break;
@@ -124,9 +125,14 @@ public class OtaUpdater {
                 int valueEnd = json.indexOf("\"", valueStart + 1);
                 if (valueStart == -1 || valueEnd == -1) break;
                 String url = json.substring(valueStart + 1, valueEnd);
-                if (url.endsWith(".apk")) return url;
+                if (url.endsWith(".apk")) {
+                    // Prefer Instagram APK specifically (handles multi-APK releases)
+                    if (url.contains("instagram")) return url;
+                    if (fallback == null) fallback = url;
+                }
                 searchStart = valueEnd;
             }
+            return fallback;
         } catch (Exception e) {
             PikoUtils.logger(e);
         }

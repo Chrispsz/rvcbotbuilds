@@ -1,12 +1,16 @@
-name: 🔄 Sync & Build
+name: 🔄 CI — Smart Build & Release
 
 on:
   workflow_dispatch:
     inputs:
       force_build:
-        description: 'Force build even without updates? (true/false)'
+        description: 'Force build all? (true/false)'
         required: false
         default: 'false'
+      force_target:
+        description: 'Force specific target? (all/instagram/youtube)'
+        required: false
+        default: 'all'
   schedule:
     - cron: "0 16 * * *"   # Daily at 16:00 UTC (13:00 BRT)
 
@@ -15,122 +19,147 @@ env:
 
 jobs:
   # ===========================================
-  # Step 1: Check if upstream has updates
+  # Step 1: Check what needs updating
   # ===========================================
   check-updates:
-    permissions: write-all
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     outputs:
-      SHOULD_BUILD: ${{ steps.check.outputs.SHOULD_BUILD }}
-      PIKO_UPDATED: ${{ steps.check.outputs.PIKO_UPDATED }}
-      MORPHE_UPDATED: ${{ steps.check.outputs.MORPHE_UPDATED }}
-      IG_BASE_UPDATED: ${{ steps.check.outputs.IG_BASE_UPDATED }}
+      BUILD_INSTAGRAM: ${{ steps.check.outputs.BUILD_INSTAGRAM }}
+      BUILD_YOUTUBE: ${{ steps.check.outputs.BUILD_YOUTUBE }}
+      PIKO_VERSION: ${{ steps.check.outputs.PIKO_VERSION }}
+      MORPHE_VERSION: ${{ steps.check.outputs.MORPHE_VERSION }}
+      IG_VERSION: ${{ steps.check.outputs.IG_VERSION }}
+      YT_VERSION: ${{ steps.check.outputs.YT_VERSION }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
+      - name: Install deps
+        run: sudo apt-get install -y jq
+
       - name: Check for updates
         id: check
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          SHOULD_BUILD=0
-          PIKO_UPDATED=0
-          MORPHE_UPDATED=0
-          IG_BASE_UPDATED=0
+          BUILD_INSTAGRAM=0
+          BUILD_YOUTUBE=0
 
-          # Check if this is a forced build
+          # Force build handling
           if [ "${{ inputs.force_build }}" = "true" ]; then
-            echo "Force build requested"
-            SHOULD_BUILD=1
+            echo "⚡ Force build requested — building everything"
+            BUILD_INSTAGRAM=1
+            BUILD_YOUTUBE=1
           fi
 
-          # Check piko patches version
+          if [ "${{ inputs.force_target }}" = "instagram" ]; then
+            BUILD_INSTAGRAM=1
+          elif [ "${{ inputs.force_target }}" = "youtube" ]; then
+            BUILD_YOUTUBE=1
+          fi
+
+          # ---- Check Piko patches (Instagram) ----
           echo "=== Checking piko patches ==="
-          CURRENT_PIKO=$(awk '/^\[Instagram-Piko\]/{found=1} found && /^patches-version = /{gsub(/"/, ""); print $3; exit}' config.toml)
-          echo "Current piko version in config: $CURRENT_PIKO"
+          PIKO_VERSION=$(curl -sL "https://api.github.com/repos/crimera/piko/releases?per_page=1" | jq -r '.[0].tag_name // empty' 2>/dev/null || echo "")
+          echo "Latest piko: $PIKO_VERSION"
 
-          LATEST_PIKO_TAG=$(curl -sL "https://api.github.com/repos/crimera/piko/releases?per_page=1" | jq -r '.[0].tag_name // empty' 2>/dev/null || echo "")
-          echo "Latest piko release: $LATEST_PIKO_TAG"
+          # Get last built version from update branch
+          LAST_PIKO=""
+          if git fetch origin update --depth=1 2>/dev/null; then
+            LAST_PIKO=$(git show origin/update:build-meta/instagram-version.txt 2>/dev/null || echo "")
+          fi
+          echo "Last built piko: $LAST_PIKO"
 
-          # Get current version from build.md
-          if git checkout origin/update build.md 2>/dev/null && [ -f build.md ]; then
-            LAST_BUILT_PIKO=$(grep -oP 'piko\s+\K[\w.-]+' build.md | head -1 || echo "")
-            echo "Last built piko version: $LAST_BUILT_PIKO"
+          if [ -z "$LAST_PIKO" ]; then
+            echo "🆕 First build — Instagram will be built"
+            BUILD_INSTAGRAM=1
+          elif [ -n "$PIKO_VERSION" ] && [ "$PIKO_VERSION" != "$LAST_PIKO" ]; then
+            echo "⚠️  Piko update: $LAST_PIKO → $PIKO_VERSION"
+            BUILD_INSTAGRAM=1
           else
-            LAST_BUILT_PIKO=""
-            echo "No previous build.md found — first build"
-            SHOULD_BUILD=1
+            echo "✅ Piko up to date"
           fi
 
-          if [ -n "$LATEST_PIKO_TAG" ] && [ "$LATEST_PIKO_TAG" != "$LAST_BUILT_PIKO" ]; then
-            echo "⚠️  Piko update detected: $LAST_BUILT_PIKO → $LATEST_PIKO_TAG"
-            PIKO_UPDATED=1
-            SHOULD_BUILD=1
-          else
-            echo "✅ Piko is up to date"
+          # ---- Check Instagram base APK version ----
+          echo ""
+          echo "=== Checking Instagram base ==="
+          IG_VERSION=$(curl -sL "https://instagram.en.uptodown.com/android/versions" 2>/dev/null | \
+            grep -oP '(?<=version">)[\d.]+(?:\.\d+)+' | head -1 || echo "")
+          echo "Latest IG on uptodown: $IG_VERSION"
+
+          LAST_IG=""
+          if git fetch origin update --depth=1 2>/dev/null; then
+            LAST_IG=$(git show origin/update:build-meta/ig-base-version.txt 2>/dev/null || echo "")
+          fi
+          if [ -n "$IG_VERSION" ] && [ "$IG_VERSION" != "$LAST_IG" ]; then
+            echo "⚠️  IG base update: $LAST_IG → $IG_VERSION"
+            BUILD_INSTAGRAM=1
           fi
 
-          # Check Morphe patches
+          # ---- Check Morphe patches (YouTube + Music) ----
           echo ""
           echo "=== Checking Morphe patches ==="
-          LATEST_MORPHE=$(curl -sL "https://api.github.com/repos/MorpheApp/morphe-patches/releases?per_page=1" | jq -r '.[0].tag_name // empty' 2>/dev/null || echo "")
-          echo "Latest morphe release: $LATEST_MORPHE"
+          MORPHE_VERSION=$(curl -sL "https://api.github.com/repos/MorpheApp/morphe-patches/releases?per_page=1" | jq -r '.[0].tag_name // empty' 2>/dev/null || echo "")
+          echo "Latest Morphe: $MORPHE_VERSION"
 
-          # Check Instagram base version on uptodown
-          echo ""
-          echo "=== Checking Instagram base version ==="
-          CURRENT_IG_VER=$(awk '/^\[Instagram-Piko\]/{found=1} found && /^version = /{gsub(/"/, ""); print $3; exit}' config.toml)
-          echo "Current pinned version: $CURRENT_IG_VER"
+          LAST_MORPHE=""
+          if git fetch origin update --depth=1 2>/dev/null; then
+            LAST_MORPHE=$(git show origin/update:build-meta/morphe-version.txt 2>/dev/null || echo "")
+          fi
+          echo "Last built Morphe: $LAST_MORPHE"
 
-          IG_VERSIONS=$(curl -sL "https://instagram.en.uptodown.com/android/versions" 2>/dev/null | \
-            grep -oP '(?<=version">)[\d.]+(?:\.\d+)+' | head -5) || true
-
-          if [ -n "$IG_VERSIONS" ]; then
-            LATEST_IG=$(echo "$IG_VERSIONS" | head -1)
-            echo "Latest on uptodown: $LATEST_IG"
-            if [ "$LATEST_IG" != "$CURRENT_IG_VER" ]; then
-              echo "⚠️  Instagram base update: $CURRENT_IG_VER → $LATEST_IG"
-              echo "  (Won't auto-update — piko must support it first)"
-              IG_BASE_UPDATED=1
-            else
-              echo "✅ Instagram base is up to date"
-            fi
+          if [ -z "$LAST_MORPHE" ]; then
+            echo "🆕 First build — YouTube/Music will be built"
+            BUILD_YOUTUBE=1
+          elif [ -n "$MORPHE_VERSION" ] && [ "$MORPHE_VERSION" != "$LAST_MORPHE" ]; then
+            echo "⚠️  Morphe update: $LAST_MORPHE → $MORPHE_VERSION"
+            BUILD_YOUTUBE=1
+          else
+            echo "✅ Morphe up to date"
           fi
 
-          # Use build.sh config-update check for Morphe
-          if [ -f build.sh ]; then
-            chmod +x build.sh utils.sh
-            UPDATE_CFG=$(./build.sh config.toml --config-update 2>/dev/null || true)
-            if [ -n "$UPDATE_CFG" ]; then
-              echo "⚠️  Config updates detected: $UPDATE_CFG"
-              MORPHE_UPDATED=1
-              SHOULD_BUILD=1
-            else
-              echo "✅ Morphe patches are up to date"
-            fi
+          # ---- Check YouTube base APK ----
+          echo ""
+          echo "=== Checking YouTube base ==="
+          YT_VERSION=$(curl -sL "https://youtube.en.uptodown.com/android/versions" 2>/dev/null | \
+            grep -oP '(?<=version">)[\d.]+(?:\.\d+)+' | head -1 || echo "")
+          echo "Latest YT on uptodown: $YT_VERSION"
+
+          LAST_YT=""
+          if git fetch origin update --depth=1 2>/dev/null; then
+            LAST_YT=$(git show origin/update:build-meta/yt-base-version.txt 2>/dev/null || echo "")
+          fi
+          if [ -n "$YT_VERSION" ] && [ "$YT_VERSION" != "$LAST_YT" ]; then
+            echo "⚠️  YT base update: $LAST_YT → $YT_VERSION"
+            BUILD_YOUTUBE=1
           fi
 
+          # ---- Summary ----
           echo ""
-          echo "=== Summary ==="
-          echo "Piko updated: $PIKO_UPDATED"
-          echo "Morphe updated: $MORPHE_UPDATED"
-          echo "IG base updated: $IG_BASE_UPDATED"
-          echo "Should build: $SHOULD_BUILD"
+          echo "============================================"
+          echo "  Build Decision"
+          echo "============================================"
+          echo "  Instagram: $([ $BUILD_INSTAGRAM -eq 1 ] && echo '🔨 BUILD' || echo '⏭️  SKIP')"
+          echo "  YouTube:   $([ $BUILD_YOUTUBE -eq 1 ] && echo '🔨 BUILD' || echo '⏭️  SKIP')"
+          echo "============================================"
 
-          echo "SHOULD_BUILD=$SHOULD_BUILD" >> $GITHUB_OUTPUT
-          echo "PIKO_UPDATED=$PIKO_UPDATED" >> $GITHUB_OUTPUT
-          echo "MORPHE_UPDATED=$MORPHE_UPDATED" >> $GITHUB_OUTPUT
-          echo "IG_BASE_UPDATED=$IG_BASE_UPDATED" >> $GITHUB_OUTPUT
+          echo "BUILD_INSTAGRAM=$BUILD_INSTAGRAM" >> $GITHUB_OUTPUT
+          echo "BUILD_YOUTUBE=$BUILD_YOUTUBE" >> $GITHUB_OUTPUT
+          echo "PIKO_VERSION=$PIKO_VERSION" >> $GITHUB_OUTPUT
+          echo "MORPHE_VERSION=$MORPHE_VERSION" >> $GITHUB_OUTPUT
+          echo "IG_VERSION=${IG_VERSION:-}" >> $GITHUB_OUTPUT
+          echo "YT_VERSION=${YT_VERSION:-}" >> $GITHUB_OUTPUT
 
   # ===========================================
-  # Step 2: Sync piko fork + apply overlay
+  # Step 2: Sync piko fork (if Instagram updated)
   # ===========================================
   sync-piko:
     needs: check-updates
-    if: needs.check-updates.outputs.PIKO_UPDATED == '1'
+    if: needs.check-updates.outputs.BUILD_INSTAGRAM == '1'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -145,6 +174,7 @@ jobs:
           ref: main
           path: piko-fork
           fetch-depth: 0
+          token: ${{ secrets.PAT_TOKEN }}
 
       - name: Add upstream remote
         working-directory: piko-fork
@@ -158,11 +188,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Try merge with our changes taking priority
           git merge upstream/main --no-edit -X ours || {
-            echo "⚠️  Merge conflicts detected, resolving with ours strategy"
+            echo "⚠️  Merge conflicts — resolving with ours strategy"
             git diff --name-only --diff-filter=U | while read file; do
-              echo "  Resolving conflict in $file (keeping ours)"
+              echo "  Keeping ours: $file"
               git checkout --ours "$file"
               git add "$file"
             done
@@ -181,35 +210,180 @@ jobs:
           git push
 
   # ===========================================
-  # Step 3: Build Instagram (if needed)
+  # Step 3: Build Instagram (conditional)
   # ===========================================
   build-instagram:
     needs: [check-updates, sync-piko]
-    if: needs.check-updates.outputs.SHOULD_BUILD == '1'
-    uses: ./.github/workflows/release-instagram.yml
-    with:
-      prerelease: 'false'
+    if: needs.check-updates.outputs.BUILD_INSTAGRAM == '1'
+    uses: ./.github/workflows/build-instagram.yml
     secrets: inherit
 
   # ===========================================
-  # Step 4: Build YouTube/Music (if Morphe updated)
+  # Step 4: Build YouTube + Music (conditional)
   # ===========================================
-  build-youtube-music:
+  build-youtube:
     needs: check-updates
-    if: needs.check-updates.outputs.MORPHE_UPDATED == '1'
-    uses: ./.github/workflows/build.yml
-    with:
-      build_target: 'all'
+    if: needs.check-updates.outputs.BUILD_YOUTUBE == '1'
+    uses: ./.github/workflows/build-youtube.yml
     secrets: inherit
 
   # ===========================================
-  # Step 5: Post-build cleanup
+  # Step 5: Create unified release
   # ===========================================
-  post-build:
-    needs: [check-updates, build-instagram]
-    if: always() && needs.check-updates.outputs.SHOULD_BUILD == '1'
+  release:
+    needs: [check-updates, build-instagram, build-youtube]
+    if: always() && (needs.build-instagram.result == 'success' || needs.build-youtube.result == 'success')
     runs-on: ubuntu-latest
-    permissions: write-all
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install deps
+        run: sudo apt-get install -y jq
+
+      - name: Download Instagram artifacts
+        if: needs.build-instagram.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: instagram-mod-apk
+          path: release-assets/
+
+      - name: Download YouTube artifacts
+        if: needs.build-youtube.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: youtube-mod-apk
+          path: release-assets/
+
+      - name: Download Music artifacts
+        if: needs.build-youtube.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: music-mod-apk
+          path: release-assets/
+
+      - name: Fetch previous release assets for unchanged apps
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p release-assets
+
+          # If Instagram wasn't rebuilt, fetch from previous release
+          if [ "${{ needs.build-instagram.result }}" != "success" ]; then
+            echo "📸 Instagram not rebuilt — fetching previous APK..."
+            PREV_URL=$(curl -sL "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/latest" | \
+              jq -r '.assets[] | select(.name | test("instagram")) | .url' | head -1 || true)
+            if [ -n "$PREV_URL" ]; then
+              curl -sL -H "Accept: application/octet-stream" -H "Authorization: Bearer $GITHUB_TOKEN" \
+                -o "release-assets/instagram-previous.apk" "$PREV_URL" 2>/dev/null
+              echo "✅ Fetched previous Instagram APK"
+            else
+              echo "⚠️  No previous Instagram APK found"
+            fi
+          fi
+
+          # If YouTube wasn't rebuilt, fetch from previous release
+          if [ "${{ needs.build-youtube.result }}" != "success" ]; then
+            echo "📺 YouTube not rebuilt — fetching previous APKs..."
+            for pattern in "youtube" "music"; do
+              PREV_URL=$(curl -sL "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/latest" | \
+                jq -r ".assets[] | select(.name | test(\"$pattern\")) | .url" | head -1 || true)
+              if [ -n "$PREV_URL" ]; then
+                curl -sL -H "Accept: application/octet-stream" -H "Authorization: Bearer $GITHUB_TOKEN" \
+                  -o "release-assets/${pattern}-previous.apk" "$PREV_URL" 2>/dev/null
+                echo "✅ Fetched previous $pattern APK"
+              fi
+            done
+          fi
+
+          echo "=== Release assets ==="
+          ls -la release-assets/ 2>/dev/null || echo "No assets!"
+
+      - name: Generate tag & release notes
+        id: release-meta
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DATE_TAG="v$(date +'%Y.%m.%d')"
+          echo "tag=$DATE_TAG" >> $GITHUB_OUTPUT
+
+          {
+            echo "## 📦 Mod Builds — $(date +'%d/%m/%Y')"
+            echo ""
+
+            # Instagram section
+            if [ "${{ needs.build-instagram.result }}" = "success" ]; then
+              echo "### 📸 Instagram Mod — 🔨 REBUILT"
+              echo "- Piko patches: ${{ needs.check-updates.outputs.PIKO_VERSION }}"
+              echo "- Base: ${{ needs.check-updates.outputs.IG_VERSION || 'unchanged' }}"
+            else
+              echo "### 📸 Instagram Mod — ⏭️ Unchanged"
+              echo "- Carried from previous release"
+            fi
+            echo ""
+            echo "Features: AMOLED, Download media, Privacy, 257 flags, JSON override, OTA, PT-BR"
+            echo ""
+
+            # YouTube section
+            if [ "${{ needs.build-youtube.result }}" = "success" ]; then
+              echo "### 📺 YouTube + 🎵 Music Mod — 🔨 REBUILT"
+              echo "- Morphe patches: ${{ needs.check-updates.outputs.MORPHE_VERSION }}"
+              echo "- Base: ${{ needs.check-updates.outputs.YT_VERSION || 'unchanged' }}"
+            else
+              echo "### 📺 YouTube + 🎵 Music Mod — ⏭️ Unchanged"
+              echo "- Carried from previous release"
+            fi
+            echo ""
+            echo "Features: AMOLED theme, SponsorBlock removed, clean player"
+            echo ""
+            echo "---"
+            echo ""
+            echo "### 🔧 Smart CI"
+            echo "- Only apps with upstream changes are rebuilt"
+            echo "- Previous APKs are carried forward for unchanged apps"
+            echo "- Triggered daily at 13:00 BRT or manually"
+
+          } > release-notes.md
+
+          echo "=== Release notes ==="
+          cat release-notes.md
+
+      - name: Delete previous latest release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.release-meta.outputs.tag }}"
+          # Delete old release with same tag if exists
+          OLD_ID=$(curl -sL "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$TAG" | jq -r '.id // empty' 2>/dev/null || true)
+          if [ -n "$OLD_ID" ]; then
+            echo "Deleting old release $OLD_ID for tag $TAG"
+            curl -s -X DELETE -H "Authorization: token $GITHUB_TOKEN" \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/$OLD_ID" || true
+            curl -s -X DELETE -H "Authorization: token $GITHUB_TOKEN" \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/git/refs/tags/$TAG" || true
+          fi
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release-meta.outputs.tag }}
+          name: "📦 Mod Builds ${{ steps.release-meta.outputs.tag }}"
+          body_path: release-notes.md
+          files: release-assets/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ===========================================
+  # Step 6: Update build metadata
+  # ===========================================
+  update-meta:
+    needs: [check-updates, release]
+    if: always() && needs.release.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout update branch
         uses: actions/checkout@v6
@@ -217,37 +391,55 @@ jobs:
           ref: update
           fetch-depth: 0
 
-      - name: Download build log
-        uses: actions/download-artifact@v4
-        with:
-          name: build-log
-          path: build-meta/
-
-      - name: Update build.md
+      - name: Update version tracking files
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          if [ -f build-meta/build.md ]; then
-            cp build-meta/build.md build.md
-            git add build.md
-            git diff --cached --quiet || git commit -m "chore: update build.md [skip ci]"
-            git push
+          mkdir -p build-meta
+
+          # Update Instagram version if it was built
+          if [ "${{ needs.check-updates.outputs.BUILD_INSTAGRAM }}" = "1" ] && [ -n "${{ needs.check-updates.outputs.PIKO_VERSION }}" ]; then
+            echo "${{ needs.check-updates.outputs.PIKO_VERSION }}" > build-meta/instagram-version.txt
+          fi
+          if [ -n "${{ needs.check-updates.outputs.IG_VERSION }}" ]; then
+            echo "${{ needs.check-updates.outputs.IG_VERSION }}" > build-meta/ig-base-version.txt
           fi
 
-      - name: Clean old workflow runs
+          # Update YouTube version if it was built
+          if [ "${{ needs.check-updates.outputs.BUILD_YOUTUBE }}" = "1" ] && [ -n "${{ needs.check-updates.outputs.MORPHE_VERSION }}" ]; then
+            echo "${{ needs.check-updates.outputs.MORPHE_VERSION }}" > build-meta/morphe-version.txt
+          fi
+          if [ -n "${{ needs.check-updates.outputs.YT_VERSION }}" ]; then
+            echo "${{ needs.check-updates.outputs.YT_VERSION }}" > build-meta/yt-base-version.txt
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || git commit -m "chore: update build metadata [skip ci]"
+          git push
+
+  # ===========================================
+  # Step 7: Cleanup old workflow runs
+  # ===========================================
+  cleanup:
+    needs: release
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Clean old runs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Keep only last 5 runs per workflow
           for wf_id in $(curl -s -H "Authorization: token $GH_TOKEN" \
             "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows" | \
             jq -r '.workflows[].id'); do
             runs=$(curl -s -H "Authorization: token $GH_TOKEN" \
               "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/$wf_id/runs?per_page=100" | \
-              jq -r '[.workflow_runs[] | select(.conclusion != "in_progress")] | sort_by(.created_at) | reverse | .[5:] | .[].id')
+              jq -r '[.workflow_runs[] | select(.conclusion != "in_progress")] | sort_by(.created_at) | reverse | .[3:] | .[].id')
             for run_id in $runs; do
               curl -s -X DELETE -H "Authorization: token $GH_TOKEN" \
                 "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$run_id" || true
             done
           done
-          echo "Old runs cleaned"
+          echo "Cleanup done"

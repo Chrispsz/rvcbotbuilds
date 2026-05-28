@@ -1,0 +1,82 @@
+name: 📺 Build YouTube + Music Mod
+
+on:
+  workflow_call:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Restore keystores
+        run: |
+          echo "${{ secrets.KS_KEYSTORE_B64 }}" | base64 -d > ks.keystore
+          echo "${{ secrets.KS_P12_KEYSTORE_B64 }}" | base64 -d > ks-p12.keystore
+          chmod 644 ks.keystore ks-p12.keystore
+
+      - name: Cache prebuilts
+        uses: actions/cache@v4
+        with:
+          path: temp/morpheapp-rv
+          key: morphe-prebuilts-v1-${{ github.run_id }}
+          restore-keys: morphe-prebuilts-v1-
+
+      - name: Install deps
+        run: sudo apt-get install -y jq zip python3
+
+      - name: Prepare YouTube+Music only config
+        run: |
+          set_app_enabled() {
+            local section="$1" state="$2"
+            awk -v sec="[$section]" -v val="enabled = $state" '
+              $0 == sec { in_sec=1; print; next }
+              in_sec && /^enabled = / { print val; in_sec=0; next }
+              in_sec && /^\[/ { in_sec=0 }
+              { print }
+            ' config.toml > config.toml.tmp && mv config.toml.tmp config.toml
+          }
+          set_app_enabled "Instagram-Piko" false
+          echo "=== Active config ==="
+          grep -E '^\[.*\]|^enabled' config.toml
+
+      - name: Build YouTube + Music
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          chmod +x build.sh utils.sh
+          bash build.sh config.toml 2>&1 | tee build.log
+
+      - name: Upload YouTube APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: youtube-mod-apk
+          path: build/youtube-*.apk
+          retention-days: 5
+          if-no-files-found: warn
+
+      - name: Upload Music APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: music-mod-apk
+          path: build/music-*.apk
+          retention-days: 5
+          if-no-files-found: warn
+
+      - name: Cleanup
+        if: always()
+        run: rm -f ks.keystore ks-p12.keystore
