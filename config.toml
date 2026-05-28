@@ -93,7 +93,6 @@ included-patches = """\
   'Disable ads' \
   'Disable screenshot detection' \
   'Disable typing status' \
-  'Download media' \
   'Follow back indicator' \
   'Hide navigation buttons' \
   'Hide stories tray' \
@@ -102,20 +101,26 @@ included-patches = """\
   'Limit feed to following profiles' \
   'Make ephemeral media permanent' \
   'More options on post' \
-  'More options on profile' \
   'Open links externally' \
   'Remove build expired popup' \
-  'Sanitize share links' \
   'Unlock developer options' \
   'View DMs anonymously' \
   'View live anonymously' \
   'View stories anonymously' \
-  'View story mentions' \
   """
 excluded-patches = """\
   'Unlock employee options' \
   'Unlock Plus benefits' \
+  'Download media' \
+  'More options on profile' \
+  'Sanitize share links' \
+  'View story mentions' \
   """
+# NOTE: 4 patches moved to excluded (broken on Instagram v432+):
+#   Download media — IndexOutOfBoundsException in MediaDataEntity
+#   More options on profile — NoSuchElementException in UserDataEntity
+#   Sanitize share links — NullPointerException in PermalinkResponseJsonParser
+#   View story mentions — depends on failed UserDataEntity (same as More options on profile)
 # Custom Smali patches applied AFTER ReVanced CLI:
 #   📸 Allow Screenshots in DMs — removes FLAG_SECURE from Window.setFlags
 #   🔍 MobileConfig Quality Override — medium→high, standard→hd

@@ -16,15 +16,31 @@ set -euo pipefail
 PATCHED_APK="$1"
 PKG_NAME="$2"
 
-# Self-contained logging (does NOT depend on utils.sh)
+# Self-contained variables (does NOT depend on utils.sh)
+CPT_CWD="$(cd "$(dirname "$0")/.." && pwd)"
+CPT_TEMP_DIR="${CPT_CWD}/temp"
+CPT_BIN_DIR="${CPT_CWD}/bin"
+CPT_APKSIGNER="${CPT_BIN_DIR}/apksigner.jar"
+CPT_APKEDITOR="${CPT_TEMP_DIR}/apkeditor.jar"
+
+# Self-contained logging
 cpr() { echo -e "\033[0;32m[+] ${1}\033[0m"; }
 cepr() { echo >&2 -e "\033[0;31m[-] ${1}\033[0m"; }
 cwpr() { echo >&2 -e "\033[0;33m[!] ${1}\033[0m"; }
 
-# Override pr/epr/wpr if not defined (when sourced from utils.sh)
+# Override pr/epr/wpr if not defined (when run from utils.sh context)
 if ! declare -f pr >/dev/null 2>&1; then pr() { cpr "$@"; }; fi
 if ! declare -f epr >/dev/null 2>&1; then epr() { cepr "$@"; }; fi
 if ! declare -f wpr >/dev/null 2>&1; then wpr() { cwpr "$@"; }; fi
+
+# Download apkeditor if not present
+ensure_apkeditor() {
+        if [ ! -f "$CPT_APKEDITOR" ]; then
+                pr "Custom patches: Downloading APKEditor..."
+                mkdir -p "$CPT_TEMP_DIR"
+                curl -sL "https://github.com/REAndroid/APKEditor/releases/download/V1.4.7/APKEditor-1.4.7.jar" -o "$CPT_APKEDITOR"
+        fi
+}
 
 # ============================================
 # Instagram Custom Patches
@@ -33,8 +49,10 @@ apply_instagram_patches() {
         local apk="$1"
         local dir="${apk%.apk}-custom-patch"
 
+        ensure_apkeditor
+
         pr "Custom patches: Decompiling Instagram for Smali modification..."
-        if ! java -jar "$TEMP_DIR/apkeditor.jar" d -i "$apk" -o "$dir" -f 2>&1; then
+        if ! java -jar "$CPT_APKEDITOR" d -i "$apk" -o "$dir" -f 2>&1; then
                 epr "Custom patches: Failed to decompile APK"
                 rm -rf "$dir" 2>/dev/null || :
                 return 1
@@ -43,19 +61,13 @@ apply_instagram_patches() {
         local patched=0
 
         # ---- Patch 1: Allow Screenshots in DMs ----
-        # From InstaEclipse: removes FLAG_SECURE (0x2000) from Window.setFlags()
+        # Removes FLAG_SECURE (0x2000) from Window.setFlags()
         # This allows taking screenshots in DM conversations that normally block them.
-        #
-        # Technical: Instagram sets Window.FLAG_SECURE on DM activities to prevent
-        # screenshots and screen recording. We find all invocations of
-        # Landroid/view/Window;->setFlags(II)V where the argument includes 0x2000
-        # and replace it with 0x0, effectively clearing the flag.
         pr "Custom patches: [1/2] Allow Screenshots in DMs (FLAG_SECURE removal)..."
         patched+=$(patch_flag_secure "$dir")
 
         # ---- Patch 2: MobileConfig Quality Override ----
-        # Forces high quality media loading by modifying default config values
-        # in the Instagram MobileConfig fallback/defaults.
+        # Forces high quality media loading by modifying default config values.
         # This complements "Improve image viewing" (2048px CDN) by also
         # affecting video bitrate and upload quality defaults.
         pr "Custom patches: [2/2] MobileConfig quality defaults..."
@@ -64,7 +76,7 @@ apply_instagram_patches() {
         # ---- Recompile ----
         pr "Custom patches: Recompiling APK..."
         local output="${apk%.apk}-custom.apk"
-        if ! java -jar "$TEMP_DIR/apkeditor.jar" b -i "$dir" -o "$output" -f 2>&1; then
+        if ! java -jar "$CPT_APKEDITOR" b -i "$dir" -o "$output" -f 2>&1; then
                 epr "Custom patches: Failed to recompile APK"
                 rm -rf "$dir" 2>/dev/null || :
                 return 1
@@ -72,8 +84,8 @@ apply_instagram_patches() {
 
         # ---- Re-sign ----
         pr "Custom patches: Re-signing APK..."
-        if ! java -jar "$APKSIGNER" sign \
-                --ks ks-p12.keystore \
+        if ! java -jar "$CPT_APKSIGNER" sign \
+                --ks "${CPT_CWD}/ks-p12.keystore" \
                 --ks-pass pass:123456789 \
                 --key-pass pass:123456789 \
                 --ks-key-alias jhc \
@@ -92,20 +104,6 @@ apply_instagram_patches() {
 # ============================================
 # FLAG_SECURE Removal
 # ============================================
-# InstaEclipse equivalent: AllowScreenshotsInDMs
-#
-# Instagram calls Window.setFlags(FLAG_SECURE, FLAG_SECURE) on DM activities.
-# FLAG_SECURE = 0x00002000 = 8192
-#
-# In Smali, this looks like:
-#   const/16 vN, 0x2000
-#   ...
-#   invoke-virtual {vX, vN, vN}, Landroid/view/Window;->setFlags(II)V
-#
-# We find all such patterns and replace 0x2000 with 0x0.
-# This is the exact same approach InstaEclipse uses via Xposed hooks,
-# but applied at the bytecode level instead of runtime.
-# ============================================
 patch_flag_secure() {
         local dir="$1"
         local count=0
@@ -116,32 +114,12 @@ patch_flag_secure() {
                 if grep -q "Landroid/view/Window;->setFlags" "$smali_file" 2>/dev/null && \
                    grep -q "0x2000" "$smali_file" 2>/dev/null; then
 
-                        # Replace const/16 vX, 0x2000 with const/16 vX, 0x0
-                        # This covers the most common pattern where FLAG_SECURE is loaded
-                        # via const/16 (which is used for values 0x100-0xFFFF)
-                        #
-                        # Pattern: const/16 <any_register>, 0x2000
-                        #   where 0x2000 is in the context of Window.setFlags
-                        if sed -i \
-                                '/Landroid\/view\/Window;->setFlags/{
-                                        # Look backwards up to 10 lines for the const/16 0x2000
-                                        s/\(const\/16\s\+v[0-9]*,\s\+\)0x2000/\1 0x0/g
-                                }' "$smali_file" 2>/dev/null; then
-                                :
-                        fi
-
-                        # Also handle the general case: any const loading 0x2000 near setFlags
-                        # Use a broader approach: in files that contain both patterns,
-                        # replace ALL const loads of 0x2000 with 0x0
+                        # Replace ALL const loads of 0x2000 with 0x0
+                        # ONLY in files that also reference Window.setFlags
                         # This is safe because FLAG_SECURE is the ONLY common use of 0x2000
-                        if grep -q "0x2000" "$smali_file" 2>/dev/null; then
-                                # More targeted: replace const/16 and const that load 0x2000
-                                # ONLY in files that also reference Window.setFlags
-                                sed -i 's/\(const\/16\s\+v[0-9]*,\s\+\)0x2000/\10x0/g' "$smali_file" 2>/dev/null || :
-                                # Also handle const (without /16) just in case
-                                sed -i 's/\(const\s\+v[0-9]*,\s\+\)0x2000/\10x0/g' "$smali_file" 2>/dev/null || :
-                                count=$((count + 1))
-                        fi
+                        sed -i 's/\(const\/16\s\+v[0-9]*,\s\+\)0x2000/\10x0/g' "$smali_file" 2>/dev/null || :
+                        sed -i 's/\(const\s\+v[0-9]*,\s\+\)0x2000/\10x0/g' "$smali_file" 2>/dev/null || :
+                        count=$((count + 1))
                 fi
         done < <(find "$dir" -name "*.smali" -print0)
 
@@ -152,16 +130,6 @@ patch_flag_secure() {
 # ============================================
 # MobileConfig Quality Override
 # ============================================
-# Complements "Improve image viewing" by patching default quality
-# values in Instagram's MobileConfig fallback system.
-#
-# When the app can't reach the server for config, it uses hardcoded
-# defaults. We patch these defaults to favor higher quality:
-#   - Media quality: "high" instead of "medium"
-#   - Video bitrate: increased default
-#   - Upload quality: "hd" instead of "standard"
-#   - Cache size: larger for better prefetching
-# ============================================
 patch_mobileconfig_quality() {
         local dir="$1"
         local count=0
@@ -169,13 +137,10 @@ patch_mobileconfig_quality() {
         # Find strings.xml files and patch quality defaults
         while IFS= read -r -d '' res_file; do
                 if grep -q '"medium"' "$res_file" 2>/dev/null; then
-                        # Replace media quality defaults from medium to high
-                        # Only in config-related string resources
                         sed -i 's/"medium"/"high"/g' "$res_file" 2>/dev/null || :
                         count=$((count + 1))
                 fi
                 if grep -q '"standard"' "$res_file" 2>/dev/null; then
-                        # Replace upload quality from standard to hd
                         sed -i 's/"standard"/"hd"/g' "$res_file" 2>/dev/null || :
                         count=$((count + 1))
                 fi
@@ -183,7 +148,6 @@ patch_mobileconfig_quality() {
 
         # Patch smali quality constants
         while IFS= read -r -d '' smali_file; do
-                # Look for quality-related string constants in Instagram's config classes
                 if grep -q '"medium"' "$smali_file" 2>/dev/null; then
                         sed -i 's/"medium"/"high"/g' "$smali_file" 2>/dev/null || :
                         count=$((count + 1))
