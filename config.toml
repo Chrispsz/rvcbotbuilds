@@ -53,39 +53,40 @@ uptodown-dlurl = "https://youtube-music.en.uptodown.com/android"
 apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"
 
 # ============================================
-# Instagram Piko - APK (arm64-v8a)
-# crimera/piko v3.5.0-dev.2: 18 patches (safe)
+# Instagram Piko — Module (arm64-v8a)
+# crimera/piko v3.5.0-dev.2: 19 patches
 #
 # Base: 430.0.0.53.80 (piko officially supported version)
-# Patches: dev channel (v3.5.0-dev.2)
 #
-# 🖤 AMOLED theme (pure black)
-# 📥 Download: posts, reels, stories, highlights, profile pics, audio, voice messages, video variants
-# 🚫 Ads: remove all ads + suggested content
-# 📸 Screenshots: screenshot detection disabled
-# 👥 Follow back: see who follows you back
-# 🔒 Ephemeral media: view-once messages stay permanent
-# 🔧 Settings: Piko Settings hub + Developer options
-# 🛡️ Privacy: analytics off, typing hidden, links sanitized
-# 🧹 Clean: build popup removed
+# Module features (like YouTube ReVanced module):
+#   📦 APK bind mount — patched APK replaces stock at runtime
+#   🔄 OTA updates — Magisk checks updateJson for module updates
+#   ⚙️ MetaConfig inject — mc_overrides.json (257 curated flags) copied to
+#      /data/data/com.instagram.instagram/files/mobileconfig/ on every boot
+#      → Quality max, anti-ads, privacy, developer mode, feature unlocks
+#      → Curated from 960: removed 703 trivial/low-impact flags
+#      → 148 documented flags (quality/privacy/ads/dev/media) ALL preserved
+#      → Dangerous Stories flags (59117, 92643, 69238) excluded
+#      → Survives app updates (re-injected each boot by service.sh)
+#      → OTA: checks GitHub for updated mc_overrides.json on boot
+#
+#   No detach needed — patched Instagram APK isn't recognized by Play Store
+#
+# Patches included:
+#   🖤 AMOLED theme · 📥 Download media · 🚫 Disable ads
+#   📸 Screenshot detection off · 👥 Follow back indicator
+#   🔒 Disable typing status · 📥 Download voice message
+#   🔗 Open links externally · 🧹 Remove build popup
+#   🛡️ Disable analytics · 🔧 Add settings + Developer options
+#   📋 Copy comment · ✂️ Sanitize share links · 👁 Improve image viewing
+#   📎 More options on post/profile · 📰 Hide suggested content
 #
 # EXCLUDED (stories crash — piko bug #914/#969):
-#   View story mentions — depends on handleStoryButtonPatch which modifies ReelItem
-#     → causes VerifyError in com.instagram.model.reels.ReelItem.A0c()
-#     → stories open and close immediately
-#   Hide stories tray — modifies MainFeedStoryTrayBinderGroup, can break story viewer
-#   Make ephemeral media permanent — modifies ephemeral media parser, risky with stories
-#
+#   View story mentions · Hide stories tray · Make ephemeral media permanent
 # EXCLUDED (risky/detectable):
-#   View DMs anonymously — Ghost mode in DMs (Instagram can detect, ban risk)
-#   View live anonymously — Same detection risk
-#   View stories anonymously — High detection risk, Meta monitors
-#   Limit feed to following profiles — Breaks feed algorithm
-#
+#   View DMs/live/stories anonymously · Limit feed to following
 # EXCLUDED (dangerous):
-#   Unlock employee options — Exposes internal Meta tools
-#   Unlock Plus benefits — TOS violation, detectable
-#   Hide navigation buttons — Can break UI, confusing UX
+#   Unlock employee options · Unlock Plus benefits · Hide navigation buttons
 # ============================================
 [Instagram-Piko]
 app-name = "Instagram"
