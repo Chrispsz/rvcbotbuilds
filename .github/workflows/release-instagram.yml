@@ -111,8 +111,14 @@ jobs:
           else
             APK=$(ls build/instagram-*.apk 2>/dev/null | head -1)
             if [ -n "$APK" ]; then
-              VER=$(basename "$APK" | grep -oP 'v[\d.]+')
-              TAG="instagram-${VER}-piko"
+              # Extract version: filename is instagram-morphe-v430.0.0.53.80-arm64-v8a.apk
+              # Match the version between -v and -arm64 (or -arm)
+              VER=$(basename "$APK" | sed -n 's/.*-v\([0-9][0-9.]*\)-arm.*/\1/p')
+              if [ -n "$VER" ]; then
+                TAG="v${VER}-piko3.5.0-dev.2"
+              else
+                TAG="instagram-$(date +'%Y%m%d-%H%M')"
+              fi
             else
               TAG="instagram-$(date +'%Y%m%d-%H%M')"
             fi
@@ -121,10 +127,23 @@ jobs:
           echo "Release tag: $TAG"
 
           # Extract included patches dynamically from config.toml
-          INCLUDED_PATCHES=$(awk "/^\\[Instagram-Piko\\]/,/\\[/{if(/included-patches/) {sub(/.*included-patches *= */,\"\"); gsub(/'\"'\"'/,\"'\"); print; exit}}" config.toml | tr "'" '\n' | sed '/^$/d' | grep -v '\\\\')
+          # Use the multiline string between triple-quotes, split by single-quote delimiters
+          INCLUDED_PATCHES=$(awk '
+            /^\[Instagram-Piko\]/{found=1}
+            found && /^included-patches/{capturing=1; next}
+            capturing && /"""/{capturing=0; next}
+            capturing && /\\$/{gsub(/'\''/, "", $0); gsub(/\\/, "", $0); gsub(/^ +| +$/, "", $0); if($0!="") print; next}
+            capturing{gsub(/'\''/, "", $0); gsub(/\\/, "", $0); gsub(/^ +| +$/, "", $0); if($0!="") print}
+          ' config.toml)
 
           # Extract excluded patches dynamically from config.toml
-          EXCLUDED_PATCHES=$(awk "/^\\[Instagram-Piko\\]/,/\\[/{if(/excluded-patches/) {sub(/.*excluded-patches *= */,\"\"); gsub(/'\"'\"'/,\"'\"); print; exit}}" config.toml | tr "'" '\n' | sed '/^$/d' | grep -v '\\\\')
+          EXCLUDED_PATCHES=$(awk '
+            /^\[Instagram-Piko\]/{found=1}
+            found && /^excluded-patches/{capturing=1; next}
+            capturing && /"""/{capturing=0; next}
+            capturing && /\\$/{gsub(/'\''/, "", $0); gsub(/\\/, "", $0); gsub(/^ +| +$/, "", $0); if($0!="") print; next}
+            capturing{gsub(/'\''/, "", $0); gsub(/\\/, "", $0); gsub(/^ +| +$/, "", $0); if($0!="") print}
+          ' config.toml)
 
           PATCH_COUNT=$(echo "$INCLUDED_PATCHES" | wc -l)
 
