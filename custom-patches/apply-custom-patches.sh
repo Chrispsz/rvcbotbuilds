@@ -45,6 +45,8 @@ if ! declare -f wpr >/dev/null 2>&1; then wpr() { cwpr "$@"; }; fi
 # ============================================
 apply_instagram_patches() {
         local apk="$1"
+        # Resolve to absolute path — critical for zip update after cd
+        apk="$(cd "$(dirname "$apk")" && pwd)/$(basename "$apk")"
         local tmp_extract="${apk%.apk}-binpatch"
         mkdir -p "$tmp_extract"
 
@@ -79,8 +81,12 @@ apply_instagram_patches() {
                 patched=$((patched + quality_result))
 
                 # Update the dex in the APK if any patches applied
+                # Use absolute paths and cd into extract dir so zip stores
+                # the dex with the correct relative path inside the APK
                 if [ "$flag_secure_result" -gt 0 ] || [ "$quality_result" -gt 0 ]; then
-                        cd "$tmp_extract" && zip -0 "$apk" "$dex" && cd - >/dev/null
+                        (cd "$tmp_extract" && zip -0 "$apk" "$dex") || {
+                                epr "Custom patches: Failed to update $dex in APK"
+                        }
                 fi
         done
 
