@@ -12,7 +12,7 @@ continue-on-error = true
 default-arch = "arm64-v8a"
 
 # ============================================
-# YouTube Morphe — APK + Module
+# YouTube Morphe — APK + Magisk Module
 # ============================================
 [YouTube-Morphe]
 enabled = true
@@ -30,7 +30,7 @@ uptodown-dlurl = "https://youtube.en.uptodown.com/android"
 apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"
 
 # ============================================
-# Music Morphe — APK + Module
+# Music Morphe — APK only
 # ============================================
 [Music-Morphe]
 enabled = true
@@ -39,7 +39,7 @@ patches-source = "MorpheApp/morphe-patches"
 patches-version = "latest"
 cli-source = "MorpheApp/morphe-cli"
 rv-brand = "Morphe"
-build-mode = "both"
+build-mode = "apk"
 arch = "arm64-v8a"
 included-patches = "'Theme'"
 excluded-patches = "'Custom branding' 'Enable debug logging' 'SponsorBlock'"
@@ -67,7 +67,7 @@ patches-source = "Chrispsz/piko"
 patches-version = "dev"
 cli-source = "MorpheApp/morphe-cli"
 rv-brand = "Morphe"
-build-mode = "both"
+build-mode = "apk"
 version = "430.0.0.53.80"
 exclusive-patches = true
 patcher-args = "--continue-on-error"

@@ -61,11 +61,28 @@ jobs:
           chmod +x build.sh utils.sh
           bash build.sh config.toml 2>&1 | tee build.log
 
+      - name: List build outputs
+        if: always()
+        run: |
+          echo "=== APKs ==="
+          ls -la build/*.apk 2>/dev/null || echo "No APKs"
+          echo ""
+          echo "=== Magisk Modules ==="
+          ls -la build/*.zip 2>/dev/null || echo "No modules"
+
       - name: Upload YouTube APK
         uses: actions/upload-artifact@v7
         with:
           name: youtube-mod-apk
           path: build/youtube-*.apk
+          retention-days: 5
+          if-no-files-found: warn
+
+      - name: Upload YouTube Magisk Module
+        uses: actions/upload-artifact@v7
+        with:
+          name: youtube-magisk-module
+          path: build/youtube-*.zip
           retention-days: 5
           if-no-files-found: warn
 

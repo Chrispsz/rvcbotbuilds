@@ -67,7 +67,6 @@ jobs:
           PIKO_VERSION=$(curl -sL "https://api.github.com/repos/crimera/piko/releases?per_page=1" | jq -r '.[0].tag_name // empty' 2>/dev/null || echo "")
           echo "Latest piko: $PIKO_VERSION"
 
-          # Get last built version from update branch
           LAST_PIKO=""
           if git fetch origin update --depth=1 2>/dev/null; then
             LAST_PIKO=$(git show origin/update:build-meta/instagram-version.txt 2>/dev/null || echo "")
@@ -243,68 +242,95 @@ jobs:
       - name: Install deps
         run: sudo apt-get install -y jq
 
-      - name: Download Instagram artifacts
+      # --- Download freshly built artifacts ---
+
+      - name: Download Instagram APK
         if: needs.build-instagram.result == 'success'
         uses: actions/download-artifact@v4
         with:
           name: instagram-mod-apk
           path: release-assets/
 
-      - name: Download YouTube artifacts
+      - name: Download YouTube APK
         if: needs.build-youtube.result == 'success'
         uses: actions/download-artifact@v4
         with:
           name: youtube-mod-apk
           path: release-assets/
 
-      - name: Download Music artifacts
+      - name: Download YouTube Magisk Module
+        if: needs.build-youtube.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: youtube-magisk-module
+          path: release-assets/
+
+      - name: Download Music APK
         if: needs.build-youtube.result == 'success'
         uses: actions/download-artifact@v4
         with:
           name: music-mod-apk
           path: release-assets/
 
-      - name: Fetch previous release assets for unchanged apps
+      # --- Fetch previous release assets for unchanged apps ---
+
+      - name: Carry forward unchanged assets
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p release-assets
 
-          # If Instagram wasn't rebuilt, fetch from previous release
+          # Get previous release assets list
+          PREV_RELEASE=$(curl -sL "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/latest" 2>/dev/null || echo "")
+
+          # If Instagram wasn't rebuilt, carry forward
           if [ "${{ needs.build-instagram.result }}" != "success" ]; then
             echo "📸 Instagram not rebuilt — fetching previous APK..."
-            PREV_URL=$(curl -sL "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/latest" | \
-              jq -r '.assets[] | select(.name | test("instagram")) | .url' | head -1 || true)
+            PREV_URL=$(echo "$PREV_RELEASE" | jq -r '.assets[] | select(.name | test("instagram.*\\.apk")) | .url' | head -1 || true)
             if [ -n "$PREV_URL" ]; then
               curl -sL -H "Accept: application/octet-stream" -H "Authorization: Bearer $GITHUB_TOKEN" \
-                -o "release-assets/instagram-previous.apk" "$PREV_URL" 2>/dev/null
+                -o "release-assets/instagram-carried.apk" "$PREV_URL" 2>/dev/null
               echo "✅ Fetched previous Instagram APK"
             else
               echo "⚠️  No previous Instagram APK found"
             fi
           fi
 
-          # If YouTube wasn't rebuilt, fetch from previous release
+          # If YouTube wasn't rebuilt, carry forward APK + Magisk module
           if [ "${{ needs.build-youtube.result }}" != "success" ]; then
-            echo "📺 YouTube not rebuilt — fetching previous APKs..."
-            for pattern in "youtube" "music"; do
-              PREV_URL=$(curl -sL "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/latest" | \
-                jq -r ".assets[] | select(.name | test(\"$pattern\")) | .url" | head -1 || true)
-              if [ -n "$PREV_URL" ]; then
-                curl -sL -H "Accept: application/octet-stream" -H "Authorization: Bearer $GITHUB_TOKEN" \
-                  -o "release-assets/${pattern}-previous.apk" "$PREV_URL" 2>/dev/null
-                echo "✅ Fetched previous $pattern APK"
-              fi
-            done
+            echo "📺 YouTube not rebuilt — fetching previous assets..."
+
+            # YouTube APK
+            PREV_URL=$(echo "$PREV_RELEASE" | jq -r '.assets[] | select(.name | test("youtube.*\\.apk")) | .url' | head -1 || true)
+            if [ -n "$PREV_URL" ]; then
+              curl -sL -H "Accept: application/octet-stream" -H "Authorization: Bearer $GITHUB_TOKEN" \
+                -o "release-assets/youtube-carried.apk" "$PREV_URL" 2>/dev/null
+              echo "✅ Fetched previous YouTube APK"
+            fi
+
+            # YouTube Magisk Module
+            PREV_URL=$(echo "$PREV_RELEASE" | jq -r '.assets[] | select(.name | test("youtube.*\\.zip")) | .url' | head -1 || true)
+            if [ -n "$PREV_URL" ]; then
+              curl -sL -H "Accept: application/octet-stream" -H "Authorization: Bearer $GITHUB_TOKEN" \
+                -o "release-assets/youtube-magisk-carried.zip" "$PREV_URL" 2>/dev/null
+              echo "✅ Fetched previous YouTube Magisk Module"
+            fi
+
+            # Music APK
+            PREV_URL=$(echo "$PREV_RELEASE" | jq -r '.assets[] | select(.name | test("music.*\\.apk")) | .url' | head -1 || true)
+            if [ -n "$PREV_URL" ]; then
+              curl -sL -H "Accept: application/octet-stream" -H "Authorization: Bearer $GITHUB_TOKEN" \
+                -o "release-assets/music-carried.apk" "$PREV_URL" 2>/dev/null
+              echo "✅ Fetched previous Music APK"
+            fi
           fi
 
+          echo ""
           echo "=== Release assets ==="
           ls -la release-assets/ 2>/dev/null || echo "No assets!"
 
       - name: Generate tag & release notes
         id: release-meta
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           DATE_TAG="v$(date +'%Y.%m.%d')"
           echo "tag=$DATE_TAG" >> $GITHUB_OUTPUT
@@ -328,21 +354,34 @@ jobs:
 
             # YouTube section
             if [ "${{ needs.build-youtube.result }}" = "success" ]; then
-              echo "### 📺 YouTube + 🎵 Music Mod — 🔨 REBUILT"
+              echo "### 📺 YouTube Mod — 🔨 REBUILT"
               echo "- Morphe patches: ${{ needs.check-updates.outputs.MORPHE_VERSION }}"
               echo "- Base: ${{ needs.check-updates.outputs.YT_VERSION || 'unchanged' }}"
+              echo "- Includes: **APK + Magisk Module**"
             else
-              echo "### 📺 YouTube + 🎵 Music Mod — ⏭️ Unchanged"
-              echo "- Carried from previous release"
+              echo "### 📺 YouTube Mod — ⏭️ Unchanged"
+              echo "- Carried from previous release (APK + Magisk Module)"
             fi
             echo ""
             echo "Features: AMOLED theme, SponsorBlock removed, clean player"
+            echo ""
+
+            # Music section
+            if [ "${{ needs.build-youtube.result }}" = "success" ]; then
+              echo "### 🎵 Music Mod — 🔨 REBUILT"
+            else
+              echo "### 🎵 Music Mod — ⏭️ Unchanged"
+              echo "- Carried from previous release"
+            fi
+            echo ""
+            echo "Features: AMOLED theme, clean player"
             echo ""
             echo "---"
             echo ""
             echo "### 🔧 Smart CI"
             echo "- Only apps with upstream changes are rebuilt"
-            echo "- Previous APKs are carried forward for unchanged apps"
+            echo "- Previous assets are carried forward for unchanged apps"
+            echo "- YouTube Magisk module included in every release"
             echo "- Triggered daily at 13:00 BRT or manually"
 
           } > release-notes.md
@@ -355,7 +394,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ steps.release-meta.outputs.tag }}"
-          # Delete old release with same tag if exists
           OLD_ID=$(curl -sL "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$TAG" | jq -r '.id // empty' 2>/dev/null || true)
           if [ -n "$OLD_ID" ]; then
             echo "Deleting old release $OLD_ID for tag $TAG"
@@ -371,7 +409,9 @@ jobs:
           tag_name: ${{ steps.release-meta.outputs.tag }}
           name: "📦 Mod Builds ${{ steps.release-meta.outputs.tag }}"
           body_path: release-notes.md
-          files: release-assets/*.apk
+          files: |
+            release-assets/*.apk
+            release-assets/*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -395,7 +435,6 @@ jobs:
         run: |
           mkdir -p build-meta
 
-          # Update Instagram version if it was built
           if [ "${{ needs.check-updates.outputs.BUILD_INSTAGRAM }}" = "1" ] && [ -n "${{ needs.check-updates.outputs.PIKO_VERSION }}" ]; then
             echo "${{ needs.check-updates.outputs.PIKO_VERSION }}" > build-meta/instagram-version.txt
           fi
@@ -403,7 +442,6 @@ jobs:
             echo "${{ needs.check-updates.outputs.IG_VERSION }}" > build-meta/ig-base-version.txt
           fi
 
-          # Update YouTube version if it was built
           if [ "${{ needs.check-updates.outputs.BUILD_YOUTUBE }}" = "1" ] && [ -n "${{ needs.check-updates.outputs.MORPHE_VERSION }}" ]; then
             echo "${{ needs.check-updates.outputs.MORPHE_VERSION }}" > build-meta/morphe-version.txt
           fi
