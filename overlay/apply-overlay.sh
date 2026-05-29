@@ -15,6 +15,7 @@ PIKO_DIR="${1:?Usage: $0 <piko-repo-dir>}"
 # Base paths in piko repo
 EXT_BASE="$PIKO_DIR/extensions/instagram/src/main/java/app/morphe/extension/instagram"
 PATCHES_DIR="$EXT_BASE/patches"
+ENTITY_DIR="$EXT_BASE/entity"
 TRANSLATIONS_DIR="$EXT_BASE/constants/translations"
 SETTINGS_DIR="$EXT_BASE/settings"
 SETTINGS_PREF_DIR="$SETTINGS_DIR/preference"
@@ -54,8 +55,13 @@ apply_file() {
 }
 
 echo "--- Core patches ---"
-apply_file "$OVERLAY_DIR/HookFlags.java"       "$PATCHES_DIR/HookFlags.java"        "HookFlags (257 flags + JSON override)"
+apply_file "$OVERLAY_DIR/HookFlags.java"       "$PATCHES_DIR/HookFlags.java"        "HookFlags (53 flags + JSON override)"
 apply_file "$OVERLAY_DIR/OtaUpdater.java"      "$PATCHES_DIR/OtaUpdater.java"       "OtaUpdater (in-app APK updater)"
+apply_file "$OVERLAY_DIR/WelcomeMessage.java"   "$PATCHES_DIR/WelcomeMessage.java"    "WelcomeMessage (disabled crash dialog)"
+
+echo ""
+echo "--- Entity fixes ---"
+apply_file "$OVERLAY_DIR/InstagramButton.java"  "$ENTITY_DIR/InstagramButton.java"    "InstagramButton (setText v430+ fix)"
 
 echo ""
 echo "--- Strings & Translations ---"
