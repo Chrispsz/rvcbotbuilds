@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2025 piko <https://github.com/crimera/piko>
+ * Copyright (C) 2026 piko <https://github.com/crimera/piko>
  *
  * See the included NOTICE file for GPLv3 §7(b) terms that apply to this code.
  */
@@ -9,7 +9,7 @@ package app.morphe.extension.instagram.constants.translations;
 
 public class StringsPolish extends DefaultStrings {
     public StringsPolish(){
-        this.PIKO_SETTINGS_TITLE = "Ustawienia Mod";
+        this.PIKO_SETTINGS_TITLE = "Ustawienia Piko";
 
         this.CATEGORY_ADS = "Reklamy";
         this.DISABLE_ADS = "Wyłącz reklamy";
@@ -43,6 +43,9 @@ public class StringsPolish extends DefaultStrings {
         this.DISABLE_TYPING_STATUS = "Wyłącz status pisania";
         this.DISABLE_SCREENSHOT_DETECTION = "Wyłącz wykrywanie zrzutów ekranu";
         this.VIEW_DM_ANONYMOUSLY = "Czytaj wiadomości anonimowo";
+        this.TURN_ON_ALL_GHOST_MODES = "Włącz wszystkie tryby ducha";
+        this.GHOST_MODES_ON = "Tryb ducha: WŁĄCZONY";
+        this.GHOST_MODES_DEFAULT = "Tryb ducha: DOMYŚLNY";
 
         this.CATEGORY_DISTRACTION_FREE = "Bez rozpraszaczy";
         this.DISABLE_STORIES = "Wyłącz relacje";
@@ -112,6 +115,7 @@ public class StringsPolish extends DefaultStrings {
         this.DOWNLOAD_USERNAME_FOLDER_DESC = "Tworzy osobne podfoldery dla każdego twórcy";
         this.DOWNLOAD_CURRENT_MEDIA = "Pobierz aktualny plik";
         this.DOWNLOAD_AS_IMAGE = "Pobierz jako obraz";
+        this.VIDEO_VARIANTS = "Warianty filmu";
         this.DOWNLOAD_AUDIO = "Pobierz sam dźwięk";
         this.DOWNLOAD_OPTIONS = "Opcje pobierania";
         this.COPY_MEDIA_LINK = "Skopiuj link do pliku";
@@ -121,6 +125,12 @@ public class StringsPolish extends DefaultStrings {
         this.DOWNLOADED_MEDIA = "Pobrano: ";
         this.MEDIA_EXISTS = "Plik już istnieje";
         this.DOWNLOAD_FAILED_MEDIA = "Błąd pobierania: ";
+        this.DOWNLOAD_SET_PATH = "Ustaw własny folder pobierania";
+        this.DOWNLOAD_SET_PATH_SUCCESS = "Zaktualizowano folder pobierania";
+        this.DOWNLOAD_SET_PATH_FAILED = "Nie udało się ustalić ścieżki folderu";
+        this.DOWNLOAD_GRANT_PERMISSION = "Przyznaj dostęp do pamięci, aby pobierać pliki";
+        this.DOWNLOAD_GRANT_PERMISSION_FAILED = "Nie udało się otworzyć ustawień. Przyznaj dostęp do wszystkich plików ręcznie";
+
         this.POST_OPTIONS = "Opcje posta";
         this.COPY_POST_DESCRIPTION = "Skopiuj opis posta";
         this.COPY_POST_OWNER_USERNAME = "Skopiuj nazwę twórcy";
@@ -136,8 +146,8 @@ public class StringsPolish extends DefaultStrings {
         this.HIDE_NAVIGATION_CREATE = "Ukryj przycisk Utwórz";
 
         this.PATCH_INFO_TITLE = "Informacje o modyfikacjach";
-        this.EXPORT_PIKO_PREF = "Eksportuj ustawienia Mod";
-        this.IMPORT_PIKO_PREF = "Importuj ustawienia Mod";
+        this.EXPORT_PIKO_PREF = "Eksportuj ustawienia Piko";
+        this.IMPORT_PIKO_PREF = "Importuj ustawienia Piko";
         this.APP_VERSION = "Wersja aplikacji: %s";
         this.PATCH_VERSION = "Wersja modyfikacji: %s";
 
@@ -150,18 +160,10 @@ public class StringsPolish extends DefaultStrings {
         this.RESTART_APP = "Wymagany restart aplikacji, aby zastosować zmiany";
         this.OK = "OK";
         this.DELETED = "Usunięto";
-        this.PIKO_DEBUG = "Debugowanie Mod";
+        this.PIKO_DEBUG = "Debugowanie Piko";
         this.PIKO_DEBUG_DESC = "Dodaje opcje debugowania do niektórych komponentów (do testów)";
         this.PIKO_EXPORT_EXPERIMENT_LIST = "Eksportuj listę eksperymentów";
         this.PIKO_EXPORT_EXPERIMENT_MAPPINGS = "Eksportuj mapowania eksperymentów";
-
-        // Debug tools
-        this.DEBUG_DUMP_FLAGS = "Zrzuć flagi do logcat";
-        this.DEBUG_DUMP_FLAGS_DESC = "Zapisuje wszystkie bieżące nadpisania MetaConfig do logcat (adb logcat -s ModDebug)";
-        this.DEBUG_EXPORT_DIAG = "Eksportuj diagnostykę";
-        this.DEBUG_EXPORT_DIAG_DESC = "Zapisuje status modu, ustawienia i informacje OTA do pliku w /sdcard/Android/media/";
-        this.DEBUG_ADB_HELP = "Komendy debugowania ADB";
-        this.DEBUG_ADB_HELP_DESC = "adb shell am broadcast -a app.morphe.extension.instagram.DEBUG --es command <cmd>";
 
         this.OPEN_IMAGE_EXTERNALLY = "Otwórz obraz zewnętrznie";
         this.OPEN_VIDEO_EXTERNALLY = "Otwórz film zewnętrznie";
@@ -176,9 +178,40 @@ public class StringsPolish extends DefaultStrings {
         this.ARR_DETAILED_TIMESTAMP = "Szczegółowa data";
         this.ARR_TIME_LEFT = "Pozostały czas";
 
-        this.WELCOME_TITLE = "Witaj w Mod";
-        this.WELCOME_MESSAGE = "Aby wyciągnąć z Mod jak najwięcej, zajrzyj do ustawień i dostosuj je pod siebie";
-        this.GOTO_PIKO_SETTINGS = "Przejdź do ustawień Mod";
-        this.NO_INTERNET = "Brak połączenia z internetem";        
+        this.WELCOME_TITLE = "Witaj w Piko";
+        this.WELCOME_MESSAGE = "Aby wyciągnąć z Piko jak najwięcej, zajrzyj do ustawień i dostosuj je pod siebie";
+        this.GOTO_PIKO_SETTINGS = "Przejdź do ustawień Piko";
+        this.NO_INTERNET = "Brak połączenia z internetem";     
+        this.TAP_HERE = "Kliknij tutaj";   
     }
 }
+
+    // ===== RVCArise OTA updater strings =====
+    public static String CATEGORY_OTA = "OTA Updater";
+    public static String OTA_CHECK_UPDATE = "Check for updates";
+    public static String OTA_CHECK_UPDATE_DESC = "Automatically checks for mod updates every 48 hours";
+    public static String OTA_NO_CONNECTION = "No internet connection";
+    public static String OTA_UP_TO_DATE = "Mod is up to date";
+    public static String OTA_CHECK_FAILED = "Update check failed";
+    public static String OTA_INSTALLED = "Installed version";
+    public static String OTA_AVAILABLE = "New version available";
+    public static String OTA_DOWNLOADING = "Downloading update...";
+    public static String OTA_DOWNLOAD_FAILED = "Download failed";
+    public static String OTA_APK_LOCATION = "APK saved to Downloads";
+    public static String OTA_SIGNATURE_MISMATCH = "Signature mismatch";
+    public static String OTA_SIGNATURE_TITLE = "Signature verification failed";
+    public static String OTA_UPDATE_AVAILABLE = "Update available";
+    public static String OTA_BTN_DOWNLOAD = "Download";
+    public static String OTA_BTN_LATER = "Later";
+    public static String OTA_BTN_GITHUB = "View on GitHub";
+    public static String OTA_TITLE = "OTA Updater";
+    public static String OTA_UPDATE_LABEL = "Mod Update";
+
+    // ===== RVCArise debug strings =====
+    public static String DEBUG_DUMP_FLAGS = "Dump patch flags";
+    public static String DEBUG_DUMP_FLAGS_DESC = "Log all HookFlags overrides to logcat";
+    public static String DEBUG_EXPORT_DIAG = "Export diagnostics";
+    public static String DEBUG_EXPORT_DIAG_DESC = "Export mod info for bug reports";
+    public static String DEBUG_ADB_HELP = "ADB debug commands";
+    public static String DEBUG_ADB_HELP_DESC = "Show available ADB broadcast commands for debugging";
+
