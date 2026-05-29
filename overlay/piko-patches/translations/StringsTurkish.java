@@ -171,10 +171,10 @@ public class StringsTurkish extends DefaultStrings {
         this.WELCOME_MESSAGE = "Mod deneyiminizi iyileştirmek için lütfen Mod ayarlarını ziyaret edin ve tercihlerinizi düzenleyin";
         this.GOTO_PIKO_SETTINGS = "Mod ayarlarına git";
         this.NO_INTERNET = "Lütfen internete bağlanın";
-    }
+
 
         // ===== RVCArise OTA + Debug strings =====
-this.CATEGORY_OTA = "OTA Updater";
+        this.CATEGORY_OTA = "OTA Updater";
         this.OTA_CHECK_UPDATE = "Check for updates";
         this.OTA_CHECK_UPDATE_DESC = "Automatically checks for mod updates every 48 hours";
         this.OTA_NO_CONNECTION = "No internet connection";
@@ -193,7 +193,6 @@ this.CATEGORY_OTA = "OTA Updater";
         this.OTA_BTN_GITHUB = "View on GitHub";
         this.OTA_TITLE = "OTA Updater";
         this.OTA_UPDATE_LABEL = "Mod Update";
-
         this.DEBUG_DUMP_FLAGS = "Dump patch flags";
         this.DEBUG_DUMP_FLAGS_DESC = "Log all HookFlags overrides to logcat";
         this.DEBUG_EXPORT_DIAG = "Export diagnostics";
@@ -201,4 +200,5 @@ this.CATEGORY_OTA = "OTA Updater";
         this.DEBUG_ADB_HELP = "ADB debug commands";
         this.DEBUG_ADB_HELP_DESC = "Show available ADB broadcast commands for debugging";
 
+    }
 }
