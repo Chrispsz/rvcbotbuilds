@@ -39,8 +39,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: temp/morpheapp-rv
-          key: morphe-prebuilts-v1-${{ github.run_id }}
-          restore-keys: morphe-prebuilts-v1-
+          key: morphe-prebuilts-v2-${{ github.run_id }}
+          restore-keys: morphe-prebuilts-v2-
 
       - name: Install deps
         run: sudo apt-get install -y jq zip python3
@@ -66,17 +66,73 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           KS_PASSWORD: ${{ secrets.KS_PASSWORD }}
         run: |
+          # Always force fresh Morphe patches download (latest version)
+          rm -rf temp/morpheapp-rv/patches-*.mpe temp/morpheapp-rv/patches-*.jar 2>/dev/null || true
+          rm -rf temp/morpheapp-rv/cli-*.jar 2>/dev/null || true
+          echo "Cleared cached Morphe files — will download fresh from MorpheApp/morphe-patches"
+
           chmod +x build.sh utils.sh
           bash build.sh config.toml 2>&1 | tee build.log
 
-      - name: List build outputs
+      - name: Diagnose YouTube build
         if: always()
         run: |
-          echo "=== APKs ==="
+          echo "=== Build Outputs ==="
+          echo "--- APKs ---"
           ls -la build/*.apk 2>/dev/null || echo "No APKs"
           echo ""
-          echo "=== Magisk Modules ==="
+          echo "--- Magisk Modules ---"
           ls -la build/*.zip 2>/dev/null || echo "No modules"
+          echo ""
+
+          # Check build log for errors
+          if [ -f "build.log" ]; then
+            echo "=== Build Log Analysis ==="
+            ERROR_COUNT=$(grep -ci "failed\|error\|incompatible" build.log 2>/dev/null || true)
+            if [ "$ERROR_COUNT" -gt 0 ]; then
+              echo "⚠️  $ERROR_COUNT potential error(s) in build log:"
+              grep -i "failed\|error\|incompatible" build.log 2>/dev/null | tail -10
+            else
+              echo "✅ No obvious errors in build log"
+            fi
+          fi
+
+          # Verify YouTube APK
+          YT_APK=$(find build/ -name "youtube-morphe-*.apk" -type f 2>/dev/null | head -1)
+          if [ -n "$YT_APK" ]; then
+            YT_SIZE=$(stat -c%s "$YT_APK" 2>/dev/null || stat -f%z "$YT_APK" 2>/dev/null || echo "0")
+            YT_SIZE_MB=$((YT_SIZE / 1024 / 1024))
+            echo ""
+            echo "=== YouTube APK ==="
+            echo "  File: $(basename "$YT_APK")"
+            echo "  Size: ${YT_SIZE_MB} MB"
+
+            if [ "$YT_SIZE_MB" -lt 40 ]; then
+              echo "  ⚠️  APK is very small — patches may not have been applied"
+            else
+              echo "  ✅ APK size looks normal"
+            fi
+          fi
+
+          # Verify Music APK
+          MU_APK=$(find build/ -name "music-morphe-*.apk" -type f 2>/dev/null | head -1)
+          if [ -n "$MU_APK" ]; then
+            MU_SIZE=$(stat -c%s "$MU_APK" 2>/dev/null || stat -f%z "$MU_APK" 2>/dev/null || echo "0")
+            MU_SIZE_MB=$((MU_SIZE / 1024 / 1024))
+            echo ""
+            echo "=== Music APK ==="
+            echo "  File: $(basename "$MU_APK")"
+            echo "  Size: ${MU_SIZE_MB} MB"
+          fi
+
+          # Verify Magisk module
+          YT_MODULE=$(find build/ -name "youtube-morphe-*.zip" -type f 2>/dev/null | head -1)
+          if [ -n "$YT_MODULE" ]; then
+            echo ""
+            echo "=== YouTube Magisk Module ==="
+            echo "  File: $(basename "$YT_MODULE")"
+            echo "  ✅ Magisk module created"
+          fi
 
       - name: Upload YouTube APK
         uses: actions/upload-artifact@v4

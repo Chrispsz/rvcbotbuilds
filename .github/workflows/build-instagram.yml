@@ -85,6 +85,19 @@ jobs:
           chmod +x diagnose-build.sh 2>/dev/null || true
           bash diagnose-build.sh build/ 2>/dev/null || echo "Diagnosis skipped (script not found or failed)"
 
+          # Additional CI-specific diagnostics
+          echo ""
+          echo "=== CI Build Summary ==="
+          if [ -f "build.log" ]; then
+            # Show which patches were applied
+            echo "--- Applied patches ---"
+            grep -i "patch" build.log 2>/dev/null | grep -v "^$" | tail -20 || echo "No patch info in log"
+            echo ""
+            # Check for specific failures
+            echo "--- Key events ---"
+            grep -E "(Getting prebuilts|Choosing version|Building|Failed|Error|succeeded)" build.log 2>/dev/null | tail -15 || true
+          fi
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:

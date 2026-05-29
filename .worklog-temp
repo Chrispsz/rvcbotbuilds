@@ -10,3 +10,27 @@ Stage Summary:
 - All 9 translation files updated
 - module/mc_overrides.json removed
 - overlay/README.md rewritten
+
+---
+Task ID: 2
+Agent: main
+Task: Add auto-sync from j-hc/revanced-magisk-module upstream + improve YouTube build
+
+Work Log:
+- Added sync-upstream job to ci.yml that auto-merges j-hc/revanced-magisk-module master into our repo
+- Protected custom files (overlay/, config.toml, .github/workflows/, diagnose-build.sh, ksu_profile/) with backup/restore strategy
+- Added UPSTREAM_JHC_SHA tracking in check-updates job (stored in build-meta/jhc-upstream-sha.txt)
+- Updated dependency chain: sync-upstream runs before sync-piko and build-youtube
+- When j-hc upstream changes, YouTube is automatically rebuilt with updated build system
+- Updated build-youtube.yml with build diagnostics, fresh Morphe patches download, and build log analysis
+- Updated build-instagram.yml with additional CI-specific diagnostics
+- Updated release notes to show j-hc sync status
+- Updated update-meta job to track j-hc upstream SHA
+
+Stage Summary:
+- ci.yml: New sync-upstream job + updated check-updates + updated dependency chain
+- build-youtube.yml: Added diagnostics, fresh patches download, build log analysis
+- build-instagram.yml: Added CI-specific diagnostics
+- Auto-sync keeps build system (build.sh, utils.sh, module/, bin/) updated from j-hc
+- Custom files preserved through backup/restore after merge
+- Flow: check-updates → sync-upstream → [sync-piko → build-instagram] / [build-youtube] → release

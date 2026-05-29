@@ -28,10 +28,12 @@ jobs:
     outputs:
       BUILD_INSTAGRAM: ${{ steps.check.outputs.BUILD_INSTAGRAM }}
       BUILD_YOUTUBE: ${{ steps.check.outputs.BUILD_YOUTUBE }}
+      SYNC_UPSTREAM: ${{ steps.check.outputs.SYNC_UPSTREAM }}
       PIKO_VERSION: ${{ steps.check.outputs.PIKO_VERSION }}
       MORPHE_VERSION: ${{ steps.check.outputs.MORPHE_VERSION }}
       IG_VERSION: ${{ steps.check.outputs.IG_VERSION }}
       YT_VERSION: ${{ steps.check.outputs.YT_VERSION }}
+      UPSTREAM_JHC_SHA: ${{ steps.check.outputs.UPSTREAM_JHC_SHA }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -48,6 +50,7 @@ jobs:
         run: |
           BUILD_INSTAGRAM=0
           BUILD_YOUTUBE=0
+          SYNC_UPSTREAM=0
 
           # Force build handling
           if [ "${{ inputs.force_build }}" = "true" ]; then
@@ -62,7 +65,29 @@ jobs:
             BUILD_YOUTUBE=1
           fi
 
+          # ---- Check upstream j-hc/revanced-magisk-module ----
+          echo "=== Checking upstream j-hc/revanced-magisk-module ==="
+          UPSTREAM_JHC_SHA=$(curl -sL "https://api.github.com/repos/j-hc/revanced-magisk-module/commits/master" | jq -r '.sha // empty' 2>/dev/null || echo "")
+          echo "Upstream j-hc HEAD: ${UPSTREAM_JHC_SHA:0:8}"
+
+          LAST_JHC_SHA=""
+          if git fetch origin update --depth=1 2>/dev/null; then
+            LAST_JHC_SHA=$(git show origin/update:build-meta/jhc-upstream-sha.txt 2>/dev/null || echo "")
+          fi
+          echo "Last synced j-hc: ${LAST_JHC_SHA:0:8}"
+
+          if [ -z "$LAST_JHC_SHA" ]; then
+            echo "🆕 First sync — will merge from j-hc"
+            SYNC_UPSTREAM=1
+          elif [ -n "$UPSTREAM_JHC_SHA" ] && [ "$UPSTREAM_JHC_SHA" != "$LAST_JHC_SHA" ]; then
+            echo "⚠️  Upstream j-hc has new commits: ${LAST_JHC_SHA:0:8} → ${UPSTREAM_JHC_SHA:0:8}"
+            SYNC_UPSTREAM=1
+          else
+            echo "✅ Upstream j-hc up to date"
+          fi
+
           # ---- Check Piko patches (Instagram) ----
+          echo ""
           echo "=== Checking piko patches ==="
 
           # Check BOTH upstream and our fork — any new release triggers build
@@ -91,6 +116,13 @@ jobs:
             BUILD_INSTAGRAM=1
           else
             echo "✅ Piko up to date"
+          fi
+
+          # If upstream j-hc changed, also rebuild YouTube
+          # (build system updates might affect YouTube patching)
+          if [ "$SYNC_UPSTREAM" -eq 1 ]; then
+            echo "🔄 Upstream sync needed — YouTube will be rebuilt with updated build system"
+            BUILD_YOUTUBE=1
           fi
 
           # ---- Check Instagram base APK version ----
@@ -158,23 +190,120 @@ jobs:
           echo "============================================"
           echo "  Build Decision"
           echo "============================================"
-          echo "  Instagram: $([ $BUILD_INSTAGRAM -eq 1 ] && echo '🔨 BUILD' || echo '⏭️  SKIP')"
-          echo "  YouTube:   $([ $BUILD_YOUTUBE -eq 1 ] && echo '🔨 BUILD' || echo '⏭️  SKIP')"
+          echo "  Sync j-hc upstream: $([ $SYNC_UPSTREAM -eq 1 ] && echo '🔄 SYNC' || echo '✅ Up to date')"
+          echo "  Instagram:          $([ $BUILD_INSTAGRAM -eq 1 ] && echo '🔨 BUILD' || echo '⏭️  SKIP')"
+          echo "  YouTube:            $([ $BUILD_YOUTUBE -eq 1 ] && echo '🔨 BUILD' || echo '⏭️  SKIP')"
           echo "============================================"
 
           echo "BUILD_INSTAGRAM=$BUILD_INSTAGRAM" >> $GITHUB_OUTPUT
           echo "BUILD_YOUTUBE=$BUILD_YOUTUBE" >> $GITHUB_OUTPUT
+          echo "SYNC_UPSTREAM=$SYNC_UPSTREAM" >> $GITHUB_OUTPUT
           echo "PIKO_VERSION=$PIKO_VERSION" >> $GITHUB_OUTPUT
           echo "MORPHE_VERSION=$MORPHE_VERSION" >> $GITHUB_OUTPUT
           echo "IG_VERSION=${IG_VERSION:-}" >> $GITHUB_OUTPUT
           echo "YT_VERSION=${YT_VERSION:-}" >> $GITHUB_OUTPUT
+          echo "UPSTREAM_JHC_SHA=${UPSTREAM_JHC_SHA:-}" >> $GITHUB_OUTPUT
 
   # ===========================================
-  # Step 2: Sync piko fork (if Instagram updated)
+  # Step 2: Sync upstream j-hc/revanced-magisk-module
+  # Always runs — keeps build system (build.sh, utils.sh,
+  # module/, bin/) up to date automatically.
+  # Our custom files (overlay/, config.toml, workflows)
+  # are preserved with -X ours merge strategy.
+  # ===========================================
+  sync-upstream:
+    needs: check-updates
+    if: needs.check-updates.outputs.SYNC_UPSTREAM == '1'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout rvcbotbuilds
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.PAT_TOKEN }}
+
+      - name: Add upstream remote
+        run: |
+          git remote add upstream https://github.com/j-hc/revanced-magisk-module.git
+          git fetch upstream master --depth=100
+
+      - name: Merge upstream (keeping our changes)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Save our custom files before merge
+          echo "📦 Backing up our custom files..."
+          mkdir -p /tmp/our-backup
+          cp -r overlay/ /tmp/our-backup/overlay/ 2>/dev/null || true
+          cp config.toml /tmp/our-backup/config.toml 2>/dev/null || true
+          cp -r .github/workflows/ /tmp/our-backup/workflows/ 2>/dev/null || true
+          cp diagnose-build.sh /tmp/our-backup/diagnose-build.sh 2>/dev/null || true
+          cp -r ksu_profile/ /tmp/our-backup/ksu_profile/ 2>/dev/null || true
+
+          # Merge with -X ours (our changes win on conflicts)
+          git merge upstream/master --no-edit -X ours || {
+            echo "⚠️  Merge conflicts — resolving with ours strategy"
+            git diff --name-only --diff-filter=U | while read file; do
+              echo "  Keeping ours: $file"
+              git checkout --ours "$file"
+              git add "$file"
+            done
+            git commit --no-edit || true
+          }
+
+          # Restore our protected files (always overwrite, even if
+          # upstream didn't conflict — ensures our customizations persist)
+          echo "📦 Restoring our custom files..."
+          if [ -d /tmp/our-backup/overlay ]; then
+            rm -rf overlay/
+            cp -r /tmp/our-backup/overlay/ overlay/
+            echo "  ✅ overlay/ restored"
+          fi
+          if [ -f /tmp/our-backup/config.toml ]; then
+            cp /tmp/our-backup/config.toml config.toml
+            echo "  ✅ config.toml restored"
+          fi
+          if [ -d /tmp/our-backup/workflows ]; then
+            rm -rf .github/workflows/
+            cp -r /tmp/our-backup/workflows/ .github/workflows/
+            echo "  ✅ .github/workflows/ restored"
+          fi
+          if [ -f /tmp/our-backup/diagnose-build.sh ]; then
+            cp /tmp/our-backup/diagnose-build.sh diagnose-build.sh
+            chmod +x diagnose-build.sh
+            echo "  ✅ diagnose-build.sh restored"
+          fi
+          if [ -d /tmp/our-backup/ksu_profile ]; then
+            rm -rf ksu_profile/
+            cp -r /tmp/our-backup/ksu_profile/ ksu_profile/
+            echo "  ✅ ksu_profile/ restored"
+          fi
+
+          # Commit our protected file restores
+          git add -A
+          git diff --cached --quiet || git commit -m "chore: restore custom overlay, config and workflows after j-hc sync"
+
+          # Show what changed
+          echo ""
+          echo "=== Merge summary ==="
+          git log --oneline -5
+          echo ""
+          echo "=== Files updated from upstream ==="
+          git diff --stat HEAD~1 HEAD 2>/dev/null || echo "(single commit)"
+
+      - name: Push merged changes
+        run: |
+          git push
+
+  # ===========================================
+  # Step 3: Sync piko fork (if Instagram updated)
   # ===========================================
   sync-piko:
-    needs: check-updates
-    if: needs.check-updates.outputs.BUILD_INSTAGRAM == '1'
+    needs: [check-updates, sync-upstream]
+    if: always() && needs.check-updates.outputs.BUILD_INSTAGRAM == '1'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -325,11 +454,11 @@ Users who need extra flags: Mod Settings → Developer options → Import" \
             --prerelease
 
   # ===========================================
-  # Step 3: Build Instagram (conditional)
+  # Step 4: Build Instagram (conditional)
   # ===========================================
   build-instagram:
     needs: [check-updates, sync-piko]
-    if: needs.check-updates.outputs.BUILD_INSTAGRAM == '1'
+    if: always() && needs.check-updates.outputs.BUILD_INSTAGRAM == '1'
     uses: ./.github/workflows/build-instagram.yml
     secrets:
       PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
@@ -338,11 +467,11 @@ Users who need extra flags: Mod Settings → Developer options → Import" \
       KS_PASSWORD: ${{ secrets.KS_PASSWORD }}
 
   # ===========================================
-  # Step 4: Build YouTube + Music (conditional)
+  # Step 5: Build YouTube + Music (conditional)
   # ===========================================
   build-youtube:
-    needs: check-updates
-    if: needs.check-updates.outputs.BUILD_YOUTUBE == '1'
+    needs: [check-updates, sync-upstream]
+    if: always() && needs.check-updates.outputs.BUILD_YOUTUBE == '1'
     uses: ./.github/workflows/build-youtube.yml
     secrets:
       KS_KEYSTORE_B64: ${{ secrets.KS_KEYSTORE_B64 }}
@@ -350,7 +479,7 @@ Users who need extra flags: Mod Settings → Developer options → Import" \
       KS_PASSWORD: ${{ secrets.KS_PASSWORD }}
 
   # ===========================================
-  # Step 5: Create unified release
+  # Step 6: Create unified release
   # ===========================================
   release:
     needs: [check-updates, build-instagram, build-youtube]
@@ -483,6 +612,11 @@ Users who need extra flags: Mod Settings → Developer options → Import" \
           echo "tag=$DATE_TAG" >> $GITHUB_OUTPUT
           echo "📋 Release tag: $DATE_TAG (build $BUILD_NUM of the day)"
 
+          SYNC_STATUS="⏭️ No sync needed"
+          if [ "${{ needs.check-updates.outputs.SYNC_UPSTREAM }}" = "1" ]; then
+            SYNC_STATUS="🔄 Synced from j-hc"
+          fi
+
           IG_STATUS="⏭️ Unchanged"
           IG_DETAIL="Carried from previous release"
           if [ "${{ needs.build-instagram.result }}" = "success" ]; then
@@ -507,6 +641,8 @@ Users who need extra flags: Mod Settings → Developer options → Import" \
           {
             echo "🚀 RVCArise — $(date +'%d/%m/%Y')"
             echo ""
+            echo "🔄 Build system — ${SYNC_STATUS}"
+            echo ""
             echo "📸 Instagram — ${IG_STATUS}"
             echo "   ${IG_DETAIL}"
             echo "📺 YouTube — ${YT_STATUS}"
@@ -528,6 +664,7 @@ Users who need extra flags: Mod Settings → Developer options → Import" \
             echo "---"
             echo ""
             echo "🔧 Smart CI — daily 13:00 BRT"
+            echo "• Auto-sync from j-hc/revanced-magisk-module"
             echo "• Only changed apps are rebuilt"
             echo "• YouTube Magisk included"
             echo "• Previous assets carried forward"
@@ -594,7 +731,7 @@ Users who need extra flags: Mod Settings → Developer options → Import" \
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ===========================================
-  # Step 6: Update build metadata
+  # Step 7: Update build metadata
   # ===========================================
   update-meta:
     needs: [check-updates, release]
@@ -612,6 +749,11 @@ Users who need extra flags: Mod Settings → Developer options → Import" \
       - name: Update version tracking files
         run: |
           mkdir -p build-meta
+
+          # Update j-hc upstream SHA
+          if [ -n "${{ needs.check-updates.outputs.UPSTREAM_JHC_SHA }}" ]; then
+            echo "${{ needs.check-updates.outputs.UPSTREAM_JHC_SHA }}" > build-meta/jhc-upstream-sha.txt
+          fi
 
           if [ "${{ needs.check-updates.outputs.BUILD_INSTAGRAM }}" = "1" ] && [ -n "${{ needs.check-updates.outputs.PIKO_VERSION }}" ]; then
             echo "${{ needs.check-updates.outputs.PIKO_VERSION }}" > build-meta/instagram-version.txt
@@ -634,7 +776,7 @@ Users who need extra flags: Mod Settings → Developer options → Import" \
           git push
 
   # ===========================================
-  # Step 7: Cleanup old workflow runs
+  # Step 8: Cleanup old workflow runs
   # ===========================================
   cleanup:
     needs: release
