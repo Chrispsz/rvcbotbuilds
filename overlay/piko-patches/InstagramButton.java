@@ -5,16 +5,17 @@
  *
  * Fixed by Chrispsz — setText compatibility with Instagram v430+
  * Original code called igdsButton.setText(String) directly, but IgdsButton
- * doesn't declare setText(String). It extends AppCompatButton → TextView,
- * which only has setText(CharSequence). Direct call resolves to the wrong
- * method at compile time and throws NoSuchMethodError at runtime.
+ * doesn't declare setText(String) in the stub JAR. At compile time, the
+ * stub resolves to setText(String) which doesn't exist at runtime.
+ * At runtime, IgdsButton extends AppCompatButton → TextView which has
+ * setText(CharSequence), but we can't cast because the stub doesn't
+ * expose the inheritance. So we use reflection to call setText(CharSequence).
  */
 
 
 package app.morphe.extension.instagram.entity;
 
 import android.widget.FrameLayout;
-import android.widget.TextView;
 import android.content.Context;
 import android.view.View;
 import android.view.ViewGroup;
@@ -31,6 +32,8 @@ import com.instagram.igds.components.button.IgdsButton;
 
 public class InstagramButton extends FrameLayout {
     private IgdsButton igdsButton;
+    private static Method setTextMethod = null;
+    private static boolean setTextMethodSearched = false;
 
     public InstagramButton(Context context) {
         super(context);
@@ -42,42 +45,62 @@ public class InstagramButton extends FrameLayout {
     }
 
     /**
-     * Set text on IgdsButton safely.
+     * Find the correct setText method via reflection.
      *
-     * IgdsButton extends AppCompatButton → TextView, so setText(CharSequence)
-     * is inherited. However, if the stub JAR declares setText(String), the
-     * compiler will resolve to that — and it won't exist at runtime.
+     * The stub JAR declares setText(String) on IgdsButton, but that method
+     * doesn't exist at runtime. The real method is setText(CharSequence)
+     * inherited from TextView. We can't cast to TextView because the stub
+     * doesn't expose the inheritance hierarchy.
      *
-     * Fix: cast to TextView to ensure we call setText(CharSequence).
-     * Fallback: reflection if IgdsButton hierarchy changed.
+     * Strategy: Walk up the class hierarchy via reflection to find
+     * setText(CharSequence) on the actual superclass.
      */
-    public void setText(String text) {
+    private static Method findSetTextMethod() {
+        if (setTextMethodSearched) return setTextMethod;
+        setTextMethodSearched = true;
+
         try {
-            // Primary: IgdsButton extends AppCompatButton → TextView
-            // Cast to TextView to call setText(CharSequence) directly.
-            ((TextView) this.igdsButton).setText(text);
-        } catch (Throwable t) {
-            // Catch Throwable because NoSuchMethodError extends Error, not Exception
-            Logger.printException(() -> "InstagramButton setText via TextView cast failed, trying reflection", t);
+            // Try setText(CharSequence) on IgdsButton first (inherited from TextView)
             try {
-                // Fallback: find setText(CharSequence) via reflection on IgdsButton
-                Method m = IgdsButton.class.getMethod("setText", CharSequence.class);
-                m.invoke(this.igdsButton, (CharSequence) text);
-            } catch (Throwable t2) {
-                Logger.printException(() -> "InstagramButton setText via reflection also failed", t2);
-                // Last resort: search all methods named setText
+                setTextMethod = IgdsButton.class.getMethod("setText", CharSequence.class);
+                return setTextMethod;
+            } catch (NoSuchMethodException ignored) {}
+
+            // Walk up the superclass chain looking for setText(CharSequence)
+            Class<?> clazz = IgdsButton.class.getSuperclass();
+            while (clazz != null) {
                 try {
-                    for (Method m : IgdsButton.class.getMethods()) {
-                        if (m.getName().equals("setText") && m.getParameterCount() == 1) {
-                            m.invoke(this.igdsButton, text);
-                            return;
-                        }
-                    }
-                    Logger.printException(() -> "InstagramButton: no setText method found at all", null);
-                } catch (Throwable t3) {
-                    Logger.printException(() -> "InstagramButton setText exhaustive fallback failed", t3);
+                    setTextMethod = clazz.getMethod("setText", CharSequence.class);
+                    return setTextMethod;
+                } catch (NoSuchMethodException ignored) {}
+                clazz = clazz.getSuperclass();
+            }
+
+            // Last resort: find any single-arg setText method
+            for (Method m : IgdsButton.class.getMethods()) {
+                if (m.getName().equals("setText") && m.getParameterCount() == 1) {
+                    setTextMethod = m;
+                    return setTextMethod;
                 }
             }
+        } catch (Exception e) {
+            Logger.printException(() -> "Failed to find setText method", e);
+        }
+        return null;
+    }
+
+    public void setText(String text) {
+        try {
+            Method m = findSetTextMethod();
+            if (m != null) {
+                m.invoke(this.igdsButton, (CharSequence) text);
+            } else {
+                Logger.printException(() -> "InstagramButton: no setText method found", null);
+            }
+        } catch (Throwable t) {
+            // Catch Throwable because Error subclasses (NoSuchMethodError, etc.)
+            // are not caught by Exception
+            Logger.printException(() -> "InstagramButton setText failed", t);
         }
     }
 
