@@ -82,6 +82,7 @@ apply_file "$OVERLAY_DIR/translations/StringsTurkish.java"       "$TRANSLATIONS_
 echo ""
 echo "--- Settings UI ---"
 apply_file "$OVERLAY_DIR/ScreenBuilder.java"    "$SETTINGS_PREF_DIR/ScreenBuilder.java"    "ScreenBuilder (OTA section)"
+apply_file "$OVERLAY_DIR/ButtonPref.java"       "$SETTINGS_PREF_DIR/widgets/ButtonPref.java" "ButtonPref (no reload config)"
 apply_file "$OVERLAY_DIR/SettingsActivity.java" "$SETTINGS_DIR/SettingsActivity.java"      "SettingsActivity (OTA section)"
 
 echo ""
