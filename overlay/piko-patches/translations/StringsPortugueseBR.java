@@ -197,10 +197,10 @@ public class StringsPortugueseBR extends DefaultStrings {
         this.WELCOME_MESSAGE = "Para melhorar sua experiência com o Mod, visite as configurações do Mod e ajuste suas configurações";
         this.GOTO_PIKO_SETTINGS = "Ir para configurações do Mod";
         this.NO_INTERNET = "Conecte-se à internet";
-    }
+
 
         // ===== RVCArise OTA + Debug strings =====
-this.CATEGORY_OTA = "Atualização OTA";
+        this.CATEGORY_OTA = "Atualização OTA";
         this.OTA_CHECK_UPDATE = "Verificar atualizações";
         this.OTA_CHECK_UPDATE_DESC = "Verifica atualizações do mod automaticamente a cada 48 horas";
         this.OTA_NO_CONNECTION = "Sem conexão com a internet";
@@ -219,7 +219,6 @@ this.CATEGORY_OTA = "Atualização OTA";
         this.OTA_BTN_GITHUB = "Ver no GitHub";
         this.OTA_TITLE = "Atualização OTA";
         this.OTA_UPDATE_LABEL = "Atualização do Mod";
-
         this.DEBUG_DUMP_FLAGS = "Exportar flags de patch";
         this.DEBUG_DUMP_FLAGS_DESC = "Registra todas as substituições do HookFlags no logcat";
         this.DEBUG_EXPORT_DIAG = "Exportar diagnóstico";
@@ -227,4 +226,5 @@ this.CATEGORY_OTA = "Atualização OTA";
         this.DEBUG_ADB_HELP = "Comandos ADB de depuração";
         this.DEBUG_ADB_HELP_DESC = "Mostra comandos broadcast ADB disponíveis para depuração";
 
+    }
 }
