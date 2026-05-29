@@ -612,8 +612,10 @@ patch_apk() {
 
         # Safely split patcher_args into array elements
         if [ -n "$patcher_args" ]; then
-                # Validate: only allow safe characters (alphanumeric, dash, underscore, dot, space, quotes, equals)
-                if [[ "$patcher_args" =~ [^[:alnum:]\ _\'\"\.\-=/\$\(\)\@\:] ]]; then
+                # Blacklist dangerous shell metacharacters instead of whitelisting
+                # (whitelist was too restrictive — rejected @ and : used in Android resources)
+                # Blocked: backtick, semicolon, pipe, ampersand, angle brackets, newline
+                if [[ "$patcher_args" =~ [\`\;\|\&\<\>] ]]; then
                         epr "patcher_args contains potentially unsafe characters, skipping eval"
                 else
                         local _pa
