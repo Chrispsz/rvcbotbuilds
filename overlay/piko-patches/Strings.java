@@ -255,12 +255,6 @@ public class Strings {
         }
         return tag;
     }
-            // Pattern: v3.5.0-fork.N
-            if (tag.contains("-fork.")) {
-                return tag.replace("v", "").replace("-fork.", " fork ");
-            }
-        } catch (Exception ignored) {}
-        return tag;
-    }
+
 
 }
