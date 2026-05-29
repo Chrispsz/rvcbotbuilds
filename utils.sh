@@ -613,7 +613,7 @@ patch_apk() {
         # Safely split patcher_args into array elements
         if [ -n "$patcher_args" ]; then
                 # Validate: only allow safe characters (alphanumeric, dash, underscore, dot, space, quotes, equals)
-                if [[ "$patcher_args" =~ [^[:alnum:]\ _\'\"\.\-=/\$\(\)] ]]; then
+                if [[ "$patcher_args" =~ [^[:alnum:]\ _\'\"\.\-=/\$\(\)\@\:] ]]; then
                         epr "patcher_args contains potentially unsafe characters, skipping eval"
                 else
                         local _pa
