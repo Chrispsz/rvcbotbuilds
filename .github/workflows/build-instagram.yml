@@ -41,8 +41,10 @@ jobs:
         uses: actions/cache@v4
         with:
           path: temp/chrispsz-rv
-          key: piko-prebuilts-v2-${{ github.run_id }}
-          restore-keys: piko-prebuilts-v2-
+          # Include piko version in key to invalidate on new .mpp
+          key: piko-prebuilts-v3-${{ hashFiles('config.toml') }}
+          restore-keys: |
+            piko-prebuilts-v3-
 
       - name: Install deps
         run: sudo apt-get install -y jq zip python3
@@ -69,8 +71,19 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           KS_PASSWORD: ${{ secrets.KS_PASSWORD }}
         run: |
+          # Always force fresh .mpp download (patches-version = "dev" gets latest)
+          # Delete cached piko prebuilts to prevent stale .mpp
+          rm -rf temp/chrispsz-rv/patches-*.mpp temp/chrispsz-rv/patches-*.jar 2>/dev/null || true
+          echo "Cleared cached .mpp files — will download fresh from Chrispsz/piko"
+
           chmod +x build.sh utils.sh
           bash build.sh config.toml 2>&1 | tee build.log
+
+      - name: Diagnose build
+        if: always()
+        run: |
+          chmod +x diagnose-build.sh 2>/dev/null || true
+          bash diagnose-build.sh build/ 2>/dev/null || echo "Diagnosis skipped (script not found or failed)"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4

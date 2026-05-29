@@ -64,8 +64,15 @@ jobs:
 
           # ---- Check Piko patches (Instagram) ----
           echo "=== Checking piko patches ==="
-          PIKO_VERSION=$(curl -sL "https://api.github.com/repos/crimera/piko/releases?per_page=1" | jq -r '.[0].tag_name // empty' 2>/dev/null || echo "")
-          echo "Latest piko: $PIKO_VERSION"
+
+          # Check BOTH upstream and our fork — any new release triggers build
+          UPSTREAM_PIKO=$(curl -sL "https://api.github.com/repos/crimera/piko/releases?per_page=1" | jq -r '.[0].tag_name // empty' 2>/dev/null || echo "")
+          FORK_PIKO=$(curl -sL "https://api.github.com/repos/Chrispsz/piko/releases?per_page=1" | jq -r '.[0].tag_name // empty' 2>/dev/null || echo "")
+          echo "Latest upstream piko: $UPSTREAM_PIKO"
+          echo "Latest fork piko: $FORK_PIKO"
+
+          # Use the fork version as the primary (our .mpp comes from there)
+          PIKO_VERSION="$FORK_PIKO"
 
           LAST_PIKO=""
           if git fetch origin update --depth=1 2>/dev/null; then
@@ -76,8 +83,11 @@ jobs:
           if [ -z "$LAST_PIKO" ]; then
             echo "🆕 First build — Instagram will be built"
             BUILD_INSTAGRAM=1
-          elif [ -n "$PIKO_VERSION" ] && [ "$PIKO_VERSION" != "$LAST_PIKO" ]; then
-            echo "⚠️  Piko update: $LAST_PIKO → $PIKO_VERSION"
+          elif [ -n "$FORK_PIKO" ] && [ "$FORK_PIKO" != "$LAST_PIKO" ]; then
+            echo "⚠️  Fork piko update: $LAST_PIKO → $FORK_PIKO"
+            BUILD_INSTAGRAM=1
+          elif [ -n "$UPSTREAM_PIKO" ] && [ "$UPSTREAM_PIKO" != "$LAST_PIKO" ] && [ "$UPSTREAM_PIKO" != "$FORK_PIKO" ]; then
+            echo "⚠️  Upstream piko has new release: $UPSTREAM_PIKO (fork not yet updated)"
             BUILD_INSTAGRAM=1
           else
             echo "✅ Piko up to date"
@@ -267,15 +277,16 @@ jobs:
             exit 1
           fi
 
-          # Get version
+          # Get version from gradle
           VER=$(cd patches && grep -oP 'version\s*=\s*"\K[^"]+' build.gradle.kts 2>/dev/null || echo "3.5.0")
-          TAG="v${VER}-fork.1"
-          echo "Version: $VER, Tag: $TAG"
 
-          # Delete existing release and tag if present
-          gh release delete "$TAG" --repo Chrispsz/piko --yes 2>/dev/null || true
-          git tag -d "$TAG" 2>/dev/null || true
-          git push origin ":refs/tags/$TAG" 2>/dev/null || true
+          # Incremental tag: find highest fork.N and increment
+          BASE_TAG="v${VER}-fork"
+          LAST_N=$(gh release list --repo Chrispsz/piko --limit 50 2>/dev/null | \
+            grep -oP "${BASE_TAG}\.\K[0-9]+" | sort -n | tail -1 || echo "0")
+          NEW_N=$((LAST_N + 1))
+          TAG="${BASE_TAG}.${NEW_N}"
+          echo "Version: $VER, Tag: $TAG (incremental from fork.${LAST_N})"
 
           # Generate patches list files
           LIST_JSON="patches-list.json"
@@ -292,10 +303,25 @@ jobs:
           [ -f "$LIST_JSON" ] && RELEASE_FILES="$RELEASE_FILES $LIST_JSON"
           [ -f "$BUNDLE_JSON" ] && RELEASE_FILES="$RELEASE_FILES $BUNDLE_JSON"
 
+          # Get upstream version for release notes
+          UPSTREAM_VER=$(curl -sL "https://api.github.com/repos/crimera/piko/releases?per_page=1" | jq -r '.[0].tag_name // "unknown"' 2>/dev/null)
+
           gh release create "$TAG" $RELEASE_FILES \
             --repo Chrispsz/piko \
             --title "Piko patches $TAG (Chrispsz fork)" \
-            --notes "## Auto-built from source with overlay fixes" \
+            --notes "## Auto-built from source with overlay
+
+Based on upstream crimera/piko ${UPSTREAM_VER}.
+
+Our modifications:
+- **15 verified MetaConfig patch flags** (only flags required by piko patches)
+- **No JSON loading** — Instagram has built-in importer for extra flags
+- **ADB DebugReceiver** — always-on debug via ADB, no toggle needed
+- **OTA mod updater** — checks GitHub releases, installs APK updates
+- **Mod rebrand** — Piko → Mod in all UI strings
+- **PT-BR** complete translation
+
+Users who need extra flags: Mod Settings → Developer options → Import" \
             --prerelease
 
   # ===========================================
@@ -491,7 +517,7 @@ jobs:
             echo "---"
             echo ""
             echo "📸 Instagram"
-            echo "AMOLED · Download · Privacy · 76 flags · OTA · PT-BR"
+            echo "AMOLED · Download · Privacy · 15 patch flags · OTA · Debug ADB · PT-BR"
             echo ""
             echo "📺 YouTube"
             echo "AMOLED · Clean player · APK + Magisk"
