@@ -293,16 +293,6 @@ jobs:
     secrets: inherit
 
   # ===========================================
-  # ===========================================
-  # Step 3: Build Instagram (conditional)
-  # ===========================================
-  build-instagram:
-    needs: [check-updates, sync-piko]
-    if: needs.check-updates.outputs.BUILD_INSTAGRAM == '1'
-    uses: ./.github/workflows/build-instagram.yml
-    secrets: inherit
-
-  # ===========================================
   # Step 4: Build YouTube + Music (conditional)
   # ===========================================
   build-youtube:
