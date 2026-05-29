@@ -193,15 +193,8 @@ public class Strings {
     public static final String NO_INTERNET = langInstance.NO_INTERNET;
     public static final String TAP_HERE = langInstance.TAP_HERE;
 
-    public static void load() {
 
     // ===== RVCArise custom strings (OTA updater + Debug) =====
-    public static final String DEBUG_DUMP_FLAGS = langInstance.DEBUG_DUMP_FLAGS;
-    public static final String DEBUG_DUMP_FLAGS_DESC = langInstance.DEBUG_DUMP_FLAGS_DESC;
-    public static final String DEBUG_EXPORT_DIAG = langInstance.DEBUG_EXPORT_DIAG;
-    public static final String DEBUG_EXPORT_DIAG_DESC = langInstance.DEBUG_EXPORT_DIAG_DESC;
-    public static final String DEBUG_ADB_HELP = langInstance.DEBUG_ADB_HELP;
-    public static final String DEBUG_ADB_HELP_DESC = langInstance.DEBUG_ADB_HELP_DESC;
     public static final String CATEGORY_OTA = langInstance.CATEGORY_OTA;
     public static final String OTA_CHECK_UPDATE = langInstance.OTA_CHECK_UPDATE;
     public static final String OTA_CHECK_UPDATE_DESC = langInstance.OTA_CHECK_UPDATE_DESC;
@@ -222,6 +215,14 @@ public class Strings {
     public static final String OTA_TITLE = langInstance.OTA_TITLE;
     public static final String OTA_UPDATE_LABEL = langInstance.OTA_UPDATE_LABEL;
 
+    public static final String DEBUG_DUMP_FLAGS = langInstance.DEBUG_DUMP_FLAGS;
+    public static final String DEBUG_DUMP_FLAGS_DESC = langInstance.DEBUG_DUMP_FLAGS_DESC;
+    public static final String DEBUG_EXPORT_DIAG = langInstance.DEBUG_EXPORT_DIAG;
+    public static final String DEBUG_EXPORT_DIAG_DESC = langInstance.DEBUG_EXPORT_DIAG_DESC;
+    public static final String DEBUG_ADB_HELP = langInstance.DEBUG_ADB_HELP;
+    public static final String DEBUG_ADB_HELP_DESC = langInstance.DEBUG_ADB_HELP_DESC;
+
+    public static void load() {
         ExtensionStrings.setDefaultPikoFolder(Strings.DEFAULT_PIKO_FOLDER);
         ExtensionStrings.setDownloadOngoing(Strings.DOWNLOADING_MEDIA);
         ExtensionStrings.setDownloadCompleted(Strings.DOWNLOADED_MEDIA);
