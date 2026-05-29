@@ -241,15 +241,20 @@ public class Strings {
      */
     public static String formatTagDisplay(String tag) {
         if (tag == null) return "unknown";
-        try {
-            // Pattern: vYYYY.MM.DD-N or v3.5.0-fork.N
-            if (tag.matches("^v\\d{4}\\.\\d{2}\\.\\d{2}-\\d+$")) {
-                String trimmed = tag.substring(1); // remove leading 'v'
-                int dashIdx = trimmed.lastIndexOf('-');
+        // Pattern: vYYYY.MM.DD-N -> YYYY.MM.DD (build N)
+        if (tag.startsWith("v") && tag.length() > 1) {
+            String trimmed = tag.substring(1);
+            int dashIdx = trimmed.lastIndexOf('-');
+            if (dashIdx > 0 && dashIdx < trimmed.length() - 1) {
                 String date = trimmed.substring(0, dashIdx);
                 String build = trimmed.substring(dashIdx + 1);
                 return date + " (build " + build + ")";
             }
+            // Pattern: v3.5.0-fork.N -> 3.5.0 fork N
+            return trimmed.replace("-fork.", " fork ");
+        }
+        return tag;
+    }
             // Pattern: v3.5.0-fork.N
             if (tag.contains("-fork.")) {
                 return tag.replace("v", "").replace("-fork.", " fork ");
