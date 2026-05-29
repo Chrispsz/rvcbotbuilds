@@ -50,9 +50,9 @@ apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"
 # ============================================
 # Instagram Mod — Chrispsz/piko fork (dev branch)
 #
-# BUILD A (diag): 6 "safe" patches only — unlikely to touch profile rendering
-#   Amoled theme, Disable analytics, Disable ads,
-#   Open links externally, Remove build expired popup, Unlock developer options
+# BUILD B (diag): 4 "suspicious" patches — likely to touch profile rendering
+#   Download media, Hide suggested content,
+#   Improve image viewing, More options on post
 #
 # Based on crimera/piko dev branch with:
 #   🔄 OTA: in-app APK updater (48h auto-check)
@@ -70,11 +70,9 @@ version = "430.0.0.53.80"
 exclusive-patches = true
 arch = "arm64-v8a"
 included-patches = """\
-  'Amoled theme' \
-  'Disable analytics' \
-  'Disable ads' \
-  'Open links externally' \
-  'Remove build expired popup' \
-  'Unlock developer options' \
+  'Download media' \
+  'Hide suggested content' \
+  'Improve image viewing' \
+  'More options on post' \
   """
 uptodown-dlurl = "https://instagram.en.uptodown.com/android"
