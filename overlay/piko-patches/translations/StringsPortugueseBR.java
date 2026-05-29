@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2025 piko <https://github.com/crimera/piko>
+ * Copyright (C) 2026 piko <https://github.com/crimera/piko>
  *
  * See the included NOTICE file for GPLv3 §7(b) terms that apply to this code.
  */
@@ -11,11 +11,15 @@ public class StringsPortugueseBR extends DefaultStrings {
     public StringsPortugueseBR() {
 
         this.PIKO_SETTINGS_TITLE = "Configurações do Mod";
-
+    
+    // Anúncios
+       
         this.CATEGORY_ADS = "Anúncios";
         this.DISABLE_ADS = "Desativar anúncios";
         this.HIDE_SUGEESTED_CONTENT = "Ocultar conteúdo sugerido";
         this.HIDE_SUGEESTED_CONTENT_DESC = "Oculta stories, reels e threads sugeridos (posts sugeridos ainda serão mostrados).";
+    
+    // Opções de desenvolvedor
 
         this.CATEGORY_DEV_OPTIONS = "Opções de desenvolvedor";
         this.ENABLE_DEV_OPTIONS = "Ativar opções de desenvolvedor";
@@ -28,22 +32,28 @@ public class StringsPortugueseBR extends DefaultStrings {
         this.ALLOW_USER_NETWORK_CERTIFICATE_DESC = "Permite certificado de rede do usuário para testes whitehat";
         this.REMOVE_BUILD_EXPIRE_POPUP = "Remover popup de versão expirada";
         this.REMOVE_BUILD_EXPIRE_POPUP_DESC = "Remove o popup que aparece após um tempo quando a versão do app envelhece";
-        this.EXPORT_DEV_OVERRIDES = "Exportar Backup";
-        this.IMPORT_DEV_OVERRIDES = "Importar Backup";
+        this.EXPORT_DEV_OVERRIDES = "Exportar Backup de comandos";
+        this.IMPORT_DEV_OVERRIDES = "Importar Backup de comandos";
         this.IMPORT_ID_MAPPING = "Importar arquivos de mapeamento";
         this.DOWNLOAD_ID_MAPPING = "Baixar arquivo de mapeamento";
+
+    // Catégoria Links
 
         this.CATEGORY_LINKS = "Links";
         this.OPEN_LINKS_EXTERNALLY = "Abrir links externamente";
         this.OPEN_LINKS_EXTERNALLY_DESC = "Abrir links no navegador externo em vez do navegador interno do app";
         this.SANITIZE_SHARE_LINKS = "Higienizar links compartilhados";
 
-        this.CATEGORY_GHOST = "Fantasma";
+    // Modo Fantasma
+
+        this.CATEGORY_GHOST = "Modo Fantasma";
         this.VIEW_STORIES_ANONYMOUSLY = "Ver stories anonimamente";
         this.VIEW_LIVE_ANONYMOUSLY = "Ver lives anonimamente";
         this.DISABLE_TYPING_STATUS = "Desativar status de digitação";
         this.DISABLE_SCREENSHOT_DETECTION = "Desativar detecção de captura de tela";
-        this.VIEW_DM_ANONYMOUSLY = "Ver mensagens diretas anonimamente";
+        this.VIEW_DM_ANONYMOUSLY = "Ver mensagens no direct anonimamente";
+
+    // Sem Distrações
 
         this.CATEGORY_DISTRACTION_FREE = "Sem distrações";
         this.DISABLE_STORIES = "Desativar stories";
@@ -66,12 +76,14 @@ public class StringsPortugueseBR extends DefaultStrings {
         this.DISABLE_DOUBLE_TAP_LIKE_COMMENT = "Desativar curtida por toque duplo em comentários";
         this.DISABLE_DOUBLE_TAP_LIKE_MESSAGE = "Desativar curtida por toque duplo em mensagens";
 
+    // Diversos
+
         this.CATEGORY_MISC = "Diversos";
         this.DISABLE_ANALYTICS = "Desativar análises";
         this.DELETE_ANALYTICS_CACHE = "Excluir cache de análises";
         this.DISABLE_ANALYTICS_DESC = "Bloqueia análises enviados para os servidores do Instagram/Facebook";
         this.DISABLE_DISCOVER_PEOPLE = "Desativar descobrir pessoas";
-        this.DISABLE_DISCOVER_PEOPLE_DESC = "Desativar a seção descobrir pessoas no perfil";
+        this.DISABLE_DISCOVER_PEOPLE_DESC = "Desativar a seção de descobrir pessoas no perfil";
         this.FOLLOW_BACK_INDICATOR = "Ativar indicador de seguindo de volta";
         this.FBI_FOLLOWS_YOU = "Segue você";
         this.FBI_DOESNT_FOLLOWS_YOU = "Não segue você";
@@ -105,6 +117,8 @@ public class StringsPortugueseBR extends DefaultStrings {
         this.UNLOCK_PLUS_BENEFITS_DESC = "Desbloqueia benefícios da assinatura 'Plus' verificados localmente. USE POR SUA CONTA E RISCO";
         this.CUSTOMISE_STORY_RING_SIZE = "Personalizar tamanho do anel do story";
 
+    // Downloads
+
         this.CATEGORY_DOWNLOAD_MEDIA = "Baixar mídia";
         this.ENABLE_DOWNLOAD = "Ativar download";
         this.ENABLE_DIRECT_DOWNLOAD = "Ativar download direct";
@@ -123,13 +137,20 @@ public class StringsPortugueseBR extends DefaultStrings {
         this.MEDIA_EXISTS = "A mídia já existe";
         this.DOWNLOAD_FAILED_MEDIA = "Falha ao baixar : ";
 
+    // Opções de Donwloads (fora das configurações)
+
         this.POST_OPTIONS = "Opções do post";
         this.COPY_POST_DESCRIPTION = "Copiar descrição do post";
         this.COPY_POST_OWNER_USERNAME = "Copiar usuário do dono do post";
         this.COPY_POST_OWNER_FULLNAME = "Copiar nome completo do dono do post";
+       
+    // Opções de Donwloads (dentro das configurações)
+       
         this.ENABLE_MORE_OPTIONS_ON_POST = "Ativar mais opções no post";
         this.ENABLE_MORE_OPTIONS_ON_POST_DESC = "Obtém mais opções ao segurar o post";
 
+    // Ocultar Botões de Navegação
+        
         this.CATEGORY_HIDE_NAVIGATION_BUTTONS = "Ocultar botões de navegação";
         this.HIDE_NAVIGATION_FEED = "Ocultar botão Feed";
         this.HIDE_NAVIGATION_REELS = "Ocultar botão Reels";
@@ -137,9 +158,11 @@ public class StringsPortugueseBR extends DefaultStrings {
         this.HIDE_NAVIGATION_SEARCH = "Ocultar botão Pesquisa";
         this.HIDE_NAVIGATION_CREATE = "Ocultar botão Criar";
 
+    // Piko (detalhes técnicos)
+
         this.PATCH_INFO_TITLE = "Informações do patch";
-        this.EXPORT_PIKO_PREF = "Exportar preferências do Mod";
-        this.IMPORT_PIKO_PREF = "Importar preferências do Mod";
+        this.EXPORT_PIKO_PREF = "Exportar preferências do Piko";
+        this.IMPORT_PIKO_PREF = "Importar preferências do Piko";
         this.APP_VERSION = "Versão do app: %s";
         this.PATCH_VERSION = "Versão do patch: %s";
 
@@ -152,18 +175,10 @@ public class StringsPortugueseBR extends DefaultStrings {
         this.RESTART_APP = "O app precisa ser reiniciado para as alterações serem feitos";
         this.OK = "OK";
         this.DELETED = "Excluído";
-        this.PIKO_DEBUG = "Debug do Mod";
+        this.PIKO_DEBUG = "Debug do Piko";
         this.PIKO_DEBUG_DESC = "Adiciona opções de debug em alguns componentes para testes";
-        this.PIKO_EXPORT_EXPERIMENT_LIST = "Exportar lista de experimentos";
-        this.PIKO_EXPORT_EXPERIMENT_MAPPINGS = "Exportar mapeamentos de experimentos";
-
-        // Debug tools
-        this.DEBUG_DUMP_FLAGS = "Dump flags no logcat";
-        this.DEBUG_DUMP_FLAGS_DESC = "Escreve todas as flags MetaConfig no logcat (adb logcat -s ModDebug)";
-        this.DEBUG_EXPORT_DIAG = "Exportar diagnóstico";
-        this.DEBUG_EXPORT_DIAG_DESC = "Salva status do mod, configurações e info OTA em /sdcard/Android/media/";
-        this.DEBUG_ADB_HELP = "Comandos ADB de debug";
-        this.DEBUG_ADB_HELP_DESC = "adb shell am broadcast -a app.morphe.extension.instagram.DEBUG --es command <cmd>";
+        this.PIKO_EXPORT_EXPERIMENT_LIST = "Exportar lista de experimentos Piko";
+        this.PIKO_EXPORT_EXPERIMENT_MAPPINGS = "Exportar mapeamentos de experimentos Piko";
 
         this.OPEN_IMAGE_EXTERNALLY = "Abrir imagem externamente";
         this.OPEN_VIDEO_EXTERNALLY = "Abrir vídeo externamente";
@@ -175,35 +190,42 @@ public class StringsPortugueseBR extends DefaultStrings {
         this.AVAILABLE_LIKE_ANIMATION = "Animações de curtida disponíveis";
 
         this.DEFAULT = "Padrão";
-        this.ARR_DETAILED_TIMESTAMP = "Horário detalhado";
-        this.ARR_TIME_LEFT = "Tempo restante";
+        this.ARR_DETAILED_TIMESTAMP = "Horário detalhado (Dia da Semana/Mês/Data/Hora/Minutos/Segundos)";
+        this.ARR_TIME_LEFT = "Tempo restante (Falta: Hora/Minutos/Segundos)";
 
-        this.WELCOME_TITLE = "Bem-vindo ao Mod";
-        this.WELCOME_MESSAGE = "Para melhorar sua experiência, visite as configurações do Mod e ajuste suas preferências";
-        this.GOTO_PIKO_SETTINGS = "Ir para configurações do Mod";
+        this.WELCOME_TITLE = "Bem-vindo ao Piko";
+        this.WELCOME_MESSAGE = "Para melhorar sua experiência com o Piko, visite as configurações do Piko e ajuste suas configurações";
+        this.GOTO_PIKO_SETTINGS = "Ir para configurações do Piko";
         this.NO_INTERNET = "Conecte-se à internet";
-
-        // OTA / Atualizações do Mod
-        this.CATEGORY_OTA = "Atualizações do Mod";
-        this.OTA_CHECK_UPDATE = "Verificar atualizações do mod";
-        this.OTA_CHECK_UPDATE_DESC = "Verifica no GitHub por novas versões do APK mod";
-
-        // OTA runtime messages
-        this.OTA_NO_CONNECTION = "Não foi possível verificar atualizações.\nVerifique sua conexão.";
-        this.OTA_UP_TO_DATE = "Já está na versão mais recente: ";
-        this.OTA_CHECK_FAILED = "Falha ao verificar: ";
-        this.OTA_INSTALLED = "Instalada: ";
-        this.OTA_AVAILABLE = "Disponível: ";
-        this.OTA_DOWNLOADING = "Baixando atualização... Verifique as notificações.";
-        this.OTA_DOWNLOAD_FAILED = "Falha no download. Abra o navegador.";
-        this.OTA_APK_LOCATION = "APK em Downloads/rvcbotbuilds/";
-        this.OTA_SIGNATURE_MISMATCH = "Aviso: O APK baixado tem uma assinatura diferente. Instalar mesmo assim?";
-        this.OTA_SIGNATURE_TITLE = "Verificação de Assinatura";
-        this.OTA_UPDATE_AVAILABLE = "⚡ Atualização disponível";
-        this.OTA_BTN_DOWNLOAD = "Baixar";
-        this.OTA_BTN_LATER = "Depois";
-        this.OTA_BTN_GITHUB = "GitHub";
-        this.OTA_TITLE = "Atualização";
-        this.OTA_UPDATE_LABEL = "Atualização: ";
     }
 }
+
+    // ===== RVCArise OTA updater strings (PT-BR) =====
+    public static String CATEGORY_OTA = "Atualização OTA";
+    public static String OTA_CHECK_UPDATE = "Verificar atualizações";
+    public static String OTA_CHECK_UPDATE_DESC = "Verifica atualizações do mod automaticamente a cada 48 horas";
+    public static String OTA_NO_CONNECTION = "Sem conexão com a internet";
+    public static String OTA_UP_TO_DATE = "Mod está atualizado";
+    public static String OTA_CHECK_FAILED = "Falha ao verificar atualização";
+    public static String OTA_INSTALLED = "Versão instalada";
+    public static String OTA_AVAILABLE = "Nova versão disponível";
+    public static String OTA_DOWNLOADING = "Baixando atualização...";
+    public static String OTA_DOWNLOAD_FAILED = "Falha no download";
+    public static String OTA_APK_LOCATION = "APK salvo em Downloads";
+    public static String OTA_SIGNATURE_MISMATCH = "Assinatura inválida";
+    public static String OTA_SIGNATURE_TITLE = "Falha na verificação de assinatura";
+    public static String OTA_UPDATE_AVAILABLE = "Atualização disponível";
+    public static String OTA_BTN_DOWNLOAD = "Baixar";
+    public static String OTA_BTN_LATER = "Depois";
+    public static String OTA_BTN_GITHUB = "Ver no GitHub";
+    public static String OTA_TITLE = "Atualização OTA";
+    public static String OTA_UPDATE_LABEL = "Atualização do Mod";
+
+    // ===== RVCArise debug strings (PT-BR) =====
+    public static String DEBUG_DUMP_FLAGS = "Exportar flags de patch";
+    public static String DEBUG_DUMP_FLAGS_DESC = "Registra todas as substituições do HookFlags no logcat";
+    public static String DEBUG_EXPORT_DIAG = "Exportar diagnóstico";
+    public static String DEBUG_EXPORT_DIAG_DESC = "Exportar informações do mod para relatórios de bugs";
+    public static String DEBUG_ADB_HELP = "Comandos ADB de depuração";
+    public static String DEBUG_ADB_HELP_DESC = "Mostra comandos broadcast ADB disponíveis para depuração";
+
