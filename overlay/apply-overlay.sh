@@ -60,13 +60,9 @@ apply_file "$OVERLAY_DIR/Constants.kt"          "$PIKO_PATCHES_SRC/utils/Constan
 apply_file "$OVERLAY_DIR/HookFlags.java"       "$PATCHES_DIR/HookFlags.java"        "HookFlags (patch flags only, no JSON)"
 apply_file "$OVERLAY_DIR/OtaUpdater.java"      "$PATCHES_DIR/OtaUpdater.java"       "OtaUpdater (in-app APK updater)"
 apply_file "$OVERLAY_DIR/WelcomeMessage.java"   "$PATCHES_DIR/WelcomeMessage.java"    "WelcomeMessage (debug receiver + OTA)"
-apply_file "$OVERLAY_DIR/DebugReceiver.java"   "$PATCHES_DIR/DebugReceiver.java"      "DebugReceiver (ADB debug commands)"
 
 echo ""
-echo "--- Entity fixes ---"
-apply_file "$OVERLAY_DIR/InstagramButton.java"  "$ENTITY_DIR/InstagramButton.java"    "InstagramButton (setText v430+ fix)"
-apply_file "$OVERLAY_DIR/MediaData.java"        "$ENTITY_DIR/MediaData.java"          "MediaData (resilient audio/description v430+ fix)"
-apply_file "$OVERLAY_DIR/InstagramDialogBox.java" "$ENTITY_DIR/InstagramDialogBox.java" "InstagramDialogBox (resilient constructor v430+ fix)"
+echo "--- Entity fixes (upstream handles these) ---"
 
 echo ""
 echo "--- Strings & Translations ---"
@@ -115,13 +111,6 @@ if [ -f "$PATCHES_DIR/HookFlags.java" ]; then
     fi
 else
     echo "  ⚠️  HookFlags.java not found at target"
-fi
-
-# Verify DebugReceiver was applied
-if [ -f "$PATCHES_DIR/DebugReceiver.java" ]; then
-    echo "  ✅ DebugReceiver.java applied (ADB debug available)"
-else
-    echo "  ⚠️  DebugReceiver.java not found at target"
 fi
 
 # Verify Constants.kt was applied
