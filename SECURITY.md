@@ -18,6 +18,7 @@ This project uses GitHub Secrets for sensitive data:
 | `PAT_TOKEN` | Push to Chrispsz/piko fork | Fine-grained PAT with `contents: write` on `Chrispsz/piko` only |
 | `KS_KEYSTORE_B64` | Base64-encoded keystore for APK signing | Repo secret |
 | `KS_P12_KEYSTORE_B64` | Base64-encoded P12 keystore | Repo secret |
+| `KS_PASSWORD` | Keystore signing password | Repo secret (defaults to `123456789` for local builds) |
 | `GITHUB_TOKEN` | Auto-provided by Actions | Job-scoped, ephemeral |
 
 ### Minimum PAT_TOKEN scopes (fine-grained):

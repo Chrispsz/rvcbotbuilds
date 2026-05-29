@@ -12,7 +12,7 @@ public class DefaultStrings {
 
     public static String CATEGORY_ADS = "Ads";
     public static String DISABLE_ADS = "Disable ads";
-    public static String HIDE_SUGEESTED_CONTENT = "Hide suggested content";
+    public static String HIDE_SUGEESTED_CONTENT = "Hide suggested content"; // Typo inherited from upstream piko — must match Settings.HIDE_SUGGESTED_CONTENT key
     public static String HIDE_SUGEESTED_CONTENT_DESC = "Hides suggested stories, reels, threads (Suggested posts will still be shown).";
 
     public static String CATEGORY_DEV_OPTIONS = "Developer options";

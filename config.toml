@@ -51,7 +51,7 @@ apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"
 # Instagram Mod — Chrispsz/piko fork
 #
 # Custom modifications (immutable overlay):
-#   🔧 HookFlags: 257 preset MetaConfig flags
+#   🔧 HookFlags: 76 preset MetaConfig flags
 #   📋 JSON override: mc_overrides.json (no root)
 #   🔄 OTA: in-app APK updater from GitHub
 #   🏷️ Rebrand: Piko → Mod (all strings)

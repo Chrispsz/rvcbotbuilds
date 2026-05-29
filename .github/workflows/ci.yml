@@ -301,6 +301,7 @@ jobs:
       PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
       KS_KEYSTORE_B64: ${{ secrets.KS_KEYSTORE_B64 }}
       KS_P12_KEYSTORE_B64: ${{ secrets.KS_P12_KEYSTORE_B64 }}
+      KS_PASSWORD: ${{ secrets.KS_PASSWORD }}
 
   # ===========================================
   # Step 4: Build YouTube + Music (conditional)
@@ -313,6 +314,7 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       KS_KEYSTORE_B64: ${{ secrets.KS_KEYSTORE_B64 }}
       KS_P12_KEYSTORE_B64: ${{ secrets.KS_P12_KEYSTORE_B64 }}
+      KS_PASSWORD: ${{ secrets.KS_PASSWORD }}
 
   # ===========================================
   # Step 5: Create unified release

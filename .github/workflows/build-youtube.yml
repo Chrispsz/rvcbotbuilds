@@ -9,6 +9,8 @@ on:
         required: true
       KS_P12_KEYSTORE_B64:
         required: true
+      KS_PASSWORD:
+        required: false
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -64,6 +66,7 @@ jobs:
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          KS_PASSWORD: ${{ secrets.KS_PASSWORD }}
         run: |
           chmod +x build.sh utils.sh
           bash build.sh config.toml 2>&1 | tee build.log
