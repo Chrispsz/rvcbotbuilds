@@ -48,7 +48,8 @@ public class HookFlags {
     }
 
     private static void adsFlags() {
-        BOOL_FLAGS.put("110800::0", false);
+        // Moved to presetFlags() — same key "110800::0" is set there as ads main toggle
+        // This method kept for organizational clarity but is now empty
     }
 
     private static void employeeOptionsFlags() {
@@ -226,7 +227,14 @@ public class HookFlags {
     }
 
     public static void load() {
-        // Load JSON overrides (they take priority over hardcoded flags)
+        // Load hardcoded preset flags first (lowest priority)
+        contactPermissionConsentFlags();
+        simpleOverflowMenuFlags();
+        adsFlags();
+        employeeOptionsFlags();
+        presetFlags();
+
+        // Then load JSON overrides (they override hardcoded flags)
         loadJsonOverrides();
     }
 

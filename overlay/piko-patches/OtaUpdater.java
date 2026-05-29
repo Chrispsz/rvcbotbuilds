@@ -55,6 +55,9 @@ public class OtaUpdater {
     private static long activeDownloadId = -1;
     private static Handler timeoutHandler = new Handler(Looper.getMainLooper());
 
+    // Timeout runnable reference for targeted cancellation
+    private static Runnable timeoutRunnable = null;
+
     // ======== Public API ========
 
     /**
@@ -463,13 +466,23 @@ public class OtaUpdater {
                     }
                 }
             };
-            context.registerReceiver(activeReceiver, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
+            // Android 13+ (API 33) requires RECEIVER_EXPORTED/RECEIVER_NOT_EXPORTED flag
+            try {
+                context.registerReceiver(activeReceiver,
+                        new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
+                        Context.RECEIVER_NOT_EXPORTED, null);
+            } catch (NoSuchMethodError e) {
+                // API < 33: registerReceiver doesn't accept flags
+                context.registerReceiver(activeReceiver,
+                        new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
+            }
 
             // Safety timeout — unregister after 5 minutes to prevent leak
-            timeoutHandler.postDelayed(() -> {
+            timeoutRunnable = () -> {
                 unregisterReceiverSafe(context);
                 activeDownloadId = -1;
-            }, DOWNLOAD_TIMEOUT_MS);
+            };
+            timeoutHandler.postDelayed(timeoutRunnable, DOWNLOAD_TIMEOUT_MS);
 
         } catch (Exception e) {
             try {
@@ -492,7 +505,10 @@ public class OtaUpdater {
     }
 
     private static void cancelTimeout() {
-        timeoutHandler.removeCallbacksAndMessages(null);
+        if (timeoutRunnable != null) {
+            timeoutHandler.removeCallbacks(timeoutRunnable);
+            timeoutRunnable = null;
+        }
     }
 
     private static void promptInstall(Context context, String fileUri) {
