@@ -9,7 +9,7 @@ package app.morphe.extension.instagram.constants.translations;
 
 public class StringsIndonesian extends DefaultStrings {
 	public StringsIndonesian() {
-		this.PIKO_SETTINGS_TITLE = "Pengaturan Piko";
+		this.PIKO_SETTINGS_TITLE = "Pengaturan Mod";
 
 		this.CATEGORY_ADS = "Iklan";
 		this.DISABLE_ADS = "Nonaktifkan iklan";
@@ -160,7 +160,7 @@ public class StringsIndonesian extends DefaultStrings {
 		this.RESTART_APP = "Aplikasi perlu dimulai ulang agar perubahan diterapkan";
 		this.OK = "OKE";
 		this.DELETED = "Dihapus";
-		this.PIKO_DEBUG = "Piko debug";
+		this.PIKO_DEBUG = "Mod debug";
 		this.PIKO_DEBUG_DESC = "Menambahkan pilihan debug pada beberapa komponen untuk pengujian";
 		this.PIKO_EXPORT_EXPERIMENT_LIST = "Ekspor daftar eksperimen";
 		this.PIKO_EXPORT_EXPERIMENT_MAPPINGS = "Ekspor pemetaan eksperimen";
@@ -178,40 +178,39 @@ public class StringsIndonesian extends DefaultStrings {
 		this.ARR_DETAILED_TIMESTAMP = "Stempel waktu detail";
 		this.ARR_TIME_LEFT = "Waktu tersisa";
 		
-		this.WELCOME_TITLE = "Selamat datang di Piko";
-		this.WELCOME_MESSAGE = "Untuk meningkatkan pengalaman Anda menggunakan Piko, silakan buka pengaturan Piko dan sesuaikan preferensi Anda";
-		this.GOTO_PIKO_SETTINGS = "Ke pengaturan Piko";
+		this.WELCOME_TITLE = "Selamat datang di Mod";
+		this.WELCOME_MESSAGE = "Untuk meningkatkan pengalaman Anda menggunakan Mod, silakan buka pengaturan Mod dan sesuaikan preferensi Anda";
+		this.GOTO_PIKO_SETTINGS = "Ke pengaturan Mod";
 		this.NO_INTERNET = "Silakan sambungkan ke internet";
 		this.TAP_HERE = "Ketuk di sini !!";
 	}
+
+        // ===== RVCArise OTA + Debug strings =====
+this.CATEGORY_OTA = "OTA Updater";
+        this.OTA_CHECK_UPDATE = "Check for updates";
+        this.OTA_CHECK_UPDATE_DESC = "Automatically checks for mod updates every 48 hours";
+        this.OTA_NO_CONNECTION = "No internet connection";
+        this.OTA_UP_TO_DATE = "Mod is up to date";
+        this.OTA_CHECK_FAILED = "Update check failed";
+        this.OTA_INSTALLED = "Installed version";
+        this.OTA_AVAILABLE = "New version available";
+        this.OTA_DOWNLOADING = "Downloading update...";
+        this.OTA_DOWNLOAD_FAILED = "Download failed";
+        this.OTA_APK_LOCATION = "APK saved to Downloads";
+        this.OTA_SIGNATURE_MISMATCH = "Signature mismatch";
+        this.OTA_SIGNATURE_TITLE = "Signature verification failed";
+        this.OTA_UPDATE_AVAILABLE = "Update available";
+        this.OTA_BTN_DOWNLOAD = "Download";
+        this.OTA_BTN_LATER = "Later";
+        this.OTA_BTN_GITHUB = "View on GitHub";
+        this.OTA_TITLE = "OTA Updater";
+        this.OTA_UPDATE_LABEL = "Mod Update";
+
+        this.DEBUG_DUMP_FLAGS = "Dump patch flags";
+        this.DEBUG_DUMP_FLAGS_DESC = "Log all HookFlags overrides to logcat";
+        this.DEBUG_EXPORT_DIAG = "Export diagnostics";
+        this.DEBUG_EXPORT_DIAG_DESC = "Export mod info for bug reports";
+        this.DEBUG_ADB_HELP = "ADB debug commands";
+        this.DEBUG_ADB_HELP_DESC = "Show available ADB broadcast commands for debugging";
+
 }
-
-    // ===== RVCArise OTA updater strings =====
-    public static String CATEGORY_OTA = "OTA Updater";
-    public static String OTA_CHECK_UPDATE = "Check for updates";
-    public static String OTA_CHECK_UPDATE_DESC = "Automatically checks for mod updates every 48 hours";
-    public static String OTA_NO_CONNECTION = "No internet connection";
-    public static String OTA_UP_TO_DATE = "Mod is up to date";
-    public static String OTA_CHECK_FAILED = "Update check failed";
-    public static String OTA_INSTALLED = "Installed version";
-    public static String OTA_AVAILABLE = "New version available";
-    public static String OTA_DOWNLOADING = "Downloading update...";
-    public static String OTA_DOWNLOAD_FAILED = "Download failed";
-    public static String OTA_APK_LOCATION = "APK saved to Downloads";
-    public static String OTA_SIGNATURE_MISMATCH = "Signature mismatch";
-    public static String OTA_SIGNATURE_TITLE = "Signature verification failed";
-    public static String OTA_UPDATE_AVAILABLE = "Update available";
-    public static String OTA_BTN_DOWNLOAD = "Download";
-    public static String OTA_BTN_LATER = "Later";
-    public static String OTA_BTN_GITHUB = "View on GitHub";
-    public static String OTA_TITLE = "OTA Updater";
-    public static String OTA_UPDATE_LABEL = "Mod Update";
-
-    // ===== RVCArise debug strings =====
-    public static String DEBUG_DUMP_FLAGS = "Dump patch flags";
-    public static String DEBUG_DUMP_FLAGS_DESC = "Log all HookFlags overrides to logcat";
-    public static String DEBUG_EXPORT_DIAG = "Export diagnostics";
-    public static String DEBUG_EXPORT_DIAG_DESC = "Export mod info for bug reports";
-    public static String DEBUG_ADB_HELP = "ADB debug commands";
-    public static String DEBUG_ADB_HELP_DESC = "Show available ADB broadcast commands for debugging";
-
