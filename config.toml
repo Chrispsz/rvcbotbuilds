@@ -1,6 +1,6 @@
 # ============================================
 # RVCBotBuilds — Instagram Mod
-# arm64-v8a | Morphe patches | Piko fork
+# arm64-v8a | Morphe patches | Piko fork (dev)
 # ============================================
 
 enable-module-update = true
@@ -48,27 +48,16 @@ uptodown-dlurl = "https://youtube-music.en.uptodown.com/android"
 apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"
 
 # ============================================
-# Instagram Mod — Chrispsz/piko fork
+# Instagram Mod — Chrispsz/piko fork (dev branch)
 #
-# IMPORTANT: version = "auto" lets the CLI pick the
-# Instagram version supported by the .mpp. This prevents
-# the version mismatch bug where piko v3.4.0 (supports 426)
-# silently skips ALL patches for Instagram 430.
+# 11 patches — só o essencial, sem lixo:
+#   CORE: settings, download, ads, suggested, build expired
+#   UTIL: developer options, analytics, links, Plus, images, AMOLED
 #
-# If you want a specific version, change to e.g.:
-#   version = "430.0.0.53.80"
-# But make sure your fork's .mpp supports that version!
-#
-# Custom modifications (immutable overlay):
-#   🔧 HookFlags: patch flags only (no JSON — use Instagram importer for extras)
-#   🔄 OTA: in-app APK updater from GitHub
-#   🔍 Debug: ADB DebugReceiver (always-on, no toggle needed)
-#   🏷️ Rebrand: Piko → Mod (all strings)
+# Based on crimera/piko dev branch with:
+#   🔄 OTA: in-app APK updater (48h auto-check)
+#   ⚙️ Mod settings button on profile
 #   🇧🇷 PT-BR translation complete
-#   🖤 AMOLED theme
-#   📥 Download media
-#   🛡️ Privacy patches
-#   🔗 Link sanitization
 # ============================================
 [Instagram-Piko]
 app-name = "Instagram"
@@ -83,27 +72,14 @@ arch = "arm64-v8a"
 included-patches = """\
   'Add settings' \
   'Amoled theme' \
-  'Copy comment' \
   'Disable analytics' \
   'Disable ads' \
-  'Disable screenshot detection' \
-  'Disable typing status' \
   'Download media' \
-  'Follow back indicator' \
   'Hide suggested content' \
   'Improve image viewing' \
   'More options on post' \
   'Open links externally' \
   'Remove build expired popup' \
-  'Sanitize share links' \
   'Unlock developer options' \
-  'View stories anonymously' \
-  'View DMs anonymously' \
-  'Remove empty bottom space' \
-  """
-excluded-patches = """\
-  'Unlock employee options' \
-  'Unlock Plus benefits' \
-  'More options on profile' \
   """
 uptodown-dlurl = "https://instagram.en.uptodown.com/android"
