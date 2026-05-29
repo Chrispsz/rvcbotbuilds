@@ -297,7 +297,6 @@ jobs:
     if: needs.check-updates.outputs.BUILD_INSTAGRAM == '1'
     uses: ./.github/workflows/build-instagram.yml
     secrets:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
       KS_KEYSTORE_B64: ${{ secrets.KS_KEYSTORE_B64 }}
       KS_P12_KEYSTORE_B64: ${{ secrets.KS_P12_KEYSTORE_B64 }}
@@ -311,7 +310,6 @@ jobs:
     if: needs.check-updates.outputs.BUILD_YOUTUBE == '1'
     uses: ./.github/workflows/build-youtube.yml
     secrets:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       KS_KEYSTORE_B64: ${{ secrets.KS_KEYSTORE_B64 }}
       KS_P12_KEYSTORE_B64: ${{ secrets.KS_P12_KEYSTORE_B64 }}
       KS_PASSWORD: ${{ secrets.KS_PASSWORD }}

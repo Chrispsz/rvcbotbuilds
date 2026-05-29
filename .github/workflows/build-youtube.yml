@@ -3,8 +3,6 @@ name: 📺 Build YouTube + Music Mod
 on:
   workflow_call:
     secrets:
-      GITHUB_TOKEN:
-        required: true
       KS_KEYSTORE_B64:
         required: true
       KS_P12_KEYSTORE_B64:
@@ -65,7 +63,7 @@ jobs:
       - name: Build YouTube + Music
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
           KS_PASSWORD: ${{ secrets.KS_PASSWORD }}
         run: |
           chmod +x build.sh utils.sh
@@ -107,4 +105,3 @@ jobs:
       - name: Cleanup
         if: always()
         run: rm -f ks.keystore ks-p12.keystore
-

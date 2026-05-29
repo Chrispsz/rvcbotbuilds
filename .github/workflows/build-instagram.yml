@@ -3,8 +3,6 @@ name: 📸 Build Instagram Mod
 on:
   workflow_call:
     secrets:
-      GITHUB_TOKEN:
-        required: true
       PAT_TOKEN:
         required: false
       KS_KEYSTORE_B64:
@@ -68,7 +66,7 @@ jobs:
       - name: Build Instagram
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
           KS_PASSWORD: ${{ secrets.KS_PASSWORD }}
         run: |
           chmod +x build.sh utils.sh
@@ -85,4 +83,3 @@ jobs:
       - name: Cleanup
         if: always()
         run: rm -f ks.keystore ks-p12.keystore
-
