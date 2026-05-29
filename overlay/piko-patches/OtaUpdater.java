@@ -482,9 +482,10 @@ public class OtaUpdater {
             };
             // Android 13+ (API 33) requires RECEIVER_EXPORTED/RECEIVER_NOT_EXPORTED flag
             try {
+                // Use 3-arg registerReceiver(receiver, filter, flags) added in API 33
                 context.registerReceiver(activeReceiver,
                         new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
-                        Context.RECEIVER_NOT_EXPORTED, null);
+                        Context.RECEIVER_NOT_EXPORTED);
             } catch (NoSuchMethodError e) {
                 // API < 33: registerReceiver doesn't accept flags
                 context.registerReceiver(activeReceiver,
