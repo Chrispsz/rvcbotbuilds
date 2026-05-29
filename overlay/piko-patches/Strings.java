@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2025 piko <https://github.com/crimera/piko>
+ * Copyright (C) 2026 piko <https://github.com/crimera/piko>
  *
  * See the included NOTICE file for GPLv3 §7(b) terms that apply to this code.
  */
@@ -9,6 +9,7 @@ package app.morphe.extension.instagram.constants;
 
 import app.morphe.extension.instagram.constants.translations.DefaultStrings;
 import app.morphe.extension.instagram.constants.translations.LanguageInstance;
+import app.morphe.extension.crimera.constants.ExtensionStrings;
 
 public class Strings {
     private static final DefaultStrings langInstance = LanguageInstance.getLanguageInstance();
@@ -16,7 +17,7 @@ public class Strings {
     public static final String PIKO = "piko";
     public static final String PIKO_SETTINGS = PIKO + "_settings";
     public static final String SHARED_PREF_NAME = PIKO_SETTINGS;
-    public static final String DEFAULT_PIKO_FOLDER = "Mod-Instagram";
+    public static final String DEFAULT_PIKO_FOLDER = "Piko-Instagram";
     public static final String DEFAULT_AUDIO_FOLDER = "Audio";
 
     public static final String PIKO_SETTINGS_TITLE = langInstance.PIKO_SETTINGS_TITLE;
@@ -52,6 +53,9 @@ public class Strings {
     public static final String DISABLE_TYPING_STATUS = langInstance.DISABLE_TYPING_STATUS;
     public static final String DISABLE_SCREENSHOT_DETECTION = langInstance.DISABLE_SCREENSHOT_DETECTION;
     public static final String VIEW_DM_ANONYMOUSLY = langInstance.VIEW_DM_ANONYMOUSLY;
+    public static final String TURN_ON_ALL_GHOST_MODES = langInstance.TURN_ON_ALL_GHOST_MODES;
+    public static final String GHOST_MODES_ON = langInstance.GHOST_MODES_ON;
+    public static final String GHOST_MODES_DEFAULT = langInstance.GHOST_MODES_DEFAULT;
 
     public static final String CATEGORY_DISTRACTION_FREE = langInstance.CATEGORY_DISTRACTION_FREE;
     public static final String DISABLE_STORIES = langInstance.DISABLE_STORIES;
@@ -121,20 +125,26 @@ public class Strings {
     public static final String DOWNLOAD_AS_IMAGE = langInstance.DOWNLOAD_AS_IMAGE;
     public static final String DOWNLOAD_AUDIO = langInstance.DOWNLOAD_AUDIO;
     public static final String DOWNLOAD_OPTIONS = langInstance.DOWNLOAD_OPTIONS;
+    public static final String VIDEO_VARIANTS = langInstance.VIDEO_VARIANTS;
     public static final String COPY_MEDIA_LINK = langInstance.COPY_MEDIA_LINK;
     public static final String COPIED_MEDIA_LINK = langInstance.COPIED_MEDIA_LINK;
     public static final String DOWNLOAD_ALL = langInstance.DOWNLOAD_ALL;
     public static final String DOWNLOADING_MEDIA = langInstance.DOWNLOADING_MEDIA;
     public static final String DOWNLOADED_MEDIA = langInstance.DOWNLOADED_MEDIA;
+    public static final String DOWNLOAD_SET_PATH = langInstance.DOWNLOAD_SET_PATH;
     public static final String MEDIA_EXISTS = langInstance.MEDIA_EXISTS;
     public static final String DOWNLOAD_FAILED_MEDIA = langInstance.DOWNLOAD_FAILED_MEDIA;
+    public static final String DOWNLOAD_SET_PATH_SUCCESS = langInstance.DOWNLOAD_SET_PATH_SUCCESS;
+    public static final String DOWNLOAD_SET_PATH_FAILED = langInstance.DOWNLOAD_SET_PATH_FAILED;
+    public static final String DOWNLOAD_GRANT_PERMISSION = langInstance.DOWNLOAD_GRANT_PERMISSION;
+    public static final String DOWNLOAD_GRANT_PERMISSION_FAILED = langInstance.DOWNLOAD_GRANT_PERMISSION_FAILED;
+
     public static final String POST_OPTIONS = langInstance.POST_OPTIONS;
     public static final String COPY_POST_DESCRIPTION = langInstance.COPY_POST_DESCRIPTION;
     public static final String COPY_POST_OWNER_USERNAME = langInstance.COPY_POST_OWNER_USERNAME;
     public static final String COPY_POST_OWNER_FULLNAME = langInstance.COPY_POST_OWNER_FULLNAME;
     public static final String ENABLE_MORE_OPTIONS_ON_POST = langInstance.ENABLE_MORE_OPTIONS_ON_POST;
     public static final String ENABLE_MORE_OPTIONS_ON_POST_DESC = langInstance.ENABLE_MORE_OPTIONS_ON_POST_DESC;
-
 
     public static final String CATEGORY_HIDE_NAVIGATION_BUTTONS = langInstance.CATEGORY_HIDE_NAVIGATION_BUTTONS;
 
@@ -164,14 +174,6 @@ public class Strings {
     public static final String PIKO_EXPORT_EXPERIMENT_LIST = langInstance.PIKO_EXPORT_EXPERIMENT_LIST;
     public static String PIKO_EXPORT_EXPERIMENT_MAPPINGS = langInstance.PIKO_EXPORT_EXPERIMENT_MAPPINGS;
 
-    // Debug tools
-    public static final String DEBUG_DUMP_FLAGS = langInstance.DEBUG_DUMP_FLAGS;
-    public static final String DEBUG_DUMP_FLAGS_DESC = langInstance.DEBUG_DUMP_FLAGS_DESC;
-    public static final String DEBUG_EXPORT_DIAG = langInstance.DEBUG_EXPORT_DIAG;
-    public static final String DEBUG_EXPORT_DIAG_DESC = langInstance.DEBUG_EXPORT_DIAG_DESC;
-    public static final String DEBUG_ADB_HELP = langInstance.DEBUG_ADB_HELP;
-    public static final String DEBUG_ADB_HELP_DESC = langInstance.DEBUG_ADB_HELP_DESC;
-
     public static final String OPEN_IMAGE_EXTERNALLY = langInstance.OPEN_IMAGE_EXTERNALLY;
     public static final String OPEN_VIDEO_EXTERNALLY = langInstance.OPEN_VIDEO_EXTERNALLY;
     public static final String OPEN_IMAGE_WITH = langInstance.OPEN_IMAGE_WITH;
@@ -185,16 +187,24 @@ public class Strings {
     public static final String ARR_DETAILED_TIMESTAMP = langInstance.ARR_DETAILED_TIMESTAMP;
     public static final String ARR_TIME_LEFT = langInstance.ARR_TIME_LEFT;
 
-    public static String WELCOME_TITLE = langInstance.WELCOME_TITLE;
-    public static String WELCOME_MESSAGE = langInstance.WELCOME_MESSAGE;
-    public static String GOTO_PIKO_SETTINGS = langInstance.GOTO_PIKO_SETTINGS;
-    public static String NO_INTERNET = langInstance.NO_INTERNET;
-    // OTA Update
+    public static final String WELCOME_TITLE = langInstance.WELCOME_TITLE;
+    public static final String WELCOME_MESSAGE = langInstance.WELCOME_MESSAGE;
+    public static final String GOTO_PIKO_SETTINGS = langInstance.GOTO_PIKO_SETTINGS;
+    public static final String NO_INTERNET = langInstance.NO_INTERNET;
+    public static final String TAP_HERE = langInstance.TAP_HERE;
+
+    public static void load() {
+
+    // ===== RVCArise custom strings (OTA updater + Debug) =====
+    public static final String DEBUG_DUMP_FLAGS = langInstance.DEBUG_DUMP_FLAGS;
+    public static final String DEBUG_DUMP_FLAGS_DESC = langInstance.DEBUG_DUMP_FLAGS_DESC;
+    public static final String DEBUG_EXPORT_DIAG = langInstance.DEBUG_EXPORT_DIAG;
+    public static final String DEBUG_EXPORT_DIAG_DESC = langInstance.DEBUG_EXPORT_DIAG_DESC;
+    public static final String DEBUG_ADB_HELP = langInstance.DEBUG_ADB_HELP;
+    public static final String DEBUG_ADB_HELP_DESC = langInstance.DEBUG_ADB_HELP_DESC;
     public static final String CATEGORY_OTA = langInstance.CATEGORY_OTA;
     public static final String OTA_CHECK_UPDATE = langInstance.OTA_CHECK_UPDATE;
     public static final String OTA_CHECK_UPDATE_DESC = langInstance.OTA_CHECK_UPDATE_DESC;
-
-    // OTA runtime messages
     public static final String OTA_NO_CONNECTION = langInstance.OTA_NO_CONNECTION;
     public static final String OTA_UP_TO_DATE = langInstance.OTA_UP_TO_DATE;
     public static final String OTA_CHECK_FAILED = langInstance.OTA_CHECK_FAILED;
@@ -212,28 +222,14 @@ public class Strings {
     public static final String OTA_TITLE = langInstance.OTA_TITLE;
     public static final String OTA_UPDATE_LABEL = langInstance.OTA_UPDATE_LABEL;
 
-    // ======== Utility methods ========
-
-    /**
-     * Format a release tag for display: "v2025.05.29-2" → "29/05/2025 build 2"
-     * "v2025.05.29" → "29/05/2025"
-     */
-    public static String formatTagDisplay(String tag) {
-        if (tag == null || tag.isEmpty()) return "—";
-        String clean = tag.replace("v", "");
-        String[] parts = clean.split("-", 2);
-        String date = parts[0];
-        String[] d = date.split("\\.");
-        String display;
-        if (d.length >= 3) {
-            display = d[2] + "/" + d[1] + "/" + d[0];
-        } else {
-            display = date;
-        }
-        if (parts.length > 1 && !parts[1].equals("0")) {
-            display += " build " + parts[1];
-        }
-        return display;
+        ExtensionStrings.setDefaultPikoFolder(Strings.DEFAULT_PIKO_FOLDER);
+        ExtensionStrings.setDownloadOngoing(Strings.DOWNLOADING_MEDIA);
+        ExtensionStrings.setDownloadCompleted(Strings.DOWNLOADED_MEDIA);
+        ExtensionStrings.setDownloadError(Strings.DOWNLOAD_FAILED_MEDIA);
+        ExtensionStrings.setDownloadMediaExists(Strings.MEDIA_EXISTS);
+        ExtensionStrings.setDownloadSetPathFailed(DOWNLOAD_SET_PATH_FAILED);
+        ExtensionStrings.setDownloadSetPathSuccess(DOWNLOAD_SET_PATH_SUCCESS);
+        ExtensionStrings.setDownloadGrantPermission(DOWNLOAD_GRANT_PERMISSION);
+        ExtensionStrings.setDownloadGrantPermissionFailed(DOWNLOAD_GRANT_PERMISSION_FAILED);
     }
-
 }
