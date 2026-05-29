@@ -45,7 +45,7 @@ public class OtaUpdater {
                 String[] releaseInfo = fetchLatestRelease();
 
                 if (releaseInfo == null) {
-                    showOnUi(activity, "Could not check for updates. Check your internet connection.");
+                    showOnUi(activity, "Não foi possível verificar atualizações. Verifique sua conexão.");
                     return;
                 }
 
@@ -56,10 +56,10 @@ public class OtaUpdater {
                 if (isNewerVersion(currentVersion, latestTag)) {
                     showUpdateDialog(activity, latestTag, changelog, downloadUrl);
                 } else {
-                    showOnUi(activity, "You're already on the latest version: " + latestTag);
+                    showOnUi(activity, "✅ Já está na versão mais recente: " + latestTag);
                 }
             } catch (Exception e) {
-                showOnUi(activity, "Update check failed: " + e.getMessage());
+                showOnUi(activity, "Falha ao verificar: " + e.getMessage());
             }
         }).start();
     }
@@ -169,33 +169,75 @@ public class OtaUpdater {
     private static void showUpdateDialog(Activity activity, String version, String changelog, String downloadUrl) {
         new Handler(Looper.getMainLooper()).post(() -> {
             try {
-                String message = "New version available: " + version;
+                StringBuilder message = new StringBuilder();
+                message.append("Nova versão: ").append(version);
+
                 if (changelog != null && !changelog.isEmpty()) {
-                    String cl = changelog.length() > 500 ? changelog.substring(0, 500) + "..." : changelog;
-                    message += "\n\n" + cl;
+                    String clean = cleanChangelog(changelog);
+                    if (!clean.isEmpty()) {
+                        message.append("\n\n").append(clean);
+                    }
                 }
+
                 new AlertDialog.Builder(activity)
-                    .setTitle("Update Available")
-                    .setMessage(message)
-                    .setPositiveButton("Download", (dialog, which) -> downloadApk(activity, downloadUrl, version))
-                    .setNegativeButton("Later", null)
+                    .setTitle("⚡ Atualização disponível")
+                    .setMessage(message.toString())
+                    .setPositiveButton("Baixar", (dialog, which) -> downloadApk(activity, downloadUrl, version))
+                    .setNegativeButton("Depois", null)
                     .show();
             } catch (Exception e) {
-                Toast.makeText(activity, "Update available: " + version, Toast.LENGTH_LONG).show();
+                Toast.makeText(activity, "Atualização: " + version, Toast.LENGTH_LONG).show();
             }
         });
+    }
+
+    /**
+     * Strip markdown and clean changelog for display in AlertDialog.
+     * Removes tables, HTML tags, horizontal rules, and excessive whitespace.
+     */
+    private static String cleanChangelog(String raw) {
+        String text = raw;
+        // Strip markdown table lines (|...|)
+        text = text.replaceAll("(?m)^\\|.*\\|\\s*$", "");
+        // Strip HTML tags
+        text = text.replaceAll("<[^>]+>", "");
+        // Strip markdown bold/italic
+        text = text.replaceAll("\\*{1,2}([^*]+)\\*{1,2}", "$1");
+        // Strip markdown links [text](url)
+        text = text.replaceAll("\\[([^]]+)\\]\\([^)]+\\)", "$1");
+        // Strip horizontal rules (--- or ━━━)
+        text = text.replaceAll("[-━]{3,}", "");
+        // Collapse 3+ blank lines into 2
+        text = text.replaceAll("\n{3,}", "\n\n");
+        // Trim each line
+        String[] lines = text.split("\n");
+        StringBuilder sb = new StringBuilder();
+        for (String line : lines) {
+            String trimmed = line.trim();
+            if (!trimmed.isEmpty()) {
+                sb.append(trimmed).append("\n");
+            } else if (sb.length() > 0 && sb.charAt(sb.length() - 1) != '\n') {
+                sb.append("\n");
+            }
+        }
+        String result = sb.toString().trim();
+        // Limit length
+        if (result.length() > 400) {
+            result = result.substring(0, 400).trim() + "…";
+        }
+        return result;
     }
 
     private static void downloadApk(Context context, String downloadUrl, String version) {
         try {
             DownloadManager.Request request = new DownloadManager.Request(Uri.parse(downloadUrl));
-            request.setTitle("rvcbotbuilds " + version);
-            request.setDescription("Downloading mod update...");
+            request.setTitle("Mod " + version);
+            request.setDescription("Baixando atualização...");
             request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
             request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "rvcbotbuilds/instagram-morphe-" + version + ".apk");
             DownloadManager dm = (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
             long downloadId = dm.enqueue(request);
-            Toast.makeText(context, "Downloading update... Check notification bar.", Toast.LENGTH_LONG).show();
+            Toast.makeText(context, "Baixando atualização... Verifique a barra de notificações.", Toast.LENGTH_LONG).show();
 
             BroadcastReceiver receiver = new BroadcastReceiver() {
                 @Override
@@ -225,7 +267,7 @@ public class OtaUpdater {
                 browserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 context.startActivity(browserIntent);
             } catch (Exception ex) {
-                Toast.makeText(context, "Download failed. Open browser manually.", Toast.LENGTH_LONG).show();
+                Toast.makeText(context, "Falha no download. Abra o navegador manualmente.", Toast.LENGTH_LONG).show();
             }
         }
     }
@@ -242,7 +284,7 @@ public class OtaUpdater {
                 openDownloads.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 context.startActivity(openDownloads);
             } catch (Exception ex2) {
-                Toast.makeText(context, "Find APK in Downloads/rvcbotbuilds/", Toast.LENGTH_LONG).show();
+                Toast.makeText(context, "APK em Downloads/rvcbotbuilds/", Toast.LENGTH_LONG).show();
             }
         }
     }
@@ -251,7 +293,7 @@ public class OtaUpdater {
         new Handler(Looper.getMainLooper()).post(() -> {
             try {
                 new AlertDialog.Builder(activity)
-                    .setTitle("Update Check")
+                    .setTitle("Atualização")
                     .setMessage(message)
                     .setPositiveButton("OK", null)
                     .show();
