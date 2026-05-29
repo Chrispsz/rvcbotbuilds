@@ -158,11 +158,11 @@ public class StringsPortugueseBR extends DefaultStrings {
         this.HIDE_NAVIGATION_SEARCH = "Ocultar botão Pesquisa";
         this.HIDE_NAVIGATION_CREATE = "Ocultar botão Criar";
 
-    // Piko (detalhes técnicos)
+    // Mod (detalhes técnicos)
 
         this.PATCH_INFO_TITLE = "Informações do patch";
-        this.EXPORT_PIKO_PREF = "Exportar preferências do Piko";
-        this.IMPORT_PIKO_PREF = "Importar preferências do Piko";
+        this.EXPORT_PIKO_PREF = "Exportar preferências do Mod";
+        this.IMPORT_PIKO_PREF = "Importar preferências do Mod";
         this.APP_VERSION = "Versão do app: %s";
         this.PATCH_VERSION = "Versão do patch: %s";
 
@@ -175,10 +175,10 @@ public class StringsPortugueseBR extends DefaultStrings {
         this.RESTART_APP = "O app precisa ser reiniciado para as alterações serem feitos";
         this.OK = "OK";
         this.DELETED = "Excluído";
-        this.PIKO_DEBUG = "Debug do Piko";
+        this.PIKO_DEBUG = "Debug do Mod";
         this.PIKO_DEBUG_DESC = "Adiciona opções de debug em alguns componentes para testes";
-        this.PIKO_EXPORT_EXPERIMENT_LIST = "Exportar lista de experimentos Piko";
-        this.PIKO_EXPORT_EXPERIMENT_MAPPINGS = "Exportar mapeamentos de experimentos Piko";
+        this.PIKO_EXPORT_EXPERIMENT_LIST = "Exportar lista de experimentos Mod";
+        this.PIKO_EXPORT_EXPERIMENT_MAPPINGS = "Exportar mapeamentos de experimentos Mod";
 
         this.OPEN_IMAGE_EXTERNALLY = "Abrir imagem externamente";
         this.OPEN_VIDEO_EXTERNALLY = "Abrir vídeo externamente";
@@ -193,39 +193,38 @@ public class StringsPortugueseBR extends DefaultStrings {
         this.ARR_DETAILED_TIMESTAMP = "Horário detalhado (Dia da Semana/Mês/Data/Hora/Minutos/Segundos)";
         this.ARR_TIME_LEFT = "Tempo restante (Falta: Hora/Minutos/Segundos)";
 
-        this.WELCOME_TITLE = "Bem-vindo ao Piko";
-        this.WELCOME_MESSAGE = "Para melhorar sua experiência com o Piko, visite as configurações do Piko e ajuste suas configurações";
-        this.GOTO_PIKO_SETTINGS = "Ir para configurações do Piko";
+        this.WELCOME_TITLE = "Bem-vindo ao Mod";
+        this.WELCOME_MESSAGE = "Para melhorar sua experiência com o Mod, visite as configurações do Mod e ajuste suas configurações";
+        this.GOTO_PIKO_SETTINGS = "Ir para configurações do Mod";
         this.NO_INTERNET = "Conecte-se à internet";
     }
+
+        // ===== RVCArise OTA + Debug strings =====
+this.CATEGORY_OTA = "Atualização OTA";
+        this.OTA_CHECK_UPDATE = "Verificar atualizações";
+        this.OTA_CHECK_UPDATE_DESC = "Verifica atualizações do mod automaticamente a cada 48 horas";
+        this.OTA_NO_CONNECTION = "Sem conexão com a internet";
+        this.OTA_UP_TO_DATE = "Mod está atualizado";
+        this.OTA_CHECK_FAILED = "Falha ao verificar atualização";
+        this.OTA_INSTALLED = "Versão instalada";
+        this.OTA_AVAILABLE = "Nova versão disponível";
+        this.OTA_DOWNLOADING = "Baixando atualização...";
+        this.OTA_DOWNLOAD_FAILED = "Falha no download";
+        this.OTA_APK_LOCATION = "APK salvo em Downloads";
+        this.OTA_SIGNATURE_MISMATCH = "Assinatura inválida";
+        this.OTA_SIGNATURE_TITLE = "Falha na verificação de assinatura";
+        this.OTA_UPDATE_AVAILABLE = "Atualização disponível";
+        this.OTA_BTN_DOWNLOAD = "Baixar";
+        this.OTA_BTN_LATER = "Depois";
+        this.OTA_BTN_GITHUB = "Ver no GitHub";
+        this.OTA_TITLE = "Atualização OTA";
+        this.OTA_UPDATE_LABEL = "Atualização do Mod";
+
+        this.DEBUG_DUMP_FLAGS = "Exportar flags de patch";
+        this.DEBUG_DUMP_FLAGS_DESC = "Registra todas as substituições do HookFlags no logcat";
+        this.DEBUG_EXPORT_DIAG = "Exportar diagnóstico";
+        this.DEBUG_EXPORT_DIAG_DESC = "Exportar informações do mod para relatórios de bugs";
+        this.DEBUG_ADB_HELP = "Comandos ADB de depuração";
+        this.DEBUG_ADB_HELP_DESC = "Mostra comandos broadcast ADB disponíveis para depuração";
+
 }
-
-    // ===== RVCArise OTA updater strings (PT-BR) =====
-    public static String CATEGORY_OTA = "Atualização OTA";
-    public static String OTA_CHECK_UPDATE = "Verificar atualizações";
-    public static String OTA_CHECK_UPDATE_DESC = "Verifica atualizações do mod automaticamente a cada 48 horas";
-    public static String OTA_NO_CONNECTION = "Sem conexão com a internet";
-    public static String OTA_UP_TO_DATE = "Mod está atualizado";
-    public static String OTA_CHECK_FAILED = "Falha ao verificar atualização";
-    public static String OTA_INSTALLED = "Versão instalada";
-    public static String OTA_AVAILABLE = "Nova versão disponível";
-    public static String OTA_DOWNLOADING = "Baixando atualização...";
-    public static String OTA_DOWNLOAD_FAILED = "Falha no download";
-    public static String OTA_APK_LOCATION = "APK salvo em Downloads";
-    public static String OTA_SIGNATURE_MISMATCH = "Assinatura inválida";
-    public static String OTA_SIGNATURE_TITLE = "Falha na verificação de assinatura";
-    public static String OTA_UPDATE_AVAILABLE = "Atualização disponível";
-    public static String OTA_BTN_DOWNLOAD = "Baixar";
-    public static String OTA_BTN_LATER = "Depois";
-    public static String OTA_BTN_GITHUB = "Ver no GitHub";
-    public static String OTA_TITLE = "Atualização OTA";
-    public static String OTA_UPDATE_LABEL = "Atualização do Mod";
-
-    // ===== RVCArise debug strings (PT-BR) =====
-    public static String DEBUG_DUMP_FLAGS = "Exportar flags de patch";
-    public static String DEBUG_DUMP_FLAGS_DESC = "Registra todas as substituições do HookFlags no logcat";
-    public static String DEBUG_EXPORT_DIAG = "Exportar diagnóstico";
-    public static String DEBUG_EXPORT_DIAG_DESC = "Exportar informações do mod para relatórios de bugs";
-    public static String DEBUG_ADB_HELP = "Comandos ADB de depuração";
-    public static String DEBUG_ADB_HELP_DESC = "Mostra comandos broadcast ADB disponíveis para depuração";
-
