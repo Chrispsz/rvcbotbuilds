@@ -435,22 +435,27 @@ jobs:
           # Get upstream version for release notes
           UPSTREAM_VER=$(curl -sL "https://api.github.com/repos/crimera/piko/releases?per_page=1" | jq -r '.[0].tag_name // "unknown"' 2>/dev/null)
 
+          # Write release notes to file to avoid YAML parsing issues with multi-line strings
+          cat > /tmp/piko-release-notes.md <<EOF
+          ## Auto-built from source with overlay
+
+          Based on upstream crimera/piko ${UPSTREAM_VER}.
+
+          Our modifications:
+          - **15 verified MetaConfig patch flags** (only flags required by piko patches)
+          - **No JSON loading** — Instagram has built-in importer for extra flags
+          - **ADB DebugReceiver** — always-on debug via ADB, no toggle needed
+          - **OTA mod updater** — checks GitHub releases, installs APK updates
+          - **Mod rebrand** — Piko → Mod in all UI strings
+          - **PT-BR** complete translation
+
+          Users who need extra flags: Mod Settings → Developer options → Import
+          EOF
+
           gh release create "$TAG" $RELEASE_FILES \
             --repo Chrispsz/piko \
             --title "Piko patches $TAG (Chrispsz fork)" \
-            --notes "## Auto-built from source with overlay
-
-Based on upstream crimera/piko ${UPSTREAM_VER}.
-
-Our modifications:
-- **15 verified MetaConfig patch flags** (only flags required by piko patches)
-- **No JSON loading** — Instagram has built-in importer for extra flags
-- **ADB DebugReceiver** — always-on debug via ADB, no toggle needed
-- **OTA mod updater** — checks GitHub releases, installs APK updates
-- **Mod rebrand** — Piko → Mod in all UI strings
-- **PT-BR** complete translation
-
-Users who need extra flags: Mod Settings → Developer options → Import" \
+            --notes-file /tmp/piko-release-notes.md \
             --prerelease
 
   # ===========================================
