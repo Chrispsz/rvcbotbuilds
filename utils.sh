@@ -148,7 +148,11 @@ get_prebuilts() {
                         if [ "$REMOVE_RV_INTEGRATIONS_CHECKS" = true ]; then
                                 local extensions_ext
                                 extensions_ext=$(unzip -l "${file}" "extensions/shared.*" | grep -o "shared\..*") extensions_ext="${extensions_ext#*.}"
-                                if ! (
+                                # Skip paccer for .mpe files (Morphe DEX format) —
+                                # Morphe extensions don't have ReVanced integrations checks
+                                if [ "$extensions_ext" = "mpe" ]; then
+                                        pr "Skipping REMOVE_RV_INTEGRATIONS_CHECKS for .mpe (Morphe extension)" >&2
+                                elif ! (
                                         mkdir -p "${file}-zip" || return 1
                                         unzip -qo "${file}" -d "${file}-zip" || return 1
                                         java -cp "${BIN_DIR}/paccer.jar:${BIN_DIR}/dexlib2.jar" com.jhc.Main "${file}-zip/extensions/shared.${extensions_ext}" "${file}-zip/extensions/shared-patched.${extensions_ext}" || return 1
@@ -596,7 +600,7 @@ get_direct_resp() { __DIRECT_APKNAME__=$(awk -F/ '{print $NF}' <<<"$1"); }
 
 patch_apk() {
         local stock_input=$1 patched_apk=$2 patcher_args=$3 cli_jar=$4 patches_jar=$5
-        local cmd=(java -jar "$cli_jar" patch "$stock_input" --purge -o "$patched_apk" -p "$patches_jar" --keystore=ks.keystore \
+        local cmd=(java -jar "$cli_jar" patch "$stock_input" --purge -o "$patched_apk" -p "$patches_jar" -f --keystore=ks.keystore \
 --keystore-entry-password="${KS_PASSWORD:-123456789}" --keystore-password="${KS_PASSWORD:-123456789}" --signer=jhc --keystore-entry-alias=jhc -t "$patched_apk-tmp")
 
         # TODO: remove this later

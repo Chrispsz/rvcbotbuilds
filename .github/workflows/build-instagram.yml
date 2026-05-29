@@ -40,7 +40,7 @@ jobs:
       - name: Cache prebuilts
         uses: actions/cache@v4
         with:
-          path: temp/crimera-rv
+          path: temp/chrispsz-rv
           key: piko-prebuilts-v2-${{ github.run_id }}
           restore-keys: piko-prebuilts-v2-
 

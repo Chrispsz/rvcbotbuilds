@@ -20,6 +20,7 @@ TRANSLATIONS_DIR="$EXT_BASE/constants/translations"
 SETTINGS_DIR="$EXT_BASE/settings"
 SETTINGS_PREF_DIR="$SETTINGS_DIR/preference"
 CONSTANTS_DIR="$EXT_BASE/constants"
+PIKO_PATCHES_SRC="$PIKO_DIR/patches/src/main/kotlin/app/crimera/patches/instagram"
 
 echo "============================================"
 echo "Immutable Patch Overlay Applier"
@@ -55,6 +56,7 @@ apply_file() {
 }
 
 echo "--- Core patches ---"
+apply_file "$OVERLAY_DIR/Constants.kt"          "$PIKO_PATCHES_SRC/utils/Constants.kt" "Constants (Instagram 430 version)"
 apply_file "$OVERLAY_DIR/HookFlags.java"       "$PATCHES_DIR/HookFlags.java"        "HookFlags (76 flags + JSON override)"
 apply_file "$OVERLAY_DIR/OtaUpdater.java"      "$PATCHES_DIR/OtaUpdater.java"       "OtaUpdater (in-app APK updater)"
 apply_file "$OVERLAY_DIR/WelcomeMessage.java"   "$PATCHES_DIR/WelcomeMessage.java"    "WelcomeMessage (disabled crash dialog)"
