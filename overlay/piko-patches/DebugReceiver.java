@@ -12,6 +12,7 @@
  *   adb shell am broadcast -a app.morphe.extension.instagram.DEBUG --es command "export_log"
  *   adb shell am broadcast -a app.morphe.extension.instagram.DEBUG --es command "status"
  *   adb shell am broadcast -a app.morphe.extension.instagram.DEBUG --es command "version"
+ *   adb shell am broadcast -a app.morphe.extension.instagram.DEBUG --es command "patch_status"
  *
  * View logs:
  *   adb logcat -s ModDebug
@@ -41,6 +42,7 @@ import java.util.Map;
 import app.morphe.extension.crimera.PikoUtils;
 import app.morphe.extension.instagram.utils.Pref;
 import app.morphe.extension.instagram.patches.HookFlags;
+import app.morphe.extension.instagram.settings.SettingsStatus;
 import app.morphe.extension.shared.Utils;
 
 public class DebugReceiver extends BroadcastReceiver {
@@ -55,7 +57,7 @@ public class DebugReceiver extends BroadcastReceiver {
 
         String command = intent.getStringExtra(EXTRA_COMMAND);
         if (command == null || command.isEmpty()) {
-            log("No command specified. Use: dump_flags, toggle_debug, export_log, status, version");
+            log("No command specified. Use: dump_flags, toggle_debug, export_log, status, version, patch_status");
             return;
         }
 
@@ -78,9 +80,12 @@ public class DebugReceiver extends BroadcastReceiver {
                 case "version":
                     showVersion();
                     break;
+                case "patch_status":
+                    showPatchStatus(context);
+                    break;
                 default:
                     log("Unknown command: " + command);
-                    log("Available: dump_flags, toggle_debug, export_log, status, version");
+                    log("Available: dump_flags, toggle_debug, export_log, status, version, patch_status");
             }
         } catch (Exception e) {
             StringWriter sw = new StringWriter();
@@ -174,6 +179,107 @@ public class DebugReceiver extends BroadcastReceiver {
         log("Last OTA check: " + (lastCheck > 0 ? new Date(lastCheck).toString() : "never"));
 
         log("Flag system: hardcoded patches only (use Instagram importer for extra flags)");
+    }
+
+    /**
+     * Show patch status grouped by category.
+     * Uses SettingsStatus (runtime flags set by enableSettings()) and
+     * SharedPreferences (user preferences) to determine active state.
+     */
+    private void showPatchStatus(Context context) {
+        SharedPreferences prefs = context.getSharedPreferences("piko_settings", Context.MODE_PRIVATE);
+
+        log("=== PATCH STATUS (Grouped) ===");
+
+        // === PRIVACY ===
+        log("[PRIVACY]");
+        log("  viewStoriesAnonymously    : " + status(SettingsStatus.viewStoriesAnonymously));
+        log("  viewDmAnonymously         : " + status(SettingsStatus.viewDmAnonymously));
+        log("  viewLiveAnonymously       : " + status(SettingsStatus.viewLiveAnonymously));
+        log("  disableTypingStatus       : " + status(SettingsStatus.disableTypingStatus));
+        log("  disableScreenshotDetection: " + status(SettingsStatus.disableScreenshotDetection));
+        log("  disableAnalytics          : " + status(SettingsStatus.disableAnalytics));
+        log("  sanitizeShareLinks        : " + status(SettingsStatus.sanitizeShareLinks));
+
+        // === ADS ===
+        log("[ADS & SUGGESTIONS]");
+        log("  disableAds                : " + status(SettingsStatus.disableAds));
+        log("  hideSuggestedContent      : " + status(SettingsStatus.hideSuggestedContent));
+
+        // === DOWNLOAD ===
+        log("[DOWNLOAD]");
+        log("  downloadMedia             : " + status(SettingsStatus.downloadMedia));
+        log("  enableDirectDownload      : " + boolStr(Pref.enableDirectDownload()));
+        log("  downloadUsernameFolder    : " + boolStr(Pref.downloadUsernameFolder()));
+
+        // === FEED ===
+        log("[FEED & POSTS]");
+        log("  moreOptionsOnPost         : " + status(SettingsStatus.moreOptionsOnPost));
+        log("  copyCommentButton         : " + status(SettingsStatus.copyCommentButton));
+        log("  followBackIndicator       : " + status(SettingsStatus.followBackIndicator));
+        log("  hideNavigationButtons     : " + status(SettingsStatus.hideNavigationButtons));
+        log("  viewStoryMentions         : " + status(SettingsStatus.viewStoryMentions));
+
+        // === MEDIA ===
+        log("[MEDIA VIEWING]");
+        log("  improveImageViewing       : " + status(SettingsStatus.improveImageViewing));
+        log("  removeEmptyBottomSpace    : " + status(SettingsStatus.removeEmptyBottomSpace));
+        log("  hideReshareButton         : " + status(SettingsStatus.hideReshareButton));
+        log("  unlimitedReplaysEphemeral : " + status(SettingsStatus.unlimitedReplaysOnEphemeralMedia));
+        log("  disableVideoAutoplay      : " + status(SettingsStatus.disableVideoAutoplay));
+
+        // === DISTRACTION FREE ===
+        log("[DISTRACTION FREE]");
+        log("  disableStories            : " + status(SettingsStatus.disableStories));
+        log("  disableHighlights         : " + status(SettingsStatus.disableHighlights));
+        log("  disableExplore            : " + status(SettingsStatus.disableExplore));
+        log("  disableComments           : " + status(SettingsStatus.disableComments));
+        log("  hideStoriesTray           : " + status(SettingsStatus.hideStoriesTray));
+        log("  hideNotesTray             : " + status(SettingsStatus.hideNotesTray));
+        log("  limitFollowingFeed        : " + status(SettingsStatus.limitFollowingFeed));
+        log("  hideGroupCreationOnShare  : " + status(SettingsStatus.hideGroupCreationOnSharesheet));
+        log("  disableReelsScrolling     : " + status(SettingsStatus.disableReelsScrolling));
+        log("  disableDoubleTapLike      : " + status(SettingsStatus.disableDoubleTapLike));
+
+        // === STORIES ===
+        log("[STORIES]");
+        log("  customiseStoryTimestamp   : " + status(SettingsStatus.customiseStoryTimestamp));
+        log("  customiseStoryRingSize    : " + status(SettingsStatus.customiseStoryRingSize));
+        log("  storiesAudioAutoplay      : " + status(SettingsStatus.storiesAudioAutoplay));
+        log("  disableStoryFlipping      : " + status(SettingsStatus.disableStoryFlipping));
+
+        // === LINKS ===
+        log("[LINKS]");
+        log("  openLinksExternally       : " + status(SettingsStatus.openLinksExternally));
+
+        // === MISC ===
+        log("[MISC]");
+        log("  changeLikeAnimation       : " + status(SettingsStatus.changeLikeAnimation));
+        log("  unlockPlusBenefits        : " + status(SettingsStatus.unlockPlusBenefits));
+        log("  disableDiscoverPeople     : " + status(SettingsStatus.disableDiscoverPeople));
+
+        // === DEVELOPER ===
+        log("[DEVELOPER]");
+        log("  enableDeveloperOptions    : " + status(SettingsStatus.enableDeveloperOptions));
+        log("  removeBuildExpirePopup    : " + status(SettingsStatus.removeBuildExpirePopup));
+        log("  unlockEmployeeOptions     : " + status(SettingsStatus.unlockEmployeeOptions));
+        log("  allowUserNetworkCertificate: " + status(SettingsStatus.allowUserNetworkCertificate));
+        log("  pikoDebug (pref)          : " + boolStr(prefs.getBoolean("piko_debug", false)));
+
+        // === FLAGS ===
+        log("[HOOK FLAGS]");
+        log("  hasFlags                  : " + boolStr(HookFlags.hasFlags()));
+
+        log("=== END PATCH STATUS ===");
+        log("Key: ON = patch applied & active | OFF = patch not applied or disabled");
+    }
+
+    private String status(boolean settingsStatus) {
+        return settingsStatus ? "ON" : "OFF";
+    }
+
+    private String boolStr(boolean val) {
+        return val ? "yes" : "no";
     }
 
     private void showVersion() {

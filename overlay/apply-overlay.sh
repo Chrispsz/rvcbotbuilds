@@ -65,6 +65,8 @@ apply_file "$OVERLAY_DIR/DebugReceiver.java"   "$PATCHES_DIR/DebugReceiver.java"
 echo ""
 echo "--- Entity fixes ---"
 apply_file "$OVERLAY_DIR/InstagramButton.java"  "$ENTITY_DIR/InstagramButton.java"    "InstagramButton (setText v430+ fix)"
+apply_file "$OVERLAY_DIR/MediaData.java"        "$ENTITY_DIR/MediaData.java"          "MediaData (resilient audio/description v430+ fix)"
+apply_file "$OVERLAY_DIR/InstagramDialogBox.java" "$ENTITY_DIR/InstagramDialogBox.java" "InstagramDialogBox (resilient constructor v430+ fix)"
 
 echo ""
 echo "--- Strings & Translations ---"
@@ -97,9 +99,14 @@ if [ -f "$PATCHES_DIR/HookFlags.java" ]; then
     FLAG_COUNT=$(grep -c 'BOOL_FLAGS.put' "$PATCHES_DIR/HookFlags.java" || true)
     echo "  HookFlags boolean flags: $FLAG_COUNT"
     if grep -q 'presetFlags()' "$PATCHES_DIR/HookFlags.java" 2>/dev/null; then
-        echo "  ⚠️  WARNING: presetFlags() method still exists (should be removed)"
+        # Check if it's the intentional stub (empty body) vs old fabricated flags
+        if grep -A2 'public static void presetFlags()' "$PATCHES_DIR/HookFlags.java" 2>/dev/null | grep -q '// Stub'; then
+            echo "  ✅ presetFlags() stub present (required for addFlags bytecode injection)"
+        else
+            echo "  ⚠️  WARNING: presetFlags() method exists but may contain fabricated flags"
+        fi
     else
-        echo "  ✅ No fabricated presetFlags() method"
+        echo "  ⚠️  WARNING: presetFlags() missing (addFlags bytecode injection will crash)"
     fi
     if grep -q 'mc_overrides.json' "$PATCHES_DIR/HookFlags.java" 2>/dev/null; then
         echo "  ⚠️  WARNING: mc_overrides.json loading still exists (should be removed)"

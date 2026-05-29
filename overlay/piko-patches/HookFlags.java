@@ -137,6 +137,13 @@ public class HookFlags {
     }
 
     /**
+     * Check if any flags have been loaded. Used by debug tools.
+     */
+    public static boolean hasFlags() {
+        return !BOOL_FLAGS.isEmpty();
+    }
+
+    /**
      * Dump all current flags to logcat. Called from debug tools.
      */
     public static void dumpFlags() {
