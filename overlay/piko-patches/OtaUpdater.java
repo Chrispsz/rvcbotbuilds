@@ -1,7 +1,10 @@
 /*
  * OTA Updater for Chrispsz/rvcbotbuilds
- * Smart update system — Instagram-focused changelog,
- * silent background check, 24h cooldown, version tracking.
+ * v3.0 — Build-number aware, no memory leaks, Instagram-only changelog.
+ *
+ * Version format: v2025.05.29-1  (date-buildnum)
+ * Same-day rebuilds increment the build number so OTA can detect them.
+ * Installed tag is stored in SharedPreferences for accurate comparison.
  */
 
 package app.morphe.extension.instagram.patches;
@@ -33,29 +36,36 @@ public class OtaUpdater {
 
     private static final String GITHUB_REPO = "Chrispsz/rvcbotbuilds";
     private static final String GITHUB_API = "https://api.github.com/repos/" + GITHUB_REPO + "/releases/latest";
-    private static final String USER_AGENT = "rvcbotbuilds-ota/2.0";
+    private static final String USER_AGENT = "rvcbotbuilds-ota/3.0";
 
-    // Shared preferences keys
+    // SharedPreferences keys
     private static final String PREFS_NAME = "piko_ota";
     private static final String KEY_LAST_CHECK = "last_check_ms";
-    private static final String KEY_LAST_TAG = "last_known_tag";
+    private static final String KEY_INSTALLED_TAG = "installed_tag";
     private static final String KEY_SKIPPED_TAG = "skipped_tag";
 
     // 24h cooldown for auto-check
     private static final long CHECK_COOLDOWN_MS = 24 * 60 * 60 * 1000L;
 
+    // Timeout for download completion receiver (5 minutes)
+    private static final long DOWNLOAD_TIMEOUT_MS = 5 * 60 * 1000L;
+
+    // Track active download receiver to prevent leaks
+    private static BroadcastReceiver activeReceiver = null;
+    private static long activeDownloadId = -1;
+    private static Handler timeoutHandler = new Handler(Looper.getMainLooper());
+
     // ======== Public API ========
 
     /**
-     * Manual check — always shows result dialog (success or "already up to date").
+     * Manual check — always shows result dialog.
      */
     public static void checkForUpdates(Activity activity) {
         performCheck(activity, true);
     }
 
     /**
-     * Silent auto-check — respects 24h cooldown, only notifies on new version.
-     * Call this on app launch.
+     * Silent auto-check — 24h cooldown, only notifies on new version.
      */
     public static void autoCheck(Activity activity) {
         performCheck(activity, false);
@@ -66,20 +76,19 @@ public class OtaUpdater {
     private static void performCheck(Activity activity, boolean manual) {
         new Thread(() -> {
             try {
-                // Cooldown check for auto mode
+                SharedPreferences prefs = activity.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+
+                // Cooldown for auto mode
                 if (!manual) {
-                    SharedPreferences prefs = activity.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
                     long lastCheck = prefs.getLong(KEY_LAST_CHECK, 0);
                     if (System.currentTimeMillis() - lastCheck < CHECK_COOLDOWN_MS) {
-                        return; // Too soon, skip silently
+                        return;
                     }
                 }
 
-                String currentVersion = Utils.getAppVersionName();
                 String[] releaseInfo = fetchLatestRelease();
 
                 // Save check timestamp
-                SharedPreferences prefs = activity.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
                 prefs.edit().putLong(KEY_LAST_CHECK, System.currentTimeMillis()).apply();
 
                 if (releaseInfo == null) {
@@ -93,18 +102,31 @@ public class OtaUpdater {
                 String downloadUrl = releaseInfo[1];
                 String changelog = releaseInfo[2];
 
-                // Save latest known tag
-                prefs.edit().putString(KEY_LAST_TAG, latestTag).apply();
+                String installedTag = prefs.getString(KEY_INSTALLED_TAG, "");
+                int comparison = compareTags(installedTag, latestTag);
 
-                if (isNewerVersion(currentVersion, latestTag)) {
-                    // User skipped this version?
+                // comparison > 0 → latest is newer
+                // comparison == 0 → same version
+                // comparison < 0 → installed is newer (shouldn't happen)
+
+                if (comparison > 0) {
+                    // User skipped this specific tag?
                     if (!manual && latestTag.equals(prefs.getString(KEY_SKIPPED_TAG, ""))) {
-                        return; // Don't re-notify for skipped version
+                        return;
                     }
                     String igChangelog = extractInstagramChangelog(changelog);
-                    showUpdateDialog(activity, latestTag, igChangelog, downloadUrl, manual);
-                } else if (manual) {
-                    showOnUi(activity, "✅ Já está na versão mais recente: " + latestTag);
+                    showUpdateDialog(activity, installedTag, latestTag, igChangelog, downloadUrl);
+                } else if (comparison == 0) {
+                    if (manual) {
+                        showOnUi(activity, "✅ Já está na versão mais recente: " + latestTag);
+                    }
+                } else {
+                    // Installed is "newer" than latest — means our tag tracking is stale
+                    // Update stored tag to latest
+                    prefs.edit().putString(KEY_INSTALLED_TAG, latestTag).apply();
+                    if (manual) {
+                        showOnUi(activity, "✅ Já está na versão mais recente: " + latestTag);
+                    }
                 }
             } catch (Exception e) {
                 if (manual) {
@@ -114,87 +136,132 @@ public class OtaUpdater {
         }).start();
     }
 
-    // ======== Smart changelog ========
+    // ======== Version comparison ========
 
     /**
-     * Extract ONLY the Instagram section from the release notes.
-     * Parses structured format:
-     *   📸 Instagram — 🔨 Rebuilt
-     *      Piko v1.x · Base 430.x
-     *   ...
-     *   ━━━
-     *   📸 Instagram
-     *   AMOLED · Download · ...
+     * Compare two release tags. Format: vYYYY.MM.DD-N or vYYYY.MM.DD
+     * Returns: >0 if b is newer, 0 if equal, <0 if a is newer.
      */
+    private static int compareTags(String a, String b) {
+        if (a == null || a.isEmpty()) return 1; // No installed tag → treat as outdated
+        if (b == null || b.isEmpty()) return -1;
+
+        // Strip 'v' prefix
+        String cleanA = a.replace("v", "").trim();
+        String cleanB = b.replace("v", "").trim();
+
+        // Split date and build number: "2025.05.29-2" → date="2025.05.29", build=2
+        String[] partsA = cleanA.split("-", 2);
+        String[] partsB = cleanB.split("-", 2);
+
+        String dateA = partsA[0];
+        String dateB = partsB[0];
+        int buildA = partsA.length > 1 ? safeParseInt(partsA[1]) : 0;
+        int buildB = partsB.length > 1 ? safeParseInt(partsB[1]) : 0;
+
+        // Compare date parts
+        String[] datePartsA = dateA.split("\\.");
+        String[] datePartsB = dateB.split("\\.");
+        int maxLen = Math.max(datePartsA.length, datePartsB.length);
+        for (int i = 0; i < maxLen; i++) {
+            int da = i < datePartsA.length ? safeParseInt(datePartsA[i]) : 0;
+            int db = i < datePartsB.length ? safeParseInt(datePartsB[i]) : 0;
+            if (db != da) return db - da;
+        }
+
+        // Same date → compare build number
+        return buildB - buildA;
+    }
+
+    private static int safeParseInt(String s) {
+        try {
+            StringBuilder num = new StringBuilder();
+            for (char c : s.toCharArray()) {
+                if (Character.isDigit(c)) num.append(c);
+                else break;
+            }
+            return num.length() > 0 ? Integer.parseInt(num.toString()) : 0;
+        } catch (Exception e) { return 0; }
+    }
+
+    /**
+     * Format tag for display: "v2025.05.29-2" → "29/05/2025 build 2"
+     * "v2025.05.29" → "29/05/2025"
+     */
+    private static String formatTagDisplay(String tag) {
+        if (tag == null || tag.isEmpty()) return "—";
+        String clean = tag.replace("v", "");
+        String[] parts = clean.split("-", 2);
+        String date = parts[0];
+        String[] d = date.split("\\.");
+        String display;
+        if (d.length >= 3) {
+            display = d[2] + "/" + d[1] + "/" + d[0];
+        } else {
+            display = date;
+        }
+        if (parts.length > 1 && !parts[1].equals("0")) {
+            display += " build " + parts[1];
+        }
+        return display;
+    }
+
+    // ======== Smart changelog ========
+
     private static String extractInstagramChangelog(String raw) {
         if (raw == null || raw.isEmpty()) return "";
 
         String[] lines = raw.split("\\\\n|\n");
         StringBuilder igSection = new StringBuilder();
         boolean inIgBlock = false;
-        boolean pastFirstBlock = false;
-
-        // Separator that marks the detail sections
         boolean pastSeparator = false;
 
         for (String line : lines) {
             String trimmed = line.trim();
             if (trimmed.isEmpty()) continue;
 
-            // Detect separator (━━━ or ---)
             if (trimmed.matches("[-━]{3,}")) {
                 pastSeparator = true;
                 inIgBlock = false;
                 continue;
             }
 
-            // First block: status lines (📸 Instagram — 🔨 Rebuilt)
             if (!pastSeparator) {
                 if (trimmed.contains("📸") || trimmed.contains("Instagram")) {
                     inIgBlock = true;
-                    // Clean: remove emoji prefix, keep content
                     String cleaned = trimmed
                             .replaceFirst("^[📸📺🎵]\\s*", "")
                             .replace("Instagram — ", "Instagram: ");
                     igSection.append(cleaned).append("\n");
                     continue;
                 }
-                // Continuation line (indented detail under Instagram)
                 if (inIgBlock && (trimmed.startsWith("Piko") || trimmed.startsWith("Base") || trimmed.contains("Carried"))) {
                     igSection.append("  ").append(trimmed).append("\n");
                     inIgBlock = false;
                     continue;
                 }
-                // Hit YouTube/Music line — end of Instagram block
                 if (trimmed.contains("📺") || trimmed.contains("🎵") || trimmed.contains("YouTube") || trimmed.contains("Music")) {
                     inIgBlock = false;
                     continue;
                 }
             }
 
-            // Second block: detail sections (📸 Instagram\n AMOLED · ...)
             if (pastSeparator) {
                 if (trimmed.contains("📸") || trimmed.contains("Instagram")) {
                     inIgBlock = true;
-                    // Skip the header "📸 Instagram" — it's redundant
                     continue;
                 }
                 if (inIgBlock) {
-                    // End Instagram detail block when hitting YouTube/Music
                     if (trimmed.contains("📺") || trimmed.contains("🎵") ||
                         trimmed.contains("YouTube") || trimmed.contains("Music")) {
                         inIgBlock = false;
                         continue;
                     }
-                    // Skip "🔧 Smart CI" section
                     if (trimmed.contains("🔧") || trimmed.contains("Smart CI")) {
                         inIgBlock = false;
                         continue;
                     }
-                    // Skip bullet list items under Smart CI
-                    if (trimmed.startsWith("•")) {
-                        continue;
-                    }
+                    if (trimmed.startsWith("•")) continue;
                     igSection.append(trimmed).append("\n");
                 }
             }
@@ -202,20 +269,14 @@ public class OtaUpdater {
 
         String result = igSection.toString().trim();
         if (result.isEmpty()) {
-            // Fallback: generic clean
             result = cleanFallback(raw);
         }
-
         if (result.length() > 350) {
             result = result.substring(0, 350).trim() + "…";
         }
-
         return result;
     }
 
-    /**
-     * Fallback: strip all markdown and return cleaned text (limited).
-     */
     private static String cleanFallback(String raw) {
         String text = raw;
         text = text.replaceAll("(?m)^\\|.*\\|\\s*$", "");
@@ -236,9 +297,10 @@ public class OtaUpdater {
     // ======== GitHub API ========
 
     private static String[] fetchLatestRelease() {
+        HttpURLConnection conn = null;
         try {
             URL url = new URL(GITHUB_API);
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
             conn.setRequestProperty("User-Agent", USER_AGENT);
             conn.setConnectTimeout(10000);
@@ -264,6 +326,10 @@ public class OtaUpdater {
             }
         } catch (Exception e) {
             PikoUtils.logger(e);
+        } finally {
+            if (conn != null) {
+                try { conn.disconnect(); } catch (Exception ignored) {}
+            }
         }
         return null;
     }
@@ -309,42 +375,18 @@ public class OtaUpdater {
         return null;
     }
 
-    // ======== Version comparison ========
-
-    private static boolean isNewerVersion(String currentVersion, String latestTag) {
-        String current = currentVersion.replace("v", "").trim();
-        String latest = latestTag.replace("v", "").trim();
-        if (current.isEmpty() || latest.isEmpty()) return true;
-        String[] currentParts = current.split("\\.");
-        String[] latestParts = latest.split("\\.");
-        int maxLen = Math.max(currentParts.length, latestParts.length);
-        for (int i = 0; i < maxLen; i++) {
-            int c = i < currentParts.length ? safeParseInt(currentParts[i]) : 0;
-            int l = i < latestParts.length ? safeParseInt(latestParts[i]) : 0;
-            if (l > c) return true;
-            if (l < c) return false;
-        }
-        return false;
-    }
-
-    private static int safeParseInt(String s) {
-        try {
-            StringBuilder num = new StringBuilder();
-            for (char c : s.toCharArray()) {
-                if (Character.isDigit(c)) num.append(c);
-                else break;
-            }
-            return num.length() > 0 ? Integer.parseInt(num.toString()) : 0;
-        } catch (Exception e) { return 0; }
-    }
-
     // ======== UI ========
 
-    private static void showUpdateDialog(Activity activity, String version, String changelog, String downloadUrl, boolean manual) {
+    private static void showUpdateDialog(Activity activity, String installedTag, String latestTag, String changelog, String downloadUrl) {
         new Handler(Looper.getMainLooper()).post(() -> {
             try {
                 StringBuilder message = new StringBuilder();
-                message.append("Nova versão: ").append(version);
+
+                // Clear version comparison
+                String installedDisplay = formatTagDisplay(installedTag);
+                String latestDisplay = formatTagDisplay(latestTag);
+                message.append("Instalada: ").append(installedDisplay);
+                message.append("\nDisponível: ").append(latestDisplay);
 
                 if (!changelog.isEmpty()) {
                     message.append("\n\n").append(changelog);
@@ -356,14 +398,16 @@ public class OtaUpdater {
                     .setTitle("⚡ Atualização disponível")
                     .setMessage(message.toString())
                     .setPositiveButton("Baixar", (dialog, which) -> {
-                        prefs.edit().remove(KEY_SKIPPED_TAG).apply();
-                        downloadApk(activity, downloadUrl, version);
+                        prefs.edit()
+                            .remove(KEY_SKIPPED_TAG)
+                            .putString(KEY_INSTALLED_TAG, latestTag)
+                            .apply();
+                        downloadApk(activity, downloadUrl, latestTag);
                     })
                     .setNeutralButton("Depois", (dialog, which) -> {
-                        // Remember user skipped this version
-                        prefs.edit().putString(KEY_SKIPPED_TAG, version).apply();
+                        prefs.edit().putString(KEY_SKIPPED_TAG, latestTag).apply();
                     })
-                    .setNegativeButton("Ver no GitHub", (dialog, which) -> {
+                    .setNegativeButton("GitHub", (dialog, which) -> {
                         Intent browserIntent = new Intent(Intent.ACTION_VIEW,
                                 Uri.parse("https://github.com/" + GITHUB_REPO + "/releases/latest"));
                         browserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -371,43 +415,62 @@ public class OtaUpdater {
                     })
                     .show();
             } catch (Exception e) {
-                Toast.makeText(activity, "Atualização: " + version, Toast.LENGTH_LONG).show();
+                Toast.makeText(activity, "Atualização: " + latestTag, Toast.LENGTH_LONG).show();
             }
         });
     }
 
+    // ======== Download (leak-safe) ========
+
     private static void downloadApk(Context context, String downloadUrl, String version) {
         try {
+            // Unregister any previous receiver first (prevents leak)
+            unregisterReceiverSafe(context);
+
             DownloadManager.Request request = new DownloadManager.Request(Uri.parse(downloadUrl));
             request.setTitle("Mod " + version);
             request.setDescription("Baixando atualização...");
             request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "rvcbotbuilds/instagram-" + version + ".apk");
+            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS,
+                    "rvcbotbuilds/instagram-" + version + ".apk");
+
             DownloadManager dm = (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
-            long downloadId = dm.enqueue(request);
+            activeDownloadId = dm.enqueue(request);
             Toast.makeText(context, "Baixando atualização... Verifique as notificações.", Toast.LENGTH_LONG).show();
 
-            BroadcastReceiver receiver = new BroadcastReceiver() {
+            // Register receiver with timeout
+            activeReceiver = new BroadcastReceiver() {
                 @Override
                 public void onReceive(Context ctx, Intent intent) {
                     long id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
-                    if (id == downloadId) {
-                        try { context.unregisterReceiver(this); } catch (Exception ignored) {}
+                    if (id == activeDownloadId) {
+                        // Unregister immediately — no leak
+                        unregisterReceiverSafe(ctx);
+                        cancelTimeout();
+
                         DownloadManager.Query query = new DownloadManager.Query();
-                        query.setFilterById(downloadId);
+                        query.setFilterById(activeDownloadId);
                         Cursor cursor = dm.query(query);
                         if (cursor != null && cursor.moveToFirst()) {
                             int uriIndex = cursor.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI);
                             if (uriIndex != -1) {
                                 String localUri = cursor.getString(uriIndex);
-                                promptInstall(context, localUri);
+                                promptInstall(ctx, localUri);
                             }
                             cursor.close();
                         }
+                        activeDownloadId = -1;
                     }
                 }
             };
-            context.registerReceiver(receiver, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
+            context.registerReceiver(activeReceiver, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
+
+            // Safety timeout — unregister after 5 minutes to prevent leak
+            timeoutHandler.postDelayed(() -> {
+                unregisterReceiverSafe(context);
+                activeDownloadId = -1;
+            }, DOWNLOAD_TIMEOUT_MS);
+
         } catch (Exception e) {
             try {
                 Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl));
@@ -417,6 +480,19 @@ public class OtaUpdater {
                 Toast.makeText(context, "Falha no download. Abra o navegador.", Toast.LENGTH_LONG).show();
             }
         }
+    }
+
+    private static void unregisterReceiverSafe(Context context) {
+        if (activeReceiver != null) {
+            try {
+                context.unregisterReceiver(activeReceiver);
+            } catch (Exception ignored) {}
+            activeReceiver = null;
+        }
+    }
+
+    private static void cancelTimeout() {
+        timeoutHandler.removeCallbacksAndMessages(null);
     }
 
     private static void promptInstall(Context context, String fileUri) {

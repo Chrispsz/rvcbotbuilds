@@ -406,9 +406,34 @@ jobs:
 
       - name: Generate tag & release notes
         id: release-meta
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          DATE_TAG="v$(date +'%Y.%m.%d')"
+          # Generate tag with build number: v2025.05.29-1, v2025.05.29-2, etc.
+          BASE_TAG="v$(date +'%Y.%m.%d')"
+          BUILD_NUM=1
+
+          # Check if a release with today's date already exists
+          EXISTING_TAGS=$(curl -sL -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/releases" | \
+            jq -r ".[].tag_name | select(startswith(\"$BASE_TAG\"))" 2>/dev/null || echo "")
+
+          if [ -n "$EXISTING_TAGS" ]; then
+            # Find the highest build number for today
+            HIGHEST=0
+            while IFS= read -r t; do
+              NUM=$(echo "$t" | sed "s/${BASE_TAG}-//" 2>/dev/null || echo "0")
+              NUM=${NUM:-0}
+              if [ "$NUM" -gt "$HIGHEST" ] 2>/dev/null; then
+                HIGHEST=$NUM
+              fi
+            done <<< "$EXISTING_TAGS"
+            BUILD_NUM=$((HIGHEST + 1))
+          fi
+
+          DATE_TAG="${BASE_TAG}-${BUILD_NUM}"
           echo "tag=$DATE_TAG" >> $GITHUB_OUTPUT
+          echo "📋 Release tag: $DATE_TAG (build $BUILD_NUM of the day)"
 
           IG_STATUS="⏭️ Unchanged"
           IG_DETAIL="Carried from previous release"
@@ -463,18 +488,49 @@ jobs:
 
           cat release-notes.md
 
-      - name: Delete previous latest release
+      - name: Mark old releases as prerelease
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="${{ steps.release-meta.outputs.tag }}"
-          OLD_ID=$(curl -sL "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$TAG" | jq -r '.id // empty' 2>/dev/null || true)
-          if [ -n "$OLD_ID" ]; then
-            echo "Deleting old release $OLD_ID for tag $TAG"
-            curl -s -X DELETE -H "Authorization: token $GITHUB_TOKEN" \
-              "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/$OLD_ID" || true
-            curl -s -X DELETE -H "Authorization: token $GITHUB_TOKEN" \
-              "https://api.github.com/repos/$GITHUB_REPOSITORY/git/refs/tags/$TAG" || true
+          # Mark older same-day releases as prerelease (keep history, avoid confusion)
+          BASE_TAG="v$(date +'%Y.%m.%d')"
+          RELEASES=$(curl -sL -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/releases" | \
+            jq -c ".[] | select(.tag_name | startswith(\"$BASE_TAG\")) | {id: .id, tag: .tag_name, prerelease: .prerelease}" 2>/dev/null || echo "")
+
+          while IFS= read -r rel; do
+            [ -z "$rel" ] && continue
+            REL_ID=$(echo "$rel" | jq -r '.id')
+            IS_PRE=$(echo "$rel" | jq -r '.prerelease')
+            if [ "$IS_PRE" = "false" ]; then
+              echo "Marking old release $REL_ID as prerelease"
+              curl -s -X PATCH -H "Authorization: token $GITHUB_TOKEN" \
+                -H "Content-Type: application/json" \
+                -d '{"prerelease": true}' \
+                "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/$REL_ID" > /dev/null
+            fi
+          done <<< "$RELEASES"
+
+          # Delete releases older than 7 days to keep repo clean
+          CUTOFF=$(date -d '7 days ago' +'%Y-%m-%d' 2>/dev/null || date -v-7d +'%Y-%m-%d' 2>/dev/null || echo "")
+          if [ -n "$CUTOFF" ]; then
+            ALL_RELEASES=$(curl -sL -H "Authorization: token $GITHUB_TOKEN" \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/releases?per_page=100" | \
+              jq -c ".[] | {id: .id, tag: .tag_name}" 2>/dev/null || echo "")
+            while IFS= read -r rel; do
+              [ -z "$rel" ] && continue
+              REL_TAG=$(echo "$rel" | jq -r '.tag')
+              REL_ID=$(echo "$rel" | jq -r '.id')
+              # Extract date from tag: v2025.05.29-1 → 2025.05.29
+              REL_DATE=$(echo "$REL_TAG" | sed 's/v//; s/-[0-9]*$//' | tr '.' '-')
+              if [ "$REL_DATE" "<" "$CUTOFF" ] 2>/dev/null; then
+                echo "Deleting old release $REL_ID ($REL_TAG)"
+                curl -s -X DELETE -H "Authorization: token $GITHUB_TOKEN" \
+                  "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/$REL_ID" > /dev/null
+                curl -s -X DELETE -H "Authorization: token $GITHUB_TOKEN" \
+                  "https://api.github.com/repos/$GITHUB_REPOSITORY/git/refs/tags/$REL_TAG" > /dev/null || true
+              fi
+            done <<< "$ALL_RELEASES"
           fi
 
       - name: Publish Release

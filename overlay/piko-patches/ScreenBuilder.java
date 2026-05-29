@@ -598,15 +598,25 @@ public class ScreenBuilder {
     public void otaSection() {
         PreferenceCategory category = addCategory(Strings.CATEGORY_OTA);
 
-        // Show last check time in description
+        // Show installed version and last check time
         String checkDesc = Strings.OTA_CHECK_UPDATE_DESC;
         try {
             android.content.SharedPreferences otaPrefs = context.getSharedPreferences("piko_ota", android.content.Context.MODE_PRIVATE);
             long lastCheck = otaPrefs.getLong("last_check_ms", 0);
+            String installedTag = otaPrefs.getString("installed_tag", "");
+
+            StringBuilder descExtra = new StringBuilder();
+            if (!installedTag.isEmpty()) {
+                descExtra.append("Instalada: ").append(formatTagForDisplay(installedTag));
+            }
             if (lastCheck > 0) {
                 long hoursAgo = (System.currentTimeMillis() - lastCheck) / (60 * 60 * 1000);
                 String timeAgo = hoursAgo < 1 ? "agora" : hoursAgo + "h atrás";
-                checkDesc += " (Última verificação: " + timeAgo + ")";
+                if (descExtra.length() > 0) descExtra.append(" · ");
+                descExtra.append("Verificado: ").append(timeAgo);
+            }
+            if (descExtra.length() > 0) {
+                checkDesc += "\n" + descExtra.toString();
             }
         } catch (Exception ignored) {}
 
@@ -633,6 +643,24 @@ public class ScreenBuilder {
                         Strings.OTA_CONFIG_PATH
                 )
         );
+    }
+
+    private static String formatTagForDisplay(String tag) {
+        if (tag == null || tag.isEmpty()) return "—";
+        String clean = tag.replace("v", "");
+        String[] parts = clean.split("-", 2);
+        String date = parts[0];
+        String[] d = date.split("\\.");
+        String display;
+        if (d.length >= 3) {
+            display = d[2] + "/" + d[1];
+        } else {
+            display = date;
+        }
+        if (parts.length > 1 && !parts[1].equals("0")) {
+            display += "." + parts[1];
+        }
+        return display;
     }
 
     public void aboutSection() {
