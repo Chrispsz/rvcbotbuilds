@@ -1,6 +1,7 @@
 /*
  * OTA Updater for Chrispsz/rvcbotbuilds
- * v3.0 — Build-number aware, no memory leaks, Instagram-only changelog.
+ * v3.1 — Build-number aware, no memory leaks, Instagram-only changelog,
+ *         proper JSON parsing, APK signature verification.
  *
  * Version format: v2025.05.29-1  (date-buildnum)
  * Same-day rebuilds increment the build number so OTA can detect them.
@@ -17,6 +18,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.Signature;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Environment;
@@ -25,18 +29,23 @@ import android.os.Looper;
 import android.widget.Toast;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import app.morphe.extension.crimera.PikoUtils;
+import app.morphe.extension.instagram.constants.Strings;
 import app.morphe.extension.shared.Utils;
 
 public class OtaUpdater {
 
     private static final String GITHUB_REPO = "Chrispsz/rvcbotbuilds";
     private static final String GITHUB_API = "https://api.github.com/repos/" + GITHUB_REPO + "/releases/latest";
-    private static final String USER_AGENT = "rvcbotbuilds-ota/3.0";
+    private static final String USER_AGENT = "rvcbotbuilds-ota/3.1";
 
     // SharedPreferences keys
     private static final String PREFS_NAME = "piko_ota";
@@ -49,6 +58,9 @@ public class OtaUpdater {
 
     // Timeout for download completion receiver (5 minutes)
     private static final long DOWNLOAD_TIMEOUT_MS = 5 * 60 * 1000L;
+
+    // Maximum response size for GitHub API (1 MB)
+    private static final int MAX_RESPONSE_SIZE = 1024 * 1024;
 
     // Track active download receiver to prevent leaks
     private static BroadcastReceiver activeReceiver = null;
@@ -96,7 +108,7 @@ public class OtaUpdater {
 
                 if (releaseInfo == null) {
                     if (manual) {
-                        showOnUi(activity, "Não foi possível verificar atualizações.\nVerifique sua conexão.");
+                        showOnUi(activity, Strings.OTA_NO_CONNECTION);
                     }
                     return;
                 }
@@ -121,19 +133,19 @@ public class OtaUpdater {
                     showUpdateDialog(activity, installedTag, latestTag, igChangelog, downloadUrl);
                 } else if (comparison == 0) {
                     if (manual) {
-                        showOnUi(activity, "✅ Já está na versão mais recente: " + latestTag);
+                        showOnUi(activity, "✅ " + Strings.OTA_UP_TO_DATE + latestTag);
                     }
                 } else {
                     // Installed is "newer" than latest — means our tag tracking is stale
                     // Update stored tag to latest
                     prefs.edit().putString(KEY_INSTALLED_TAG, latestTag).apply();
                     if (manual) {
-                        showOnUi(activity, "✅ Já está na versão mais recente: " + latestTag);
+                        showOnUi(activity, "✅ " + Strings.OTA_UP_TO_DATE + latestTag);
                     }
                 }
             } catch (Exception e) {
                 if (manual) {
-                    showOnUi(activity, "Falha ao verificar: " + e.getMessage());
+                    showOnUi(activity, Strings.OTA_CHECK_FAILED + e.getMessage());
                 }
             }
         }).start();
@@ -185,28 +197,6 @@ public class OtaUpdater {
             }
             return num.length() > 0 ? Integer.parseInt(num.toString()) : 0;
         } catch (Exception e) { return 0; }
-    }
-
-    /**
-     * Format tag for display: "v2025.05.29-2" → "29/05/2025 build 2"
-     * "v2025.05.29" → "29/05/2025"
-     */
-    private static String formatTagDisplay(String tag) {
-        if (tag == null || tag.isEmpty()) return "—";
-        String clean = tag.replace("v", "");
-        String[] parts = clean.split("-", 2);
-        String date = parts[0];
-        String[] d = date.split("\\.");
-        String display;
-        if (d.length >= 3) {
-            display = d[2] + "/" + d[1] + "/" + d[0];
-        } else {
-            display = date;
-        }
-        if (parts.length > 1 && !parts[1].equals("0")) {
-            display += " build " + parts[1];
-        }
-        return display;
     }
 
     // ======== Smart changelog ========
@@ -299,7 +289,7 @@ public class OtaUpdater {
 
     // ======== GitHub API ========
 
-    private static String[] fetchLatestRelease() {
+    private static String[] fetchLatestRelease() throws IOException {
         HttpURLConnection conn = null;
         try {
             URL url = new URL(GITHUB_API);
@@ -314,19 +304,54 @@ public class OtaUpdater {
             BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
             StringBuilder response = new StringBuilder();
             String line;
+            int totalSize = 0;
             while ((line = reader.readLine()) != null) {
+                totalSize += line.length() + 1; // +1 for newline
+                if (totalSize > MAX_RESPONSE_SIZE) {
+                    reader.close();
+                    throw new IOException("Response exceeds 1MB limit");
+                }
                 response.append(line);
             }
             reader.close();
 
             String json = response.toString();
-            String tagName = extractJsonString(json, "tag_name");
-            String body = extractJsonString(json, "body");
-            String apkUrl = extractApkUrl(json);
+
+            // Parse JSON response using org.json
+            JSONObject release = new JSONObject(json);
+
+            String tagName = release.getString("tag_name");
+            String body = release.optString("body", "");
+
+            // Extract APK URL from assets array
+            String apkUrl = null;
+            String fallbackUrl = null;
+            JSONArray assets = release.optJSONArray("assets");
+            if (assets != null) {
+                for (int i = 0; i < assets.length(); i++) {
+                    JSONObject asset = assets.getJSONObject(i);
+                    String downloadUrl = asset.optString("browser_download_url", "");
+                    String name = asset.optString("name", "");
+                    if (downloadUrl.endsWith(".apk")) {
+                        if (name.contains("instagram")) {
+                            apkUrl = downloadUrl;
+                            break;
+                        }
+                        if (fallbackUrl == null) {
+                            fallbackUrl = downloadUrl;
+                        }
+                    }
+                }
+            }
+            if (apkUrl == null) {
+                apkUrl = fallbackUrl;
+            }
 
             if (tagName != null && apkUrl != null) {
                 return new String[]{tagName, apkUrl, body != null ? body : ""};
             }
+        } catch (IOException e) {
+            throw e;
         } catch (Exception e) {
             PikoUtils.logger(e);
         } finally {
@@ -337,45 +362,34 @@ public class OtaUpdater {
         return null;
     }
 
-    private static String extractJsonString(String json, String key) {
-        String searchKey = "\"" + key + "\"";
-        int keyIndex = json.indexOf(searchKey);
-        if (keyIndex == -1) return null;
-        int colonIndex = json.indexOf(":", keyIndex);
-        if (colonIndex == -1) return null;
-        int valueStart = json.indexOf("\"", colonIndex);
-        if (valueStart == -1) return null;
-        int valueEnd = json.indexOf("\"", valueStart + 1);
-        if (valueEnd == -1) return null;
-        return json.substring(valueStart + 1, valueEnd);
-    }
+    // ======== APK Signature Verification ========
 
-    private static String extractApkUrl(String json) {
+    /**
+     * Verify that the downloaded APK's signing certificate matches the currently
+     * installed app's signature. Returns true if signatures match, false otherwise.
+     */
+    private static boolean verifyApkSignature(Context context, String apkPath) {
         try {
-            int assetsIndex = json.indexOf("\"assets\"");
-            if (assetsIndex == -1) return null;
-            String searchStr = "browser_download_url";
-            int searchStart = assetsIndex;
-            String fallback = null;
-            while (true) {
-                int urlKeyIndex = json.indexOf(searchStr, searchStart);
-                if (urlKeyIndex == -1) break;
-                int colonIndex = json.indexOf(":", urlKeyIndex);
-                int valueStart = json.indexOf("\"", colonIndex);
-                int valueEnd = json.indexOf("\"", valueStart + 1);
-                if (valueStart == -1 || valueEnd == -1) break;
-                String url = json.substring(valueStart + 1, valueEnd);
-                if (url.endsWith(".apk")) {
-                    if (url.contains("instagram")) return url;
-                    if (fallback == null) fallback = url;
-                }
-                searchStart = valueEnd;
-            }
-            return fallback;
+            PackageManager pm = context.getPackageManager();
+
+            // Get current app's signature
+            PackageInfo currentInfo = pm.getPackageInfo(context.getPackageName(), PackageManager.GET_SIGNATURES);
+            Signature[] currentSigs = currentInfo.signatures;
+            if (currentSigs == null || currentSigs.length == 0) return false;
+
+            // Get downloaded APK's signature
+            PackageInfo apkInfo = pm.getPackageArchiveInfo(apkPath, PackageManager.GET_SIGNATURES);
+            if (apkInfo == null || apkInfo.signatures == null || apkInfo.signatures.length == 0) return false;
+
+            // Compare first signature hash
+            String currentHash = Integer.toHexString(currentSigs[0].hashCode());
+            String apkHash = Integer.toHexString(apkInfo.signatures[0].hashCode());
+
+            return currentHash.equals(apkHash);
         } catch (Exception e) {
             PikoUtils.logger(e);
+            return false;
         }
-        return null;
     }
 
     // ======== UI ========
@@ -386,10 +400,10 @@ public class OtaUpdater {
                 StringBuilder message = new StringBuilder();
 
                 // Clear version comparison
-                String installedDisplay = formatTagDisplay(installedTag);
-                String latestDisplay = formatTagDisplay(latestTag);
-                message.append("Instalada: ").append(installedDisplay);
-                message.append("\nDisponível: ").append(latestDisplay);
+                String installedDisplay = Strings.formatTagDisplay(installedTag);
+                String latestDisplay = Strings.formatTagDisplay(latestTag);
+                message.append(Strings.OTA_INSTALLED).append(installedDisplay);
+                message.append("\n").append(Strings.OTA_AVAILABLE).append(latestDisplay);
 
                 if (!changelog.isEmpty()) {
                     message.append("\n\n").append(changelog);
@@ -398,19 +412,19 @@ public class OtaUpdater {
                 SharedPreferences prefs = activity.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
 
                 new AlertDialog.Builder(activity)
-                    .setTitle("⚡ Atualização disponível")
+                    .setTitle(Strings.OTA_UPDATE_AVAILABLE)
                     .setMessage(message.toString())
-                    .setPositiveButton("Baixar", (dialog, which) -> {
+                    .setPositiveButton(Strings.OTA_BTN_DOWNLOAD, (dialog, which) -> {
                         prefs.edit()
                             .remove(KEY_SKIPPED_TAG)
                             .putString(KEY_INSTALLED_TAG, latestTag)
                             .apply();
                         downloadApk(activity, downloadUrl, latestTag);
                     })
-                    .setNeutralButton("Depois", (dialog, which) -> {
+                    .setNeutralButton(Strings.OTA_BTN_LATER, (dialog, which) -> {
                         prefs.edit().putString(KEY_SKIPPED_TAG, latestTag).apply();
                     })
-                    .setNegativeButton("GitHub", (dialog, which) -> {
+                    .setNegativeButton(Strings.OTA_BTN_GITHUB, (dialog, which) -> {
                         Intent browserIntent = new Intent(Intent.ACTION_VIEW,
                                 Uri.parse("https://github.com/" + GITHUB_REPO + "/releases/latest"));
                         browserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -418,7 +432,7 @@ public class OtaUpdater {
                     })
                     .show();
             } catch (Exception e) {
-                Toast.makeText(activity, "Atualização: " + latestTag, Toast.LENGTH_LONG).show();
+                Toast.makeText(activity, Strings.OTA_UPDATE_LABEL + latestTag, Toast.LENGTH_LONG).show();
             }
         });
     }
@@ -432,14 +446,14 @@ public class OtaUpdater {
 
             DownloadManager.Request request = new DownloadManager.Request(Uri.parse(downloadUrl));
             request.setTitle("Mod " + version);
-            request.setDescription("Baixando atualização...");
+            request.setDescription(Strings.OTA_DOWNLOADING);
             request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
             request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS,
                     "rvcbotbuilds/instagram-" + version + ".apk");
 
             DownloadManager dm = (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
             activeDownloadId = dm.enqueue(request);
-            Toast.makeText(context, "Baixando atualização... Verifique as notificações.", Toast.LENGTH_LONG).show();
+            Toast.makeText(context, Strings.OTA_DOWNLOADING, Toast.LENGTH_LONG).show();
 
             // Register receiver with timeout
             activeReceiver = new BroadcastReceiver() {
@@ -458,7 +472,7 @@ public class OtaUpdater {
                             int uriIndex = cursor.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI);
                             if (uriIndex != -1) {
                                 String localUri = cursor.getString(uriIndex);
-                                promptInstall(ctx, localUri);
+                                handleDownloadedApk(ctx, localUri);
                             }
                             cursor.close();
                         }
@@ -490,8 +504,44 @@ public class OtaUpdater {
                 browserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 context.startActivity(browserIntent);
             } catch (Exception ex) {
-                Toast.makeText(context, "Falha no download. Abra o navegador.", Toast.LENGTH_LONG).show();
+                Toast.makeText(context, Strings.OTA_DOWNLOAD_FAILED, Toast.LENGTH_LONG).show();
             }
+        }
+    }
+
+    /**
+     * Handle a downloaded APK: verify signature, then prompt install or show warning.
+     */
+    private static void handleDownloadedApk(Context context, String fileUri) {
+        try {
+            String apkPath = Uri.parse(fileUri).getPath();
+            if (apkPath == null) {
+                apkPath = fileUri;
+            }
+
+            boolean signatureValid = verifyApkSignature(context, apkPath);
+            if (signatureValid) {
+                promptInstall(context, fileUri);
+            } else {
+                // Signature mismatch — show warning dialog
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    try {
+                        new AlertDialog.Builder(context)
+                            .setTitle(Strings.OTA_SIGNATURE_TITLE)
+                            .setMessage(Strings.OTA_SIGNATURE_MISMATCH)
+                            .setPositiveButton(android.R.string.ok, (dialog, which) -> {
+                                promptInstall(context, fileUri);
+                            })
+                            .setNegativeButton(android.R.string.cancel, null)
+                            .show();
+                    } catch (Exception e) {
+                        Toast.makeText(context, Strings.OTA_SIGNATURE_TITLE + ": " + Strings.OTA_SIGNATURE_MISMATCH, Toast.LENGTH_LONG).show();
+                    }
+                });
+            }
+        } catch (Exception e) {
+            // Fallback: just try to install anyway
+            promptInstall(context, fileUri);
         }
     }
 
@@ -523,7 +573,7 @@ public class OtaUpdater {
                 openDownloads.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 context.startActivity(openDownloads);
             } catch (Exception ex2) {
-                Toast.makeText(context, "APK em Downloads/rvcbotbuilds/", Toast.LENGTH_LONG).show();
+                Toast.makeText(context, Strings.OTA_APK_LOCATION, Toast.LENGTH_LONG).show();
             }
         }
     }
@@ -532,7 +582,7 @@ public class OtaUpdater {
         new Handler(Looper.getMainLooper()).post(() -> {
             try {
                 new AlertDialog.Builder(activity)
-                    .setTitle("Atualização")
+                    .setTitle(Strings.OTA_TITLE)
                     .setMessage(message)
                     .setPositiveButton("OK", null)
                     .show();

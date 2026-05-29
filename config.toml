@@ -8,7 +8,7 @@ parallel-jobs = 2
 compression-level = 9
 riplib = true
 remove-rv-integrations-checks = true
-continue-on-error = true
+continue-on-error = false
 default-arch = "arm64-v8a"
 
 # ============================================

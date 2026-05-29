@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2026 piko <https://github.com/crimera/piko>
+ * Copyright (C) 2025 piko <https://github.com/crimera/piko>
  *
  * See the included NOTICE file for GPLv3 §7(b) terms that apply to this code.
  */
@@ -51,7 +51,7 @@ public class ScreenBuilder {
     public void buildAdsSection() {
         if (!(SettingsStatus.adsSection())) return;
 
-        PreferenceCategory category = category = addCategory(Strings.CATEGORY_ADS);
+        PreferenceCategory category = addCategory(Strings.CATEGORY_ADS);
         if (SettingsStatus.disableAds) {
             addPreference(category,
                     helper.switchPreference(
@@ -75,7 +75,7 @@ public class ScreenBuilder {
     public void buildDeveloperSection() {
         if (!(SettingsStatus.developerOptionsSection())) return;
 
-        PreferenceCategory category = category = addCategory(Strings.CATEGORY_DEV_OPTIONS);
+        PreferenceCategory category = addCategory(Strings.CATEGORY_DEV_OPTIONS);
 
         if (SettingsStatus.removeBuildExpirePopup) {
             addPreference(category,
@@ -153,7 +153,7 @@ public class ScreenBuilder {
     public void ghostSection() {
         if (!(SettingsStatus.ghostSection())) return;
 
-        PreferenceCategory category = category = addCategory(Strings.CATEGORY_GHOST);
+        PreferenceCategory category = addCategory(Strings.CATEGORY_GHOST);
 
         if (SettingsStatus.viewStoriesAnonymously) {
             addPreference(category,
@@ -206,7 +206,7 @@ public class ScreenBuilder {
     public void linksSection() {
         if (!(SettingsStatus.linksSection())) return;
 
-        PreferenceCategory category = category = addCategory(Strings.CATEGORY_LINKS);
+        PreferenceCategory category = addCategory(Strings.CATEGORY_LINKS);
         if (SettingsStatus.openLinksExternally) {
             addPreference(category,
                     helper.switchPreference(
@@ -230,7 +230,7 @@ public class ScreenBuilder {
     public void distractionFreeSection() {
         if (!(SettingsStatus.distractionFreeSection())) return;
 
-        PreferenceCategory category = category = addCategory(Strings.CATEGORY_DISTRACTION_FREE);
+        PreferenceCategory category = addCategory(Strings.CATEGORY_DISTRACTION_FREE);
 
         if (SettingsStatus.disableStories) {
             addPreference(category,
@@ -352,7 +352,7 @@ public class ScreenBuilder {
     public void buildMiscSection() {
         if (!(SettingsStatus.miscSection())) return;
 
-        PreferenceCategory category = category = addCategory(Strings.CATEGORY_MISC);
+        PreferenceCategory category = addCategory(Strings.CATEGORY_MISC);
         if (SettingsStatus.unlockPlusBenefits) {
             addPreference(category,
                     helper.switchPreference(
@@ -521,7 +521,7 @@ public class ScreenBuilder {
     public void buildDownloadSection() {
         if (!(SettingsStatus.downloadMedia)) return;
 
-        PreferenceCategory category = category = addCategory(Strings.CATEGORY_DOWNLOAD_MEDIA);
+        PreferenceCategory category = addCategory(Strings.CATEGORY_DOWNLOAD_MEDIA);
 
         addPreference(category,
                 helper.switchPreference(
@@ -607,7 +607,7 @@ public class ScreenBuilder {
 
             StringBuilder descExtra = new StringBuilder();
             if (!installedTag.isEmpty()) {
-                descExtra.append("Instalada: ").append(formatTagForDisplay(installedTag));
+                descExtra.append(Strings.OTA_INSTALLED).append(Strings.formatTagDisplay(installedTag));
             }
             if (lastCheck > 0) {
                 long hoursAgo = (System.currentTimeMillis() - lastCheck) / (60 * 60 * 1000);
@@ -645,27 +645,11 @@ public class ScreenBuilder {
         );
     }
 
-    private static String formatTagForDisplay(String tag) {
-        if (tag == null || tag.isEmpty()) return "—";
-        String clean = tag.replace("v", "");
-        String[] parts = clean.split("-", 2);
-        String date = parts[0];
-        String[] d = date.split("\\.");
-        String display;
-        if (d.length >= 3) {
-            display = d[2] + "/" + d[1];
-        } else {
-            display = date;
-        }
-        if (parts.length > 1 && !parts[1].equals("0")) {
-            display += "." + parts[1];
-        }
-        return display;
-    }
+
 
     public void aboutSection() {
 
-        PreferenceCategory category = category = addCategory(Strings.PATCH_INFO_TITLE);
+        PreferenceCategory category = addCategory(Strings.PATCH_INFO_TITLE);
         String appVersionText = String.format(Strings.APP_VERSION, Utils.getAppVersionName());
         String patchVersionText = String.format(Strings.PATCH_VERSION, Utils.getPatchesReleaseVersion());
 

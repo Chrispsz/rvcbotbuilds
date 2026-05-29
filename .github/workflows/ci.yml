@@ -34,7 +34,7 @@ jobs:
       YT_VERSION: ${{ steps.check.outputs.YT_VERSION }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -94,7 +94,10 @@ jobs:
           if git fetch origin update --depth=1 2>/dev/null; then
             LAST_IG=$(git show origin/update:build-meta/ig-base-version.txt 2>/dev/null || echo "")
           fi
-          if [ -n "$IG_VERSION" ] && [ "$IG_VERSION" != "$LAST_IG" ]; then
+          if [ -z "$LAST_IG" ] && [ -n "$IG_VERSION" ]; then
+            echo "🆕 First IG base check — Instagram will be built"
+            BUILD_INSTAGRAM=1
+          elif [ -n "$IG_VERSION" ] && [ "$IG_VERSION" != "$LAST_IG" ]; then
             echo "⚠️  IG base update: $LAST_IG → $IG_VERSION"
             BUILD_INSTAGRAM=1
           fi
@@ -132,7 +135,10 @@ jobs:
           if git fetch origin update --depth=1 2>/dev/null; then
             LAST_YT=$(git show origin/update:build-meta/yt-base-version.txt 2>/dev/null || echo "")
           fi
-          if [ -n "$YT_VERSION" ] && [ "$YT_VERSION" != "$LAST_YT" ]; then
+          if [ -z "$LAST_YT" ] && [ -n "$YT_VERSION" ]; then
+            echo "🆕 First YT base check — YouTube will be built"
+            BUILD_YOUTUBE=1
+          elif [ -n "$YT_VERSION" ] && [ "$YT_VERSION" != "$LAST_YT" ]; then
             echo "⚠️  YT base update: $LAST_YT → $YT_VERSION"
             BUILD_YOUTUBE=1
           fi
@@ -164,10 +170,10 @@ jobs:
       contents: write
     steps:
       - name: Checkout rvcbotbuilds
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Checkout piko fork
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           repository: Chrispsz/piko
           ref: main
@@ -290,7 +296,11 @@ jobs:
     needs: [check-updates, sync-piko]
     if: needs.check-updates.outputs.BUILD_INSTAGRAM == '1'
     uses: ./.github/workflows/build-instagram.yml
-    secrets: inherit
+    secrets:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
+      KS_KEYSTORE_B64: ${{ secrets.KS_KEYSTORE_B64 }}
+      KS_P12_KEYSTORE_B64: ${{ secrets.KS_P12_KEYSTORE_B64 }}
 
   # ===========================================
   # Step 4: Build YouTube + Music (conditional)
@@ -299,7 +309,10 @@ jobs:
     needs: check-updates
     if: needs.check-updates.outputs.BUILD_YOUTUBE == '1'
     uses: ./.github/workflows/build-youtube.yml
-    secrets: inherit
+    secrets:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      KS_KEYSTORE_B64: ${{ secrets.KS_KEYSTORE_B64 }}
+      KS_P12_KEYSTORE_B64: ${{ secrets.KS_P12_KEYSTORE_B64 }}
 
   # ===========================================
   # Step 5: Create unified release
@@ -312,7 +325,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Install deps
         run: sudo apt-get install -y jq
@@ -556,7 +569,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout update branch
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           ref: update
           fetch-depth: 0

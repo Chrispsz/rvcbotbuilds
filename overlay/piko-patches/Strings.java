@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2026 piko <https://github.com/crimera/piko>
+ * Copyright (C) 2025 piko <https://github.com/crimera/piko>
  *
  * See the included NOTICE file for GPLv3 §7(b) terms that apply to this code.
  */
@@ -189,5 +189,47 @@ public class Strings {
     public static final String OTA_RELOAD_CONFIG_DESC = langInstance.OTA_RELOAD_CONFIG_DESC;
     public static final String OTA_CONFIG_PATH = langInstance.OTA_CONFIG_PATH;
     public static final String OTA_CONFIG_PATH_DESC = langInstance.OTA_CONFIG_PATH_DESC;
+
+    // OTA runtime messages
+    public static final String OTA_NO_CONNECTION = langInstance.OTA_NO_CONNECTION;
+    public static final String OTA_UP_TO_DATE = langInstance.OTA_UP_TO_DATE;
+    public static final String OTA_CHECK_FAILED = langInstance.OTA_CHECK_FAILED;
+    public static final String OTA_INSTALLED = langInstance.OTA_INSTALLED;
+    public static final String OTA_AVAILABLE = langInstance.OTA_AVAILABLE;
+    public static final String OTA_DOWNLOADING = langInstance.OTA_DOWNLOADING;
+    public static final String OTA_DOWNLOAD_FAILED = langInstance.OTA_DOWNLOAD_FAILED;
+    public static final String OTA_APK_LOCATION = langInstance.OTA_APK_LOCATION;
+    public static final String OTA_SIGNATURE_MISMATCH = langInstance.OTA_SIGNATURE_MISMATCH;
+    public static final String OTA_SIGNATURE_TITLE = langInstance.OTA_SIGNATURE_TITLE;
+    public static final String OTA_UPDATE_AVAILABLE = langInstance.OTA_UPDATE_AVAILABLE;
+    public static final String OTA_BTN_DOWNLOAD = langInstance.OTA_BTN_DOWNLOAD;
+    public static final String OTA_BTN_LATER = langInstance.OTA_BTN_LATER;
+    public static final String OTA_BTN_GITHUB = langInstance.OTA_BTN_GITHUB;
+    public static final String OTA_TITLE = langInstance.OTA_TITLE;
+    public static final String OTA_UPDATE_LABEL = langInstance.OTA_UPDATE_LABEL;
+
+    // ======== Utility methods ========
+
+    /**
+     * Format a release tag for display: "v2025.05.29-2" → "29/05/2025 build 2"
+     * "v2025.05.29" → "29/05/2025"
+     */
+    public static String formatTagDisplay(String tag) {
+        if (tag == null || tag.isEmpty()) return "—";
+        String clean = tag.replace("v", "");
+        String[] parts = clean.split("-", 2);
+        String date = parts[0];
+        String[] d = date.split("\\.");
+        String display;
+        if (d.length >= 3) {
+            display = d[2] + "/" + d[1] + "/" + d[0];
+        } else {
+            display = date;
+        }
+        if (parts.length > 1 && !parts[1].equals("0")) {
+            display += " build " + parts[1];
+        }
+        return display;
+    }
 
 }

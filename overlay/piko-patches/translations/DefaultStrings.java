@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2026 piko <https://github.com/crimera/piko>
+ * Copyright (C) 2025 piko <https://github.com/crimera/piko>
  *
  * See the included NOTICE file for GPLv3 §7(b) terms that apply to this code.
  */
@@ -127,6 +127,7 @@ public class DefaultStrings {
     public static String ENABLE_MORE_OPTIONS_ON_POST = "Enable more option on post";
     public static String ENABLE_MORE_OPTIONS_ON_POST_DESC = "Get more options on long pressing the post";
 
+
     public static String CATEGORY_HIDE_NAVIGATION_BUTTONS = "Hide navigation buttons";
     public static String HIDE_NAVIGATION_FEED = "Hide Feed button";
     public static String HIDE_NAVIGATION_REELS = "Hide Reels button";
@@ -168,8 +169,11 @@ public class DefaultStrings {
     public static String ARR_DETAILED_TIMESTAMP = "Detailed timestamp";
     public static String ARR_TIME_LEFT = "Time left";
 
+    // Keep for compat — no longer shown in dialog
     public static String WELCOME_TITLE = "Welcome to Mod";
+    // Keep for compat — no longer shown in dialog
     public static String WELCOME_MESSAGE = "To improve your experience, visit Mod settings and adjust your preferences";
+    // Keep for compat — no longer shown in dialog
     public static String GOTO_PIKO_SETTINGS = "Go to Mod settings";
     public static String NO_INTERNET = "Please connect to internet";
 
@@ -181,5 +185,23 @@ public class DefaultStrings {
     public static String OTA_RELOAD_CONFIG_DESC = "Reload mc_overrides.json from storage (no restart needed for external JSON)";
     public static String OTA_CONFIG_PATH = "Config file location";
     public static String OTA_CONFIG_PATH_DESC = "/sdcard/Android/media/com.instagram.android/mc_overrides.json";
+
+    // OTA runtime messages
+    public static String OTA_NO_CONNECTION = "Could not check for updates. Check your internet connection.";
+    public static String OTA_UP_TO_DATE = "Already on the latest version: ";
+    public static String OTA_CHECK_FAILED = "Update check failed: ";
+    public static String OTA_INSTALLED = "Installed: ";
+    public static String OTA_AVAILABLE = "Available: ";
+    public static String OTA_DOWNLOADING = "Downloading update... Check notifications.";
+    public static String OTA_DOWNLOAD_FAILED = "Download failed. Open browser.";
+    public static String OTA_APK_LOCATION = "APK in Downloads/rvcbotbuilds/";
+    public static String OTA_SIGNATURE_MISMATCH = "Warning: The downloaded APK has a different signature. Install anyway?";
+    public static String OTA_SIGNATURE_TITLE = "Signature Verification";
+    public static String OTA_UPDATE_AVAILABLE = "Update available";
+    public static String OTA_BTN_DOWNLOAD = "Download";
+    public static String OTA_BTN_LATER = "Later";
+    public static String OTA_BTN_GITHUB = "GitHub";
+    public static String OTA_TITLE = "Update";
+    public static String OTA_UPDATE_LABEL = "Update: ";
 
 }

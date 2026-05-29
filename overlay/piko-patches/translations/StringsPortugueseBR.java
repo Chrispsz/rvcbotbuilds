@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2026 piko <https://github.com/crimera/piko>
+ * Copyright (C) 2025 piko <https://github.com/crimera/piko>
  *
  * See the included NOTICE file for GPLv3 §7(b) terms that apply to this code.
  */
@@ -183,5 +183,23 @@ public class StringsPortugueseBR extends DefaultStrings {
         this.OTA_RELOAD_CONFIG_DESC = "Recarrega mc_overrides.json do armazenamento (sem precisar reiniciar)";
         this.OTA_CONFIG_PATH = "Local do arquivo de config";
         this.OTA_CONFIG_PATH_DESC = "/sdcard/Android/media/com.instagram.android/mc_overrides.json";
+
+        // OTA runtime messages
+        this.OTA_NO_CONNECTION = "Não foi possível verificar atualizações.\nVerifique sua conexão.";
+        this.OTA_UP_TO_DATE = "Já está na versão mais recente: ";
+        this.OTA_CHECK_FAILED = "Falha ao verificar: ";
+        this.OTA_INSTALLED = "Instalada: ";
+        this.OTA_AVAILABLE = "Disponível: ";
+        this.OTA_DOWNLOADING = "Baixando atualização... Verifique as notificações.";
+        this.OTA_DOWNLOAD_FAILED = "Falha no download. Abra o navegador.";
+        this.OTA_APK_LOCATION = "APK em Downloads/rvcbotbuilds/";
+        this.OTA_SIGNATURE_MISMATCH = "Aviso: O APK baixado tem uma assinatura diferente. Instalar mesmo assim?";
+        this.OTA_SIGNATURE_TITLE = "Verificação de Assinatura";
+        this.OTA_UPDATE_AVAILABLE = "⚡ Atualização disponível";
+        this.OTA_BTN_DOWNLOAD = "Baixar";
+        this.OTA_BTN_LATER = "Depois";
+        this.OTA_BTN_GITHUB = "GitHub";
+        this.OTA_TITLE = "Atualização";
+        this.OTA_UPDATE_LABEL = "Atualização: ";
     }
 }

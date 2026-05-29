@@ -1,5 +1,5 @@
 /*
-    * Copyright (C) 2026 piko <https://github.com/crimera/piko>
+    * Copyright (C) 2025 piko <https://github.com/crimera/piko>
     *
     * This file is part of piko.
     *

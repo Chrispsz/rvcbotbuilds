@@ -1,13 +1,11 @@
 <div align="center">
 
-# 📸🎬🎵 RVCBotBuilds
+# 📸🎬🎵 RVCArise
 
 **Modded APKs & Magisk Modules — Instagram, YouTube, Music**
 
 [![CI](https://github.com/Chrispsz/rvcbotbuilds/actions/workflows/ci.yml/badge.svg?event=schedule)](https://github.com/Chrispsz/rvcbotbuilds/actions/workflows/ci.yml)
-[![Build](https://github.com/Chrispsz/rvcbotbuilds/actions/workflows/build.yml/badge.svg)](https://github.com/Chrispsz/rvcbotbuilds/actions/workflows/build.yml)
 [![Release](https://img.shields.io/github/v/release/Chrispsz/rvcbotbuilds?include_prereleases&label=Latest%20Release)](https://github.com/Chrispsz/rvcbotbuilds/releases)
-[![Telegram](https://img.shields.io/badge/Telegram-2CA5E0?style=flat&logo=telegram&logoColor=white)](https://t.me/rvc_magisk)
 
 Fork do [j-hc/revanced-magisk-module](https://github.com/j-hc/revanced-magisk-module) com patches curados de múltiplas fontes.
 
@@ -17,16 +15,15 @@ Fork do [j-hc/revanced-magisk-module](https://github.com/j-hc/revanced-magisk-mo
 
 ## ✨ Features
 
-- 📸 **Instagram** — 21 patches piko + 2 custom RVCBotBuilds (FLAG_SECURE + Quality Override)
+- 📸 **Instagram** — 21 patches piko + 76 MetaConfig flags + OTA updater
 - 🎬 **YouTube** — Morphe patches com tema AMOLED (preto puro)
 - 🎵 **Music** — Morphe patches com tema AMOLED
 - 🖤 **AMOLED** — Tema preto puro para YouTube e Music (`@android:color/black`)
 - 📥 **Download** — Posts, reels, stories, highlights, profile pics, voice messages
 - 🚫 **Ads** — Ads e conteúdo sugerido removidos
-- 📸 **Screenshots em DMs** — FLAG_SECURE removido (custom patch)
-- 🔍 **Qualidade** — Imagens 2048px + MobileConfig quality override
-- 🔄 **CI Automático** — Checa atualizações de patches diariamente (13h BRT)
-- 🛡️ **Auto-Detach** — Zygisk detach bloqueia atualizações da Play Store
+- 🔍 **Qualidade** — Imagens 2048px + 76 MetaConfig quality/privacy/download flags
+- 🔄 **OTA** — Atualização automática do mod direto no app (24h cooldown, build numbers)
+- 🔄 **CI Inteligente** — Checa atualizações de patches diariamente (13h BRT), só rebuilda o que mudou
 
 ---
 
@@ -34,7 +31,7 @@ Fork do [j-hc/revanced-magisk-module](https://github.com/j-hc/revanced-magisk-mo
 
 | App | Patches | Source | Base | Modo | Arch |
 |-----|---------|--------|------|------|------|
-| 📸 Instagram | 21 + 2 custom | crimera/piko v3.5.0-dev.2 | 430.0.0.53.80 | APK | arm64-v8a |
+| 📸 Instagram | 21 + 76 flags + OTA | Chrispsz/piko (fork) | 430.0.0.53.80 | APK | arm64-v8a |
 | 🎬 YouTube | Theme (AMOLED) | MorpheApp/morphe-patches | Auto | APK + Module | arm64-v8a |
 | 🎵 Music | Theme (AMOLED) | MorpheApp/morphe-patches | Auto | APK + Module | arm64-v8a |
 
@@ -42,7 +39,7 @@ Fork do [j-hc/revanced-magisk-module](https://github.com/j-hc/revanced-magisk-mo
 
 ## 📸 Instagram Patches
 
-### ✅ Included (21 piko + 2 custom = 23 total)
+### ✅ Included (21 piko patches)
 
 <details>
 <summary><b>🖤 Theme & Visual</b></summary>
@@ -116,17 +113,28 @@ Fork do [j-hc/revanced-magisk-module](https://github.com/j-hc/revanced-magisk-mo
 
 | Patch | Descrição |
 |-------|-----------|
-| Add settings | Hub Piko Settings |
+| Add settings | Hub Mod Settings com OTA + reload config |
 | Unlock developer options | Painel MetaConfig (segure ícone home) |
 
 </details>
 
-### 🔧 Custom RVCBotBuilds Patches (binary patches)
+### 🔧 MetaConfig Flags (76 hardcoded + JSON override)
 
-| Patch | Método | Efeito |
-|-------|--------|--------|
-| 📸 **Allow Screenshots in DMs** | FLAG_SECURE removal (binary dex patch) | Screenshot liberado em DMs — 531 ocorrências em 17 DEX files |
-| 🔍 **MobileConfig Quality Override** | medium→high, standard→hd (context-gated binary patch) | Qualidade maximizada — só patch DEX com contexto de qualidade |
+| Categoria | Count | Efeito |
+|-----------|-------|--------|
+| Stories crash fix | 3 | Previne crash no v430+ |
+| Image/video quality | 13 | Upload, streaming, cache em resolução máxima |
+| Download media | 7 | Download direto, stories, reels, highlights |
+| Ads & sponsored | 11 | Remove ads do feed, explore, reels, search |
+| Analytics & tracking | 11 | Bloqueia logging, heartbeat, fingerprint |
+| Privacy | 12 | Screenshot, typing, read receipts, tracking |
+| Build/OTA | 2 | Remove expirado, skip update check |
+| Links/sharing | 4 | Sanitize, open externally, block tracking |
+| UI | 1 | Remove empty bottom space |
+| Contact consent | 4 | Permissão de contato |
+| Overflow menu | 4 | Menu overflow simplificado |
+
+> **Priority:** JSON override (`/sdcard/Android/media/com.instagram.android/mc_overrides.json`) > hardcoded flags
 
 ### ❌ Excluded (risky/detectable)
 
@@ -137,8 +145,6 @@ Fork do [j-hc/revanced-magisk-module](https://github.com/j-hc/revanced-magisk-mo
 | View stories anonymously | Meta monitora — alto risco |
 | Unlock employee options | Ferramentas internas da Meta |
 | Unlock Plus benefits | Violação de TOS |
-| Limit feed to following profiles | Quebra algoritmo do feed |
-| Hide navigation buttons | Pode quebrar UI |
 
 ---
 
@@ -160,18 +166,18 @@ Baixe os APKs e módulos na página de [**Releases**](https://github.com/Chrisps
 
 | Workflow | Trigger | Descrição |
 |----------|---------|-----------|
-| [`build.yml`](.github/workflows/build.yml) | Manual / Push | Build todos ou app específico |
-| [`release-instagram.yml`](.github/workflows/release-instagram.yml) | Manual | Build Instagram + GitHub Release |
-| [`ci.yml`](.github/workflows/ci.yml) | Diário 13h BRT | Auto-detect updates |
+| [`ci.yml`](.github/workflows/ci.yml) | Diário 13h BRT + Manual | Smart CI — só rebuilda o que mudou |
+| [`build-instagram.yml`](.github/workflows/build-instagram.yml) | Chamado pelo CI | Build Instagram APK |
+| [`build-youtube.yml`](.github/workflows/build-youtube.yml) | Chamado pelo CI | Build YouTube + Music |
 
-### Build Targets
+### Smart CI
 
-| Target | Apps | Tempo aprox. |
-|--------|------|-------------|
-| `all` | Instagram + YouTube + Music | ~15 min |
-| `instagram` | Instagram only | ~5 min |
-| `youtube` | YouTube only | ~8 min |
-| `music` | Music only | ~5 min |
+- Verifica se patches ou base APK mudaram
+- Só rebuilda apps com mudanças upstream
+- Assets de apps inalterados são carried forward
+- Mesmo-dia builds recebem build number incremental (`v2025.05.29-1`, `v2025.05.29-2`)
+- Releases antigos do mesmo dia são marcados como prerelease
+- Releases com mais de 7 dias são auto-deletados
 
 ---
 
@@ -206,7 +212,8 @@ Veja [`CONFIG.md`](./CONFIG.md) para referência completa de configuração.
 | Projeto | O que faz |
 |---------|----------|
 | [j-hc/revanced-magisk-module](https://github.com/j-hc/revanced-magisk-module) | Build system base |
-| [crimera/piko](https://github.com/crimera/piko) | 46 Instagram patches |
+| [crimera/piko](https://github.com/crimera/piko) | 46 Instagram patches (upstream) |
+| [Chrispsz/piko](https://github.com/Chrispsz/piko) | Piko fork com overlay custom |
 | [MorpheApp/morphe-patches](https://github.com/MorpheApp/morphe-patches) | YouTube/Music patches + AMOLED |
 | [j-hc/zygisk-detach](https://github.com/j-hc/zygisk-detach) | Auto-detach da Play Store |
 
@@ -214,6 +221,6 @@ Veja [`CONFIG.md`](./CONFIG.md) para referência completa de configuração.
 
 <div align="center">
 
-**[rvcbotbuilds](https://github.com/Chrispsz/rvcbotbuilds)** — feito com 🖤
+**[RVCArise](https://github.com/Chrispsz/rvcbotbuilds)** — feito com 🖤
 
 </div>
