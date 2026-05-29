@@ -177,15 +177,15 @@ public class StringsKorean extends DefaultStrings {
         this.ARR_DETAILED_TIMESTAMP = "상세 시간";
         this.ARR_TIME_LEFT = "남은 시간";
         
-        this.WELCOME_TITLE = "Mod에 오신 것을 환영합니다";
+        this.WELCOME_TITLE = "Piko에 오신 것을 환영합니다";
         this.WELCOME_MESSAGE = "Mod 사용 경험을 개선하려면 Mod 설정으로 이동하여 원하는 대로 설정해 주세요";
         this.GOTO_PIKO_SETTINGS = "Mod 설정으로 이동";
         this.NO_INTERNET = "인터넷에 연결해 주세요";
         this.TAP_HERE = "여기를 탭하세요 !!"; 
-    }
+
 
         // ===== RVCArise OTA + Debug strings =====
-this.CATEGORY_OTA = "OTA Updater";
+        this.CATEGORY_OTA = "OTA Updater";
         this.OTA_CHECK_UPDATE = "Check for updates";
         this.OTA_CHECK_UPDATE_DESC = "Automatically checks for mod updates every 48 hours";
         this.OTA_NO_CONNECTION = "No internet connection";
@@ -204,7 +204,6 @@ this.CATEGORY_OTA = "OTA Updater";
         this.OTA_BTN_GITHUB = "View on GitHub";
         this.OTA_TITLE = "OTA Updater";
         this.OTA_UPDATE_LABEL = "Mod Update";
-
         this.DEBUG_DUMP_FLAGS = "Dump patch flags";
         this.DEBUG_DUMP_FLAGS_DESC = "Log all HookFlags overrides to logcat";
         this.DEBUG_EXPORT_DIAG = "Export diagnostics";
@@ -212,4 +211,5 @@ this.CATEGORY_OTA = "OTA Updater";
         this.DEBUG_ADB_HELP = "ADB debug commands";
         this.DEBUG_ADB_HELP_DESC = "Show available ADB broadcast commands for debugging";
 
+    }
 }
