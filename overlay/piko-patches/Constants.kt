@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2025 piko <https://github.com/crimera/piko>
+ * Copyright (C) 2026 piko <https://github.com/crimera/piko>
  *
  * See the included NOTICE file for GPLv3 §7(b) terms that apply to this code.
  */
@@ -23,11 +23,10 @@ object Constants {
                     // Stable
                     AppTarget(
                         version = "430.0.0.53.80",
-                        description = "Tested on version code - 383207248, 383207252",
                         versionCodes =
                             mapOf(
-                                ARM64_V8A to 383207248,
-                                ARM64_V8A to 383207252,
+                                ARM64_V8A to 383611190,
+                                ARM64_V8A to 383611231,
                             ),
                     ),
                 ),
@@ -52,7 +51,7 @@ object Constants {
 
     const val LINKS_DESCRIPTOR = "$PATCHES_DESCRIPTOR/Links;"
     const val DOWNLOAD_DESCRIPTOR = "$PATCHES_DESCRIPTOR/download"
-    const val UI_CONSTANTS_DESCRIPTOR = "$INTEGRATIONS_PACKAGE/constants/UI;"
+    const val CONSTANTS_DESCRIPTOR = "$INTEGRATIONS_PACKAGE/constants"
     const val ENTITY_CLASS = "$INTEGRATIONS_PACKAGE/entity"
 
     const val ACTIVITY_SETTINGS_STATUS_CLASS = "$ACTIVITY_SETTINGS_CLASS/SettingsStatus;"
