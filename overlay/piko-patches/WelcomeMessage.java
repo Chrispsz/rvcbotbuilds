@@ -11,6 +11,7 @@
 package app.morphe.extension.instagram.patches;
 
 
+import android.app.Activity;
 import android.content.Context;
 
 import app.morphe.extension.instagram.utils.Pref;
@@ -22,13 +23,19 @@ public class WelcomeMessage {
     public static void openWelcomeMessage(Context context) {
         try {
             // Mark first time as seen without showing dialog.
-            // The original code called UI.welcomeDialogBox(context) which
-            // attempts to show an AlertDialog during app init — this causes
-            // a crash when the context is not a valid Activity (e.g. profile screen).
-            // The piko settings button already pulses on first launch, which is enough.
             Pref.setFirstTimePiko(false);
         } catch (Exception ex) {
             Logger.printException(() -> "openWelcomeMessage failure", ex);
+        }
+
+        // Silent auto-check for OTA updates (24h cooldown, no dialog if up-to-date)
+        try {
+            if (context instanceof Activity) {
+                OtaUpdater.autoCheck((Activity) context);
+            }
+        } catch (Exception ex) {
+            // Never crash the app for an OTA check
+            Logger.printException(() -> "OTA autoCheck failure", ex);
         }
     }
 

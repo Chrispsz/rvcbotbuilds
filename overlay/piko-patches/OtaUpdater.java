@@ -1,7 +1,7 @@
 /*
  * OTA Updater for Chrispsz/rvcbotbuilds
- * Checks GitHub releases for new mod APK versions
- * Downloads and triggers install — NO ROOT required
+ * Smart update system — Instagram-focused changelog,
+ * silent background check, 24h cooldown, version tracking.
  */
 
 package app.morphe.extension.instagram.patches;
@@ -13,6 +13,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Environment;
@@ -21,7 +22,6 @@ import android.os.Looper;
 import android.widget.Toast;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -33,19 +33,59 @@ public class OtaUpdater {
 
     private static final String GITHUB_REPO = "Chrispsz/rvcbotbuilds";
     private static final String GITHUB_API = "https://api.github.com/repos/" + GITHUB_REPO + "/releases/latest";
-    private static final String USER_AGENT = "rvcbotbuilds-ota/1.0";
+    private static final String USER_AGENT = "rvcbotbuilds-ota/2.0";
+
+    // Shared preferences keys
+    private static final String PREFS_NAME = "piko_ota";
+    private static final String KEY_LAST_CHECK = "last_check_ms";
+    private static final String KEY_LAST_TAG = "last_known_tag";
+    private static final String KEY_SKIPPED_TAG = "skipped_tag";
+
+    // 24h cooldown for auto-check
+    private static final long CHECK_COOLDOWN_MS = 24 * 60 * 60 * 1000L;
+
+    // ======== Public API ========
 
     /**
-     * Check for updates from GitHub releases.
+     * Manual check — always shows result dialog (success or "already up to date").
      */
     public static void checkForUpdates(Activity activity) {
+        performCheck(activity, true);
+    }
+
+    /**
+     * Silent auto-check — respects 24h cooldown, only notifies on new version.
+     * Call this on app launch.
+     */
+    public static void autoCheck(Activity activity) {
+        performCheck(activity, false);
+    }
+
+    // ======== Core logic ========
+
+    private static void performCheck(Activity activity, boolean manual) {
         new Thread(() -> {
             try {
+                // Cooldown check for auto mode
+                if (!manual) {
+                    SharedPreferences prefs = activity.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+                    long lastCheck = prefs.getLong(KEY_LAST_CHECK, 0);
+                    if (System.currentTimeMillis() - lastCheck < CHECK_COOLDOWN_MS) {
+                        return; // Too soon, skip silently
+                    }
+                }
+
                 String currentVersion = Utils.getAppVersionName();
                 String[] releaseInfo = fetchLatestRelease();
 
+                // Save check timestamp
+                SharedPreferences prefs = activity.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+                prefs.edit().putLong(KEY_LAST_CHECK, System.currentTimeMillis()).apply();
+
                 if (releaseInfo == null) {
-                    showOnUi(activity, "Não foi possível verificar atualizações. Verifique sua conexão.");
+                    if (manual) {
+                        showOnUi(activity, "Não foi possível verificar atualizações.\nVerifique sua conexão.");
+                    }
                     return;
                 }
 
@@ -53,16 +93,147 @@ public class OtaUpdater {
                 String downloadUrl = releaseInfo[1];
                 String changelog = releaseInfo[2];
 
+                // Save latest known tag
+                prefs.edit().putString(KEY_LAST_TAG, latestTag).apply();
+
                 if (isNewerVersion(currentVersion, latestTag)) {
-                    showUpdateDialog(activity, latestTag, changelog, downloadUrl);
-                } else {
+                    // User skipped this version?
+                    if (!manual && latestTag.equals(prefs.getString(KEY_SKIPPED_TAG, ""))) {
+                        return; // Don't re-notify for skipped version
+                    }
+                    String igChangelog = extractInstagramChangelog(changelog);
+                    showUpdateDialog(activity, latestTag, igChangelog, downloadUrl, manual);
+                } else if (manual) {
                     showOnUi(activity, "✅ Já está na versão mais recente: " + latestTag);
                 }
             } catch (Exception e) {
-                showOnUi(activity, "Falha ao verificar: " + e.getMessage());
+                if (manual) {
+                    showOnUi(activity, "Falha ao verificar: " + e.getMessage());
+                }
             }
         }).start();
     }
+
+    // ======== Smart changelog ========
+
+    /**
+     * Extract ONLY the Instagram section from the release notes.
+     * Parses structured format:
+     *   📸 Instagram — 🔨 Rebuilt
+     *      Piko v1.x · Base 430.x
+     *   ...
+     *   ━━━
+     *   📸 Instagram
+     *   AMOLED · Download · ...
+     */
+    private static String extractInstagramChangelog(String raw) {
+        if (raw == null || raw.isEmpty()) return "";
+
+        String[] lines = raw.split("\\\\n|\n");
+        StringBuilder igSection = new StringBuilder();
+        boolean inIgBlock = false;
+        boolean pastFirstBlock = false;
+
+        // Separator that marks the detail sections
+        boolean pastSeparator = false;
+
+        for (String line : lines) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty()) continue;
+
+            // Detect separator (━━━ or ---)
+            if (trimmed.matches("[-━]{3,}")) {
+                pastSeparator = true;
+                inIgBlock = false;
+                continue;
+            }
+
+            // First block: status lines (📸 Instagram — 🔨 Rebuilt)
+            if (!pastSeparator) {
+                if (trimmed.contains("📸") || trimmed.contains("Instagram")) {
+                    inIgBlock = true;
+                    // Clean: remove emoji prefix, keep content
+                    String cleaned = trimmed
+                            .replaceFirst("^[📸📺🎵]\\s*", "")
+                            .replace("Instagram — ", "Instagram: ");
+                    igSection.append(cleaned).append("\n");
+                    continue;
+                }
+                // Continuation line (indented detail under Instagram)
+                if (inIgBlock && (trimmed.startsWith("Piko") || trimmed.startsWith("Base") || trimmed.contains("Carried"))) {
+                    igSection.append("  ").append(trimmed).append("\n");
+                    inIgBlock = false;
+                    continue;
+                }
+                // Hit YouTube/Music line — end of Instagram block
+                if (trimmed.contains("📺") || trimmed.contains("🎵") || trimmed.contains("YouTube") || trimmed.contains("Music")) {
+                    inIgBlock = false;
+                    continue;
+                }
+            }
+
+            // Second block: detail sections (📸 Instagram\n AMOLED · ...)
+            if (pastSeparator) {
+                if (trimmed.contains("📸") || trimmed.contains("Instagram")) {
+                    inIgBlock = true;
+                    // Skip the header "📸 Instagram" — it's redundant
+                    continue;
+                }
+                if (inIgBlock) {
+                    // End Instagram detail block when hitting YouTube/Music
+                    if (trimmed.contains("📺") || trimmed.contains("🎵") ||
+                        trimmed.contains("YouTube") || trimmed.contains("Music")) {
+                        inIgBlock = false;
+                        continue;
+                    }
+                    // Skip "🔧 Smart CI" section
+                    if (trimmed.contains("🔧") || trimmed.contains("Smart CI")) {
+                        inIgBlock = false;
+                        continue;
+                    }
+                    // Skip bullet list items under Smart CI
+                    if (trimmed.startsWith("•")) {
+                        continue;
+                    }
+                    igSection.append(trimmed).append("\n");
+                }
+            }
+        }
+
+        String result = igSection.toString().trim();
+        if (result.isEmpty()) {
+            // Fallback: generic clean
+            result = cleanFallback(raw);
+        }
+
+        if (result.length() > 350) {
+            result = result.substring(0, 350).trim() + "…";
+        }
+
+        return result;
+    }
+
+    /**
+     * Fallback: strip all markdown and return cleaned text (limited).
+     */
+    private static String cleanFallback(String raw) {
+        String text = raw;
+        text = text.replaceAll("(?m)^\\|.*\\|\\s*$", "");
+        text = text.replaceAll("<[^>]+>", "");
+        text = text.replaceAll("\\*{1,2}([^*]+)\\*{1,2}", "$1");
+        text = text.replaceAll("\\[([^]]+)\\]\\([^)]+\\)", "$1");
+        text = text.replaceAll("[-━]{3,}", "");
+        text = text.replaceAll("\n{3,}", "\n\n");
+        String[] lines = text.split("\n");
+        StringBuilder sb = new StringBuilder();
+        for (String line : lines) {
+            String t = line.trim();
+            if (!t.isEmpty()) sb.append(t).append("\n");
+        }
+        return sb.toString().trim();
+    }
+
+    // ======== GitHub API ========
 
     private static String[] fetchLatestRelease() {
         try {
@@ -126,7 +297,6 @@ public class OtaUpdater {
                 if (valueStart == -1 || valueEnd == -1) break;
                 String url = json.substring(valueStart + 1, valueEnd);
                 if (url.endsWith(".apk")) {
-                    // Prefer Instagram APK specifically (handles multi-APK releases)
                     if (url.contains("instagram")) return url;
                     if (fallback == null) fallback = url;
                 }
@@ -138,6 +308,8 @@ public class OtaUpdater {
         }
         return null;
     }
+
+    // ======== Version comparison ========
 
     private static boolean isNewerVersion(String currentVersion, String latestTag) {
         String current = currentVersion.replace("v", "").trim();
@@ -166,66 +338,42 @@ public class OtaUpdater {
         } catch (Exception e) { return 0; }
     }
 
-    private static void showUpdateDialog(Activity activity, String version, String changelog, String downloadUrl) {
+    // ======== UI ========
+
+    private static void showUpdateDialog(Activity activity, String version, String changelog, String downloadUrl, boolean manual) {
         new Handler(Looper.getMainLooper()).post(() -> {
             try {
                 StringBuilder message = new StringBuilder();
                 message.append("Nova versão: ").append(version);
 
-                if (changelog != null && !changelog.isEmpty()) {
-                    String clean = cleanChangelog(changelog);
-                    if (!clean.isEmpty()) {
-                        message.append("\n\n").append(clean);
-                    }
+                if (!changelog.isEmpty()) {
+                    message.append("\n\n").append(changelog);
                 }
+
+                SharedPreferences prefs = activity.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
 
                 new AlertDialog.Builder(activity)
                     .setTitle("⚡ Atualização disponível")
                     .setMessage(message.toString())
-                    .setPositiveButton("Baixar", (dialog, which) -> downloadApk(activity, downloadUrl, version))
-                    .setNegativeButton("Depois", null)
+                    .setPositiveButton("Baixar", (dialog, which) -> {
+                        prefs.edit().remove(KEY_SKIPPED_TAG).apply();
+                        downloadApk(activity, downloadUrl, version);
+                    })
+                    .setNeutralButton("Depois", (dialog, which) -> {
+                        // Remember user skipped this version
+                        prefs.edit().putString(KEY_SKIPPED_TAG, version).apply();
+                    })
+                    .setNegativeButton("Ver no GitHub", (dialog, which) -> {
+                        Intent browserIntent = new Intent(Intent.ACTION_VIEW,
+                                Uri.parse("https://github.com/" + GITHUB_REPO + "/releases/latest"));
+                        browserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        activity.startActivity(browserIntent);
+                    })
                     .show();
             } catch (Exception e) {
                 Toast.makeText(activity, "Atualização: " + version, Toast.LENGTH_LONG).show();
             }
         });
-    }
-
-    /**
-     * Strip markdown and clean changelog for display in AlertDialog.
-     * Removes tables, HTML tags, horizontal rules, and excessive whitespace.
-     */
-    private static String cleanChangelog(String raw) {
-        String text = raw;
-        // Strip markdown table lines (|...|)
-        text = text.replaceAll("(?m)^\\|.*\\|\\s*$", "");
-        // Strip HTML tags
-        text = text.replaceAll("<[^>]+>", "");
-        // Strip markdown bold/italic
-        text = text.replaceAll("\\*{1,2}([^*]+)\\*{1,2}", "$1");
-        // Strip markdown links [text](url)
-        text = text.replaceAll("\\[([^]]+)\\]\\([^)]+\\)", "$1");
-        // Strip horizontal rules (--- or ━━━)
-        text = text.replaceAll("[-━]{3,}", "");
-        // Collapse 3+ blank lines into 2
-        text = text.replaceAll("\n{3,}", "\n\n");
-        // Trim each line
-        String[] lines = text.split("\n");
-        StringBuilder sb = new StringBuilder();
-        for (String line : lines) {
-            String trimmed = line.trim();
-            if (!trimmed.isEmpty()) {
-                sb.append(trimmed).append("\n");
-            } else if (sb.length() > 0 && sb.charAt(sb.length() - 1) != '\n') {
-                sb.append("\n");
-            }
-        }
-        String result = sb.toString().trim();
-        // Limit length
-        if (result.length() > 400) {
-            result = result.substring(0, 400).trim() + "…";
-        }
-        return result;
     }
 
     private static void downloadApk(Context context, String downloadUrl, String version) {
@@ -234,10 +382,10 @@ public class OtaUpdater {
             request.setTitle("Mod " + version);
             request.setDescription("Baixando atualização...");
             request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "rvcbotbuilds/instagram-morphe-" + version + ".apk");
+            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "rvcbotbuilds/instagram-" + version + ".apk");
             DownloadManager dm = (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
             long downloadId = dm.enqueue(request);
-            Toast.makeText(context, "Baixando atualização... Verifique a barra de notificações.", Toast.LENGTH_LONG).show();
+            Toast.makeText(context, "Baixando atualização... Verifique as notificações.", Toast.LENGTH_LONG).show();
 
             BroadcastReceiver receiver = new BroadcastReceiver() {
                 @Override
@@ -261,13 +409,12 @@ public class OtaUpdater {
             };
             context.registerReceiver(receiver, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
         } catch (Exception e) {
-            // Fallback: open in browser
             try {
                 Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl));
                 browserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 context.startActivity(browserIntent);
             } catch (Exception ex) {
-                Toast.makeText(context, "Falha no download. Abra o navegador manualmente.", Toast.LENGTH_LONG).show();
+                Toast.makeText(context, "Falha no download. Abra o navegador.", Toast.LENGTH_LONG).show();
             }
         }
     }

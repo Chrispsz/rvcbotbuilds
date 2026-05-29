@@ -598,10 +598,22 @@ public class ScreenBuilder {
     public void otaSection() {
         PreferenceCategory category = addCategory(Strings.CATEGORY_OTA);
 
+        // Show last check time in description
+        String checkDesc = Strings.OTA_CHECK_UPDATE_DESC;
+        try {
+            android.content.SharedPreferences otaPrefs = context.getSharedPreferences("piko_ota", android.content.Context.MODE_PRIVATE);
+            long lastCheck = otaPrefs.getLong("last_check_ms", 0);
+            if (lastCheck > 0) {
+                long hoursAgo = (System.currentTimeMillis() - lastCheck) / (60 * 60 * 1000);
+                String timeAgo = hoursAgo < 1 ? "agora" : hoursAgo + "h atrás";
+                checkDesc += " (Última verificação: " + timeAgo + ")";
+            }
+        } catch (Exception ignored) {}
+
         addPreference(category,
                 helper.buttonPreference(
                         Strings.OTA_CHECK_UPDATE,
-                        Strings.OTA_CHECK_UPDATE_DESC,
+                        checkDesc,
                         Strings.OTA_CHECK_UPDATE
                 )
         );
