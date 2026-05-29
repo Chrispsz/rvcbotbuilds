@@ -60,8 +60,8 @@ public class HookFlags {
     }
 
     // ============================================================
-    // PRESET FLAGS — Essential MetaConfig overrides only
-    // Quality · Privacy · Ads · Crash fix · Navigation
+    // PRESET FLAGS — Stable MetaConfig overrides only
+    // Quality · Privacy · Ads · Crash fix
     // Overridable via mc_overrides.json (no-root)
     // Priority: external JSON > internal JSON > hardcoded
     // ============================================================
@@ -138,39 +138,35 @@ public class HookFlags {
         BOOL_FLAGS.put("62325::0", true);    // disable_screenshot_detection
         BOOL_FLAGS.put("67066::0", true);    // disable_typing_status
 
-        // ==== NAVIGATION / UI ====
-        BOOL_FLAGS.put("1625::0", false);    // hide reels tab
-        BOOL_FLAGS.put("6307::0", false);    // hide shop tab
-        BOOL_FLAGS.put("39572::0", true);    // dark_theme
-        BOOL_FLAGS.put("86030::0", true);    // amoled_theme
-        BOOL_FLAGS.put("34044::0", true);    // remove_empty_bottom_space
-        BOOL_FLAGS.put("71972::0", true);    // hide_navigation_feed
-        BOOL_FLAGS.put("76713::0", true);    // hide_navigation_reels
-        BOOL_FLAGS.put("81454::0", true);    // hide_navigation_direct
-        BOOL_FLAGS.put("86195::0", true);    // hide_navigation_search
-        BOOL_FLAGS.put("90936::0", true);    // hide_navigation_create
-
-        // ==== LINKS / SHARING ====
-        BOOL_FLAGS.put("4761::0", true);     // sanitize_share_links
-        BOOL_FLAGS.put("9510::0", true);     // open_links_externally
-        BOOL_FLAGS.put("71807::0", true);    // sanitize_share_links (alt)
-        BOOL_FLAGS.put("76548::0", true);    // open_links_externally (alt)
-        BOOL_FLAGS.put("47448::0", false);   // share_tracking_params
-        BOOL_FLAGS.put("56937::0", false);   // share_analytics
-
         // ==== BUILD / OTA ====
         BOOL_FLAGS.put("3753::0", true);     // remove_build_expired
         BOOL_FLAGS.put("8498::0", true);     // skip_update_check
 
-        // ==== DEV OPTIONS ====
-        BOOL_FLAGS.put("28538::0", true);    // employee_options (dev menu)
-        BOOL_FLAGS.put("10339::0", true);    // unlock_developer_options
+        // ==== LINKS / SHARING ====
+        BOOL_FLAGS.put("4761::0", true);     // sanitize_share_links
+        BOOL_FLAGS.put("9510::0", true);     // open_links_externally
+        BOOL_FLAGS.put("47448::0", false);   // share_tracking_params
+        BOOL_FLAGS.put("56937::0", false);   // share_analytics
 
-        // ==== MISC USEFUL ====
-        BOOL_FLAGS.put("1061::0", true);     // more_options_post
-        BOOL_FLAGS.put("5798::0", true);     // more_options_profile
-        BOOL_FLAGS.put("24562::0", true);    // allow_user_certificate
-        BOOL_FLAGS.put("90771::0", false);   // hide_suggested_content
+        // ==== UI (safe only — no aggressive navigation hiding) ====
+        BOOL_FLAGS.put("34044::0", true);    // remove_empty_bottom_space
+
+        // NOTE: Removed the following unstable flags that caused profile crashes:
+        // - 28538::0 employee_options → unstable, changes internal app behavior
+        // - 10339::0 unlock_developer_options → breaks profile rendering
+        // - 71972::0 hide_navigation_feed → hides ALL nav, breaks navigation
+        // - 76713::0 hide_navigation_reels → hides ALL nav, breaks navigation
+        // - 81454::0 hide_navigation_direct → hides ALL nav, breaks navigation
+        // - 86195::0 hide_navigation_search → hides ALL nav, breaks navigation
+        // - 90936::0 hide_navigation_create → hides ALL nav, breaks navigation
+        // - 1061::0 more_options_post → can conflict with profile fragments
+        // - 5798::0 more_options_profile → directly affects profile rendering
+        // - 39572::0 dark_theme → use Instagram's native dark mode instead
+        // - 86030::0 amoled_theme → use Instagram's native dark mode instead
+        // - 71807::0 sanitize_share_links (alt) → duplicate
+        // - 76548::0 open_links_externally (alt) → duplicate
+        // - 24562::0 allow_user_certificate → advanced, not needed for most users
+        // - 90771::0 hide_suggested_content → already handled by ads flags
     }
 
     // ============================================================
