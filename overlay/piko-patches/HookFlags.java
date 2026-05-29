@@ -3,18 +3,16 @@
  *
  * See the included NOTICE file for GPLv3 §7(b) terms that apply to this code.
  *
- * Modified by Chrispsz — simplified to patches-only, removed JSON override
+ * Modified by Chrispsz — follows upstream pattern:
+ *   load() is EMPTY — individual patches use addFlags() to inject
+ *   calls to specific flag methods at the bytecode level.
  *
  * FLAG POLICY:
  *   Only flags REQUIRED by piko patches are hardcoded here.
- *   No JSON loading — Instagram already has its own importer
- *   accessible from the mod menu (Developer options → Import overrides).
- *
- *   This approach is more stable because:
- *   - Fewer moving parts = fewer things that can break
- *   - Hardcoded flags are verified against real Instagram IDs
- *   - No file I/O on the critical config check path
- *   - Users who need extra flags can use Instagram's built-in importer
+ *   presetFlags() exists as a stub for compatibility with
+ *   SettingsPatch.kt which calls addFlags("presetFlags").
+ *   Users who need extra flags can use Instagram's built-in
+ *   importer: Mod Settings → Developer options → Import
  */
 
 
@@ -35,10 +33,21 @@ public class HookFlags {
     // ============================================================
     // PIKO PATCH FLAGS — Required by piko patches to work correctly
     // These are the ONLY flags that get overridden automatically.
-    // Users who need additional flags should use Instagram's
-    // built-in importer: Mod Settings → Developer options → Import
+    //
+    // How it works:
+    //   load() is EMPTY. Individual patches (DisableAds, DownloadMedia,
+    //   UnlockEmployeeOptions, SettingsPatch) call addFlags("methodName")
+    //   which injects bytecode: invoke-static {}, HookFlags.methodName()V
+    //   into load() at patch time.
+    //
+    //   So at runtime, load() will call whatever methods the included
+    //   patches need. No need to hardcode calls in load() itself.
     // ============================================================
 
+    /**
+     * Called by SettingsPatch via addFlags("contactPermissionConsentFlags")
+     * and also by the "Add settings" patch.
+     */
     private static void contactPermissionConsentFlags() {
         BOOL_FLAGS.put("56295::14", false);
         BOOL_FLAGS.put("56295::15", false);
@@ -46,6 +55,10 @@ public class HookFlags {
         BOOL_FLAGS.put("56295::30", false);
     }
 
+    /**
+     * Called by DownloadMediaPatch via addFlags("simpleOverflowMenuFlags")
+     * and also by the "Add settings" patch.
+     */
     private static void simpleOverflowMenuFlags() {
         BOOL_FLAGS.put("104772::0", false);
         BOOL_FLAGS.put("104772::1", false);
@@ -53,8 +66,10 @@ public class HookFlags {
         BOOL_FLAGS.put("104772::6", false);
     }
 
+    /**
+     * Called by DisableAdsPatch via addFlags("adsFlags")
+     */
     private static void adsFlags() {
-        // Core ad flags from piko source — required by DisableAds patch
         BOOL_FLAGS.put("58206::0", false);   // is_acp_enabled
         BOOL_FLAGS.put("72396::0", false);   // is_mae_exclusion_feed_enabled
         BOOL_FLAGS.put("78046::0", false);   // is_mae_exclusion_feed_enabled (alt)
@@ -63,6 +78,9 @@ public class HookFlags {
         BOOL_FLAGS.put("110800::0", false);  // ig_android_controller_migration::use_v2_controller
     }
 
+    /**
+     * Called by UnlockEmployeeOptionsPatch via addFlags("employeeOptionsFlags")
+     */
     private static void employeeOptionsFlags() {
         if(Pref.enableEmployeeOptions()){
             BOOL_FLAGS.put("28538::0", true);
@@ -71,13 +89,35 @@ public class HookFlags {
         }
     }
 
-    public static void load() {
-        contactPermissionConsentFlags();
-        simpleOverflowMenuFlags();
-        adsFlags();
-        employeeOptionsFlags();
+    /**
+     * Stub for compatibility — SettingsPatch.kt calls addFlags("presetFlags")
+     * which injects: invoke-static {}, HookFlags.presetFlags()V into load().
+     * If this method doesn't exist, the app crashes with NoSuchMethodError.
+     *
+     * We don't use preset flags (users can import via Developer options instead),
+     * so this is intentionally empty.
+     */
+    public static void presetFlags() {
+        // Intentionally empty — flag overrides are handled by individual
+        // flag methods above, or imported via Instagram's built-in importer.
+        PikoUtils.logger("HookFlags: presetFlags() called (no-op, use Developer options to import flags)");
+    }
 
-        PikoUtils.logger("HookFlags: Loaded " + BOOL_FLAGS.size() + " hardcoded patch flags");
+    /**
+     * Entry point — called by SettingsPatch which injects
+     * LOAD_FLAGS_DESCRIPTOR.format("load") into InstagramAppShell.onCreate.
+     *
+     * This method is EMPTY by design. Individual patches use addFlags()
+     * to inject calls to specific flag methods at the bytecode level.
+     * For example:
+     *   addFlags("contactPermissionConsentFlags") → injects HookFlags.contactPermissionConsentFlags()V
+     *   addFlags("adsFlags")                       → injects HookFlags.adsFlags()V
+     *   addFlags("presetFlags")                    → injects HookFlags.presetFlags()V
+     *
+     * At runtime, load() will execute all injected calls in order.
+     */
+    public static void load() {
+        // Empty — all flag methods are injected by addFlags() calls from patches
     }
 
     public static Boolean handleBoolFlags(long mobileConfigSpecifier) {
