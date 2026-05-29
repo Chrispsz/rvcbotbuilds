@@ -156,6 +156,14 @@ public class DefaultStrings {
     public static String PIKO_EXPORT_EXPERIMENT_LIST = "Export experiment list";
     public static String PIKO_EXPORT_EXPERIMENT_MAPPINGS = "Export experiment mappings";
 
+    // Debug tools
+    public static String DEBUG_DUMP_FLAGS = "Dump flags to logcat";
+    public static String DEBUG_DUMP_FLAGS_DESC = "Writes all current MetaConfig overrides to logcat (adb logcat -s ModDebug)";
+    public static String DEBUG_EXPORT_DIAG = "Export diagnostics";
+    public static String DEBUG_EXPORT_DIAG_DESC = "Saves mod status, settings, and OTA info to a file in /sdcard/Android/media/";
+    public static String DEBUG_ADB_HELP = "ADB debug commands";
+    public static String DEBUG_ADB_HELP_DESC = "adb shell am broadcast -a app.morphe.extension.instagram.DEBUG --es command <cmd>";
+
     public static String OPEN_IMAGE_EXTERNALLY = "Open image externally";
     public static String OPEN_VIDEO_EXTERNALLY = "Open video externally";
     public static String OPEN_IMAGE_WITH = "Open image with";
@@ -181,11 +189,6 @@ public class DefaultStrings {
     public static String CATEGORY_OTA = "Mod Updates";
     public static String OTA_CHECK_UPDATE = "Check for mod updates";
     public static String OTA_CHECK_UPDATE_DESC = "Check GitHub for new mod APK versions";
-    public static String OTA_RELOAD_CONFIG = "Reload flag config";
-    public static String OTA_RELOAD_CONFIG_DESC = "Reload mc_overrides.json from storage (no restart needed for external JSON)";
-    public static String OTA_CONFIG_PATH = "Config file location";
-    public static String OTA_CONFIG_PATH_DESC = "/sdcard/Android/media/com.instagram.android/mc_overrides.json";
-
     // OTA runtime messages
     public static String OTA_NO_CONNECTION = "Could not check for updates. Check your internet connection.";
     public static String OTA_UP_TO_DATE = "Already on the latest version: ";

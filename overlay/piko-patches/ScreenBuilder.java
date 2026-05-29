@@ -20,7 +20,7 @@ import app.morphe.extension.instagram.settings.Settings;
 import app.morphe.extension.instagram.settings.preference.widgets.*;
 import app.morphe.extension.shared.Utils;
 import app.morphe.extension.instagram.utils.Pref;
-import app.morphe.extension.instagram.patches.OtaUpdater;
+
 
 public class ScreenBuilder {
     private final Context context;
@@ -611,9 +611,9 @@ public class ScreenBuilder {
             }
             if (lastCheck > 0) {
                 long hoursAgo = (System.currentTimeMillis() - lastCheck) / (60 * 60 * 1000);
-                String timeAgo = hoursAgo < 1 ? "agora" : hoursAgo + "h atrás";
+                String timeAgo = hoursAgo < 1 ? "now" : hoursAgo + "h ago";
                 if (descExtra.length() > 0) descExtra.append(" · ");
-                descExtra.append("Verificado: ").append(timeAgo);
+                descExtra.append("Checked: ").append(timeAgo);
             }
             if (descExtra.length() > 0) {
                 checkDesc += "\n" + descExtra.toString();
@@ -628,21 +628,7 @@ public class ScreenBuilder {
                 )
         );
 
-        addPreference(category,
-                helper.buttonPreference(
-                        Strings.OTA_RELOAD_CONFIG,
-                        Strings.OTA_RELOAD_CONFIG_DESC,
-                        Strings.OTA_RELOAD_CONFIG
-                )
-        );
 
-        addPreference(category,
-                helper.buttonPreference(
-                        Strings.OTA_CONFIG_PATH,
-                        Strings.OTA_CONFIG_PATH_DESC,
-                        Strings.OTA_CONFIG_PATH
-                )
-        );
     }
 
 
@@ -707,6 +693,31 @@ public class ScreenBuilder {
                             Strings.PIKO_EXPORT_EXPERIMENT_MAPPINGS,
                             "",
                             Strings.PIKO_EXPORT_EXPERIMENT_MAPPINGS
+                    )
+            );
+
+            // Debug tools — accessible without ADB
+            addPreference(category,
+                    helper.buttonPreference(
+                            Strings.DEBUG_DUMP_FLAGS,
+                            Strings.DEBUG_DUMP_FLAGS_DESC,
+                            Strings.DEBUG_DUMP_FLAGS
+                    )
+            );
+
+            addPreference(category,
+                    helper.buttonPreference(
+                            Strings.DEBUG_EXPORT_DIAG,
+                            Strings.DEBUG_EXPORT_DIAG_DESC,
+                            Strings.DEBUG_EXPORT_DIAG
+                    )
+            );
+
+            addPreference(category,
+                    helper.buttonPreference(
+                            Strings.DEBUG_ADB_HELP,
+                            Strings.DEBUG_ADB_HELP_DESC,
+                            Strings.DEBUG_ADB_HELP
                     )
             );
         }

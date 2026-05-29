@@ -1,0 +1,12 @@
+---
+Task ID: 1
+Agent: main
+Task: Remove JSON/mc_overrides.json system, simplify to patches-only
+
+Stage Summary:
+- HookFlags.java: patches-only (15 hardcoded flags, no JSON)
+- DebugReceiver.java: 5 ADB commands (removed reload_config)
+- ScreenBuilder.java: removed reload/config-path buttons
+- All 9 translation files updated
+- module/mc_overrides.json removed
+- overlay/README.md rewritten

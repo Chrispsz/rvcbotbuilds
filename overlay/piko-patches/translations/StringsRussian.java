@@ -138,6 +138,16 @@ public class StringsRussian extends DefaultStrings {
         this.PIKO_DEBUG = "Отладка Mod";
         this.PIKO_DEBUG_DESC = "Добавляет отладочные действия к некоторым элементам для проверки";
         this.PIKO_EXPORT_EXPERIMENT_LIST = "Экспорт списка экспериментов";
+        this.PIKO_EXPORT_EXPERIMENT_MAPPINGS = "Экспорт сопоставлений экспериментов";
+
+        // Debug tools
+        this.DEBUG_DUMP_FLAGS = "Сбросить флаги в logcat";
+        this.DEBUG_DUMP_FLAGS_DESC = "Записывает все текущие замещения MetaConfig в logcat (adb logcat -s ModDebug)";
+        this.DEBUG_EXPORT_DIAG = "Экспортировать диагностику";
+        this.DEBUG_EXPORT_DIAG_DESC = "Сохраняет статус мода, настройки и информацию OTA в файл в /sdcard/Android/media/";
+        this.DEBUG_ADB_HELP = "Команды отладки ADB";
+        this.DEBUG_ADB_HELP_DESC = "adb shell am broadcast -a app.morphe.extension.instagram.DEBUG --es command <cmd>";
+
         this.OPEN_IMAGE_EXTERNALLY = "Открыть изображение в другом приложении";
         this.OPEN_VIDEO_EXTERNALLY = "Открыть видео в другом приложении";
         this.OPEN_IMAGE_WITH = "Открыть изображение с помощью";

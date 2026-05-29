@@ -154,6 +154,14 @@ public class StringsTurkish extends DefaultStrings {
         this.PIKO_EXPORT_EXPERIMENT_LIST = "Deney listesini dışa aktar";
         this.PIKO_EXPORT_EXPERIMENT_MAPPINGS = "Deney eşlemelerini dışa aktar";
 
+        // Debug tools
+        this.DEBUG_DUMP_FLAGS = "Bayrakları logcat'e dök";
+        this.DEBUG_DUMP_FLAGS_DESC = "Tüm mevcut MetaConfig geçersiz kılmalarını logcat'e yazar (adb logcat -s ModDebug)";
+        this.DEBUG_EXPORT_DIAG = "Tanılamayı dışa aktar";
+        this.DEBUG_EXPORT_DIAG_DESC = "Mod durumunu, ayarları ve OTA bilgisini /sdcard/Android/media/ içindeki bir dosyaya kaydeder";
+        this.DEBUG_ADB_HELP = "ADB hata ayıklama komutları";
+        this.DEBUG_ADB_HELP_DESC = "adb shell am broadcast -a app.morphe.extension.instagram.DEBUG --es command <cmd>";
+
         this.OPEN_IMAGE_EXTERNALLY = "Resmi harici aç";
         this.OPEN_VIDEO_EXTERNALLY = "Videoyu harici aç";
         this.OPEN_IMAGE_WITH = "Resmi şununla aç";

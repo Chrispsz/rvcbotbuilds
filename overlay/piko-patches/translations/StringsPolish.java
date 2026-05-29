@@ -155,6 +155,14 @@ public class StringsPolish extends DefaultStrings {
         this.PIKO_EXPORT_EXPERIMENT_LIST = "Eksportuj listę eksperymentów";
         this.PIKO_EXPORT_EXPERIMENT_MAPPINGS = "Eksportuj mapowania eksperymentów";
 
+        // Debug tools
+        this.DEBUG_DUMP_FLAGS = "Zrzuć flagi do logcat";
+        this.DEBUG_DUMP_FLAGS_DESC = "Zapisuje wszystkie bieżące nadpisania MetaConfig do logcat (adb logcat -s ModDebug)";
+        this.DEBUG_EXPORT_DIAG = "Eksportuj diagnostykę";
+        this.DEBUG_EXPORT_DIAG_DESC = "Zapisuje status modu, ustawienia i informacje OTA do pliku w /sdcard/Android/media/";
+        this.DEBUG_ADB_HELP = "Komendy debugowania ADB";
+        this.DEBUG_ADB_HELP_DESC = "adb shell am broadcast -a app.morphe.extension.instagram.DEBUG --es command <cmd>";
+
         this.OPEN_IMAGE_EXTERNALLY = "Otwórz obraz zewnętrznie";
         this.OPEN_VIDEO_EXTERNALLY = "Otwórz film zewnętrznie";
         this.OPEN_IMAGE_WITH = "Otwórz obraz za pomocą";

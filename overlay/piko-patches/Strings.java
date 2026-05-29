@@ -164,6 +164,14 @@ public class Strings {
     public static final String PIKO_EXPORT_EXPERIMENT_LIST = langInstance.PIKO_EXPORT_EXPERIMENT_LIST;
     public static String PIKO_EXPORT_EXPERIMENT_MAPPINGS = langInstance.PIKO_EXPORT_EXPERIMENT_MAPPINGS;
 
+    // Debug tools
+    public static final String DEBUG_DUMP_FLAGS = langInstance.DEBUG_DUMP_FLAGS;
+    public static final String DEBUG_DUMP_FLAGS_DESC = langInstance.DEBUG_DUMP_FLAGS_DESC;
+    public static final String DEBUG_EXPORT_DIAG = langInstance.DEBUG_EXPORT_DIAG;
+    public static final String DEBUG_EXPORT_DIAG_DESC = langInstance.DEBUG_EXPORT_DIAG_DESC;
+    public static final String DEBUG_ADB_HELP = langInstance.DEBUG_ADB_HELP;
+    public static final String DEBUG_ADB_HELP_DESC = langInstance.DEBUG_ADB_HELP_DESC;
+
     public static final String OPEN_IMAGE_EXTERNALLY = langInstance.OPEN_IMAGE_EXTERNALLY;
     public static final String OPEN_VIDEO_EXTERNALLY = langInstance.OPEN_VIDEO_EXTERNALLY;
     public static final String OPEN_IMAGE_WITH = langInstance.OPEN_IMAGE_WITH;
@@ -185,10 +193,6 @@ public class Strings {
     public static final String CATEGORY_OTA = langInstance.CATEGORY_OTA;
     public static final String OTA_CHECK_UPDATE = langInstance.OTA_CHECK_UPDATE;
     public static final String OTA_CHECK_UPDATE_DESC = langInstance.OTA_CHECK_UPDATE_DESC;
-    public static final String OTA_RELOAD_CONFIG = langInstance.OTA_RELOAD_CONFIG;
-    public static final String OTA_RELOAD_CONFIG_DESC = langInstance.OTA_RELOAD_CONFIG_DESC;
-    public static final String OTA_CONFIG_PATH = langInstance.OTA_CONFIG_PATH;
-    public static final String OTA_CONFIG_PATH_DESC = langInstance.OTA_CONFIG_PATH_DESC;
 
     // OTA runtime messages
     public static final String OTA_NO_CONNECTION = langInstance.OTA_NO_CONNECTION;

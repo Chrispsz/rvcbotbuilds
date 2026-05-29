@@ -8,7 +8,7 @@
 package app.morphe.extension.instagram.constants.translations;
 
 public class StringsKorean extends DefaultStrings {
-	public StringsKorean() {
+        public StringsKorean() {
         this.PIKO_SETTINGS_TITLE = "Mod 설정";
 
         this.CATEGORY_ADS = "광고";
@@ -154,6 +154,14 @@ public class StringsKorean extends DefaultStrings {
         this.PIKO_DEBUG_DESC = "일부 구성요소에 테스트용 디버그 옵션을 추가합니다";
         this.PIKO_EXPORT_EXPERIMENT_LIST = "실험 목록 내보내기";
         this.PIKO_EXPORT_EXPERIMENT_MAPPINGS = "실험 매핑 내보내기";
+
+        // Debug tools
+        this.DEBUG_DUMP_FLAGS = "플래그를 logcat에 덤프";
+        this.DEBUG_DUMP_FLAGS_DESC = "모든 현재 MetaConfig 재정의를 logcat에 기록합니다 (adb logcat -s ModDebug)";
+        this.DEBUG_EXPORT_DIAG = "진단 정보 내보내기";
+        this.DEBUG_EXPORT_DIAG_DESC = "Mod 상태, 설정 및 OTA 정보를 /sdcard/Android/media/의 파일에 저장합니다";
+        this.DEBUG_ADB_HELP = "ADB 디버그 명령어";
+        this.DEBUG_ADB_HELP_DESC = "adb shell am broadcast -a app.morphe.extension.instagram.DEBUG --es command <cmd>";
 
         this.OPEN_IMAGE_EXTERNALLY = "이미지를 외부 앱으로 열기";
         this.OPEN_VIDEO_EXTERNALLY = "동영상을 외부 앱으로 열기";

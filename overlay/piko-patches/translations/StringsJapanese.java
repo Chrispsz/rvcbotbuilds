@@ -8,7 +8,7 @@
 package app.morphe.extension.instagram.constants.translations;
 
 public class StringsJapanese extends DefaultStrings {
-	public StringsJapanese() {
+        public StringsJapanese() {
         this.PIKO_SETTINGS_TITLE = "Mod設定";
 
         this.CATEGORY_ADS = "広告";
@@ -154,6 +154,14 @@ public class StringsJapanese extends DefaultStrings {
         this.PIKO_DEBUG_DESC = "一部コンポーネントにテスト用のデバッグオプションを追加します。";
         this.PIKO_EXPORT_EXPERIMENT_LIST = "実験リストをエクスポート";
         this.PIKO_EXPORT_EXPERIMENT_MAPPINGS = "実験マッピングをエクスポート";
+
+        // Debug tools
+        this.DEBUG_DUMP_FLAGS = "フラグをlogcatにダンプ";
+        this.DEBUG_DUMP_FLAGS_DESC = "現在のMetaConfigのオーバーライドをすべてlogcatに書き込みます (adb logcat -s ModDebug)";
+        this.DEBUG_EXPORT_DIAG = "診断情報をエクスポート";
+        this.DEBUG_EXPORT_DIAG_DESC = "Modのステータス・設定・OTA情報を/sdcard/Android/media/に保存します";
+        this.DEBUG_ADB_HELP = "ADBデバッグコマンド";
+        this.DEBUG_ADB_HELP_DESC = "adb shell am broadcast -a app.morphe.extension.instagram.DEBUG --es command <cmd>";
 
         this.OPEN_IMAGE_EXTERNALLY = "画像を外部アプリで開く";
         this.OPEN_VIDEO_EXTERNALLY = "動画を外部アプリで開く";

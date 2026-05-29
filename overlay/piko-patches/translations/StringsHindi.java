@@ -17,5 +17,13 @@ public class StringsHindi extends DefaultStrings {
 
         this.MORE_PROFILE_OPTIONS = "प्रोफ़ाइल के और विकल्प";
 
+        // Debug tools
+        this.DEBUG_DUMP_FLAGS = "फ्लैग को logcat में डंप करें";
+        this.DEBUG_DUMP_FLAGS_DESC = "सभी वर्तमान MetaConfig ओवरराइड को logcat में लिखता है (adb logcat -s ModDebug)";
+        this.DEBUG_EXPORT_DIAG = "डायग्नोस्टिक्स निर्यात करें";
+        this.DEBUG_EXPORT_DIAG_DESC = "Mod स्थिति, सेटिंग्स और OTA जानकारी को /sdcard/Android/media/ में एक फ़ाइल में सहेजता है";
+        this.DEBUG_ADB_HELP = "ADB डीबग कमांड";
+        this.DEBUG_ADB_HELP_DESC = "adb shell am broadcast -a app.morphe.extension.instagram.DEBUG --es command <cmd>";
+
     }
 }

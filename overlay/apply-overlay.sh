@@ -56,10 +56,11 @@ apply_file() {
 }
 
 echo "--- Core patches ---"
-apply_file "$OVERLAY_DIR/Constants.kt"          "$PIKO_PATCHES_SRC/utils/Constants.kt" "Constants (Instagram 430 version)"
-apply_file "$OVERLAY_DIR/HookFlags.java"       "$PATCHES_DIR/HookFlags.java"        "HookFlags (76 flags + JSON override)"
+apply_file "$OVERLAY_DIR/Constants.kt"          "$PIKO_PATCHES_SRC/utils/Constants.kt" "Constants (Instagram version compatibility)"
+apply_file "$OVERLAY_DIR/HookFlags.java"       "$PATCHES_DIR/HookFlags.java"        "HookFlags (patch flags only, no JSON)"
 apply_file "$OVERLAY_DIR/OtaUpdater.java"      "$PATCHES_DIR/OtaUpdater.java"       "OtaUpdater (in-app APK updater)"
-apply_file "$OVERLAY_DIR/WelcomeMessage.java"   "$PATCHES_DIR/WelcomeMessage.java"    "WelcomeMessage (disabled crash dialog)"
+apply_file "$OVERLAY_DIR/WelcomeMessage.java"   "$PATCHES_DIR/WelcomeMessage.java"    "WelcomeMessage (debug receiver + OTA)"
+apply_file "$OVERLAY_DIR/DebugReceiver.java"   "$PATCHES_DIR/DebugReceiver.java"      "DebugReceiver (ADB debug commands)"
 
 echo ""
 echo "--- Entity fixes ---"
@@ -87,3 +88,36 @@ echo ""
 echo "============================================"
 echo "Overlay applied: $applied files ✅ | $failed skipped ⚠️"
 echo "============================================"
+
+# Verify HookFlags was applied correctly
+echo ""
+echo "--- Verification ---"
+if [ -f "$PATCHES_DIR/HookFlags.java" ]; then
+    FLAG_COUNT=$(grep -c 'BOOL_FLAGS.put' "$PATCHES_DIR/HookFlags.java" || true)
+    echo "  HookFlags boolean flags: $FLAG_COUNT"
+    if grep -q 'presetFlags()' "$PATCHES_DIR/HookFlags.java" 2>/dev/null; then
+        echo "  ⚠️  WARNING: presetFlags() method still exists (should be removed)"
+    else
+        echo "  ✅ No fabricated presetFlags() method"
+    fi
+    if grep -q 'mc_overrides.json' "$PATCHES_DIR/HookFlags.java" 2>/dev/null; then
+        echo "  ⚠️  WARNING: mc_overrides.json loading still exists (should be removed)"
+    else
+        echo "  ✅ No mc_overrides.json loading (patches only)"
+    fi
+else
+    echo "  ⚠️  HookFlags.java not found at target"
+fi
+
+# Verify DebugReceiver was applied
+if [ -f "$PATCHES_DIR/DebugReceiver.java" ]; then
+    echo "  ✅ DebugReceiver.java applied (ADB debug available)"
+else
+    echo "  ⚠️  DebugReceiver.java not found at target"
+fi
+
+# Verify Constants.kt was applied
+if [ -f "$PIKO_PATCHES_SRC/utils/Constants.kt" ]; then
+    IG_VERSION=$(grep 'version = "' "$PIKO_PATCHES_SRC/utils/Constants.kt" | head -1 | sed 's/.*version = "//;s/".*//')
+    echo "  Constants.kt Instagram version: $IG_VERSION"
+fi

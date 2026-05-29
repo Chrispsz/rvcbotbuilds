@@ -157,6 +157,14 @@ public class StringsPortugueseBR extends DefaultStrings {
         this.PIKO_EXPORT_EXPERIMENT_LIST = "Exportar lista de experimentos";
         this.PIKO_EXPORT_EXPERIMENT_MAPPINGS = "Exportar mapeamentos de experimentos";
 
+        // Debug tools
+        this.DEBUG_DUMP_FLAGS = "Dump flags no logcat";
+        this.DEBUG_DUMP_FLAGS_DESC = "Escreve todas as flags MetaConfig no logcat (adb logcat -s ModDebug)";
+        this.DEBUG_EXPORT_DIAG = "Exportar diagnóstico";
+        this.DEBUG_EXPORT_DIAG_DESC = "Salva status do mod, configurações e info OTA em /sdcard/Android/media/";
+        this.DEBUG_ADB_HELP = "Comandos ADB de debug";
+        this.DEBUG_ADB_HELP_DESC = "adb shell am broadcast -a app.morphe.extension.instagram.DEBUG --es command <cmd>";
+
         this.OPEN_IMAGE_EXTERNALLY = "Abrir imagem externamente";
         this.OPEN_VIDEO_EXTERNALLY = "Abrir vídeo externamente";
         this.OPEN_IMAGE_WITH = "Abrir imagem com";
@@ -179,10 +187,6 @@ public class StringsPortugueseBR extends DefaultStrings {
         this.CATEGORY_OTA = "Atualizações do Mod";
         this.OTA_CHECK_UPDATE = "Verificar atualizações do mod";
         this.OTA_CHECK_UPDATE_DESC = "Verifica no GitHub por novas versões do APK mod";
-        this.OTA_RELOAD_CONFIG = "Recarregar config de flags";
-        this.OTA_RELOAD_CONFIG_DESC = "Recarrega mc_overrides.json do armazenamento (sem precisar reiniciar)";
-        this.OTA_CONFIG_PATH = "Local do arquivo de config";
-        this.OTA_CONFIG_PATH_DESC = "/sdcard/Android/media/com.instagram.android/mc_overrides.json";
 
         // OTA runtime messages
         this.OTA_NO_CONNECTION = "Não foi possível verificar atualizações.\nVerifique sua conexão.";
