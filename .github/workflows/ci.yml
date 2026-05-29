@@ -226,7 +226,7 @@ jobs:
 
       - name: Add upstream remote
         run: |
-          git remote add upstream https://github.com/j-hc/revanced-magisk-module.git
+          git remote add upstream https://github.com/j-hc/revanced-magisk-module.git 2>/dev/null || true
           git fetch upstream master --depth=100
 
       - name: Merge upstream (keeping our changes)
