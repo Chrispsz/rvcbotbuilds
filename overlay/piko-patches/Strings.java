@@ -233,4 +233,29 @@ public class Strings {
         ExtensionStrings.setDownloadGrantPermission(DOWNLOAD_GRANT_PERMISSION);
         ExtensionStrings.setDownloadGrantPermissionFailed(DOWNLOAD_GRANT_PERMISSION_FAILED);
     }
+
+    /**
+     * Format a release tag for display in the OTA dialog.
+     * Converts "v2025.05.29-1" → "2025.05.29 (build 1)"
+     * Falls back to the raw tag if format doesn't match.
+     */
+    public static String formatTagDisplay(String tag) {
+        if (tag == null) return "unknown";
+        try {
+            // Pattern: vYYYY.MM.DD-N or v3.5.0-fork.N
+            if (tag.matches("^v\d{4}\.\d{2}\.\d{2}-\d+$")) {
+                String trimmed = tag.substring(1); // remove leading 'v'
+                int dashIdx = trimmed.lastIndexOf('-');
+                String date = trimmed.substring(0, dashIdx);
+                String build = trimmed.substring(dashIdx + 1);
+                return date + " (build " + build + ")";
+            }
+            // Pattern: v3.5.0-fork.N
+            if (tag.contains("-fork.")) {
+                return tag.replace("v", "").replace("-fork.", " fork ");
+            }
+        } catch (Exception ignored) {}
+        return tag;
+    }
+
 }
