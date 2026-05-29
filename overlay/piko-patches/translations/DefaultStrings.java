@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2025 piko <https://github.com/crimera/piko>
+ * Copyright (C) 2026 piko <https://github.com/crimera/piko>
  *
  * See the included NOTICE file for GPLv3 §7(b) terms that apply to this code.
  */
@@ -12,7 +12,7 @@ public class DefaultStrings {
 
     public static String CATEGORY_ADS = "Ads";
     public static String DISABLE_ADS = "Disable ads";
-    public static String HIDE_SUGEESTED_CONTENT = "Hide suggested content"; // Typo inherited from upstream piko — must match Settings.HIDE_SUGGESTED_CONTENT key
+    public static String HIDE_SUGEESTED_CONTENT = "Hide suggested content";
     public static String HIDE_SUGEESTED_CONTENT_DESC = "Hides suggested stories, reels, threads (Suggested posts will still be shown).";
 
     public static String CATEGORY_DEV_OPTIONS = "Developer options";
@@ -42,6 +42,9 @@ public class DefaultStrings {
     public static String DISABLE_TYPING_STATUS = "Disable typing status";
     public static String DISABLE_SCREENSHOT_DETECTION = "Disable screenshot detection";
     public static String VIEW_DM_ANONYMOUSLY = "View direct messages anonymously";
+    public static String TURN_ON_ALL_GHOST_MODES = "Turn on all ghost modes";
+    public static String GHOST_MODES_ON = "Ghost mode: ON";
+    public static String GHOST_MODES_DEFAULT = "Ghost mode: DEFAULT";
 
     public static String CATEGORY_DISTRACTION_FREE = "Distraction free";
     public static String DISABLE_STORIES = "Disable stories";
@@ -111,22 +114,28 @@ public class DefaultStrings {
     public static String DOWNLOAD_USERNAME_FOLDER_DESC = "Creates subfolders based on username";
     public static String DOWNLOAD_CURRENT_MEDIA = "Download current media";
     public static String DOWNLOAD_AS_IMAGE = "Download as image";
+    public static String VIDEO_VARIANTS = "Video variants";
     public static String DOWNLOAD_AUDIO = "Download audio";
     public static String DOWNLOAD_OPTIONS = "Download options";
     public static String COPY_MEDIA_LINK = "Copy media link";
     public static String COPIED_MEDIA_LINK = "Copied media link";
     public static String DOWNLOAD_ALL = "Download all";
-    public static String DOWNLOADING_MEDIA = "Downloading : ";
-    public static String DOWNLOADED_MEDIA = "Downloaded : ";
+    public static String DOWNLOADING_MEDIA = "Downloading: ";
+    public static String DOWNLOADED_MEDIA = "Downloaded: ";
     public static String MEDIA_EXISTS = "Media exists";
     public static String DOWNLOAD_FAILED_MEDIA = "Download failed : ";
+    public static String DOWNLOAD_SET_PATH = "Set custom download path";
+    public static String DOWNLOAD_SET_PATH_SUCCESS = "Download directory updated!";
+    public static String DOWNLOAD_SET_PATH_FAILED = "Failed to resolve folder path";
+    public static String DOWNLOAD_GRANT_PERMISSION = "Please grant storage access to continue downloads";
+    public static String DOWNLOAD_GRANT_PERMISSION_FAILED = "Could not open settings. Please grant All Files Access manually";
+
     public static String POST_OPTIONS = "Post options";
     public static String COPY_POST_DESCRIPTION = "Copy post description";
     public static String COPY_POST_OWNER_USERNAME = "Copy post owner username";
     public static String COPY_POST_OWNER_FULLNAME = "Copy post owner fullname";
     public static String ENABLE_MORE_OPTIONS_ON_POST = "Enable more option on post";
     public static String ENABLE_MORE_OPTIONS_ON_POST_DESC = "Get more options on long pressing the post";
-
 
     public static String CATEGORY_HIDE_NAVIGATION_BUTTONS = "Hide navigation buttons";
     public static String HIDE_NAVIGATION_FEED = "Hide Feed button";
@@ -137,8 +146,8 @@ public class DefaultStrings {
 
 
     public static String PATCH_INFO_TITLE = "Patch information";
-    public static String EXPORT_PIKO_PREF = "Export Mod preferences";
-    public static String IMPORT_PIKO_PREF = "Import Mod preferences";
+    public static String EXPORT_PIKO_PREF = "Export piko preferences";
+    public static String IMPORT_PIKO_PREF = "Import piko preferences";
     public static String APP_VERSION = "App version: %s";
     public static String PATCH_VERSION = "Patch version: %s";
 
@@ -151,18 +160,10 @@ public class DefaultStrings {
     public static String RESTART_APP = "The app needs to be restarted for the changes to reflect";
     public static String OK = "OK";
     public static String DELETED = "Deleted";
-    public static String PIKO_DEBUG = "Mod debug";
-    public static String PIKO_DEBUG_DESC = "Adds debug options on some components for testing";
+    public static String PIKO_DEBUG = "Piko debug";
+    public static String PIKO_DEBUG_DESC = "Adds debug option on some of the components for testing";
     public static String PIKO_EXPORT_EXPERIMENT_LIST = "Export experiment list";
     public static String PIKO_EXPORT_EXPERIMENT_MAPPINGS = "Export experiment mappings";
-
-    // Debug tools
-    public static String DEBUG_DUMP_FLAGS = "Dump flags to logcat";
-    public static String DEBUG_DUMP_FLAGS_DESC = "Writes all current MetaConfig overrides to logcat (adb logcat -s ModDebug)";
-    public static String DEBUG_EXPORT_DIAG = "Export diagnostics";
-    public static String DEBUG_EXPORT_DIAG_DESC = "Saves mod status, settings, and OTA info to a file in /sdcard/Android/media/";
-    public static String DEBUG_ADB_HELP = "ADB debug commands";
-    public static String DEBUG_ADB_HELP_DESC = "adb shell am broadcast -a app.morphe.extension.instagram.DEBUG --es command <cmd>";
 
     public static String OPEN_IMAGE_EXTERNALLY = "Open image externally";
     public static String OPEN_VIDEO_EXTERNALLY = "Open video externally";
@@ -177,34 +178,40 @@ public class DefaultStrings {
     public static String ARR_DETAILED_TIMESTAMP = "Detailed timestamp";
     public static String ARR_TIME_LEFT = "Time left";
 
-    // Keep for compat — no longer shown in dialog
-    public static String WELCOME_TITLE = "Welcome to Mod";
-    // Keep for compat — no longer shown in dialog
-    public static String WELCOME_MESSAGE = "To improve your experience, visit Mod settings and adjust your preferences";
-    // Keep for compat — no longer shown in dialog
-    public static String GOTO_PIKO_SETTINGS = "Go to Mod settings";
+    public static String WELCOME_TITLE = "Welcome to Piko";
+    public static String WELCOME_MESSAGE = "To improve your experience with Piko, please vist Mod settings and adjust your preference";
+    public static String GOTO_PIKO_SETTINGS = "Goto Mod settings";
     public static String NO_INTERNET = "Please connect to internet";
+    public static String TAP_HERE = "Tap here !!";
 
-    // OTA Update strings
-    public static String CATEGORY_OTA = "Mod Updates";
-    public static String OTA_CHECK_UPDATE = "Check for mod updates";
-    public static String OTA_CHECK_UPDATE_DESC = "Check GitHub for new mod APK versions";
-    // OTA runtime messages
-    public static String OTA_NO_CONNECTION = "Could not check for updates. Check your internet connection.";
-    public static String OTA_UP_TO_DATE = "Already on the latest version: ";
-    public static String OTA_CHECK_FAILED = "Update check failed: ";
-    public static String OTA_INSTALLED = "Installed: ";
-    public static String OTA_AVAILABLE = "Available: ";
-    public static String OTA_DOWNLOADING = "Downloading update... Check notifications.";
-    public static String OTA_DOWNLOAD_FAILED = "Download failed. Open browser.";
-    public static String OTA_APK_LOCATION = "APK in Downloads/rvcbotbuilds/";
-    public static String OTA_SIGNATURE_MISMATCH = "Warning: The downloaded APK has a different signature. Install anyway?";
-    public static String OTA_SIGNATURE_TITLE = "Signature Verification";
+    // ===== RVCArise OTA updater strings =====
+    public static String CATEGORY_OTA = "OTA Updater";
+    public static String OTA_CHECK_UPDATE = "Check for updates";
+    public static String OTA_CHECK_UPDATE_DESC = "Automatically checks for mod updates every 48 hours";
+    public static String OTA_NO_CONNECTION = "No internet connection";
+    public static String OTA_UP_TO_DATE = "Mod is up to date";
+    public static String OTA_CHECK_FAILED = "Update check failed";
+    public static String OTA_INSTALLED = "Installed version";
+    public static String OTA_AVAILABLE = "New version available";
+    public static String OTA_DOWNLOADING = "Downloading update...";
+    public static String OTA_DOWNLOAD_FAILED = "Download failed";
+    public static String OTA_APK_LOCATION = "APK saved to Downloads";
+    public static String OTA_SIGNATURE_MISMATCH = "Signature mismatch";
+    public static String OTA_SIGNATURE_TITLE = "Signature verification failed";
     public static String OTA_UPDATE_AVAILABLE = "Update available";
     public static String OTA_BTN_DOWNLOAD = "Download";
     public static String OTA_BTN_LATER = "Later";
-    public static String OTA_BTN_GITHUB = "GitHub";
-    public static String OTA_TITLE = "Update";
-    public static String OTA_UPDATE_LABEL = "Update: ";
+    public static String OTA_BTN_GITHUB = "View on GitHub";
+    public static String OTA_TITLE = "OTA Updater";
+    public static String OTA_UPDATE_LABEL = "Mod Update";
+
+    // ===== RVCArise debug strings =====
+    public static String DEBUG_DUMP_FLAGS = "Dump patch flags";
+    public static String DEBUG_DUMP_FLAGS_DESC = "Log all HookFlags overrides to logcat";
+    public static String DEBUG_EXPORT_DIAG = "Export diagnostics";
+    public static String DEBUG_EXPORT_DIAG_DESC = "Export mod info for bug reports";
+    public static String DEBUG_ADB_HELP = "ADB debug commands";
+    public static String DEBUG_ADB_HELP_DESC = "Show available ADB broadcast commands for debugging";
+
 
 }
