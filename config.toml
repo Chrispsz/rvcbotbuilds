@@ -93,7 +93,6 @@ included-patches = """\
   'Hide suggested content' \
   'Improve image viewing' \
   'More options on post' \
-  'More options on profile' \
   'Open links externally' \
   'Remove build expired popup' \
   'Sanitize share links' \
@@ -105,5 +104,6 @@ included-patches = """\
 excluded-patches = """\
   'Unlock employee options' \
   'Unlock Plus benefits' \
+  'More options on profile' \
   """
 uptodown-dlurl = "https://instagram.en.uptodown.com/android"
