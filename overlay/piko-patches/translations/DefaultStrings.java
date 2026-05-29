@@ -178,8 +178,8 @@ public class DefaultStrings {
     public static String ARR_DETAILED_TIMESTAMP = "Detailed timestamp";
     public static String ARR_TIME_LEFT = "Time left";
 
-    public static String WELCOME_TITLE = "Welcome to Piko";
-    public static String WELCOME_MESSAGE = "To improve your experience with Piko, please vist Mod settings and adjust your preference";
+    public static String WELCOME_TITLE = "Welcome to Mod";
+    public static String WELCOME_MESSAGE = "To improve your experience with Mod, please vist Mod settings and adjust your preference";
     public static String GOTO_PIKO_SETTINGS = "Goto Mod settings";
     public static String NO_INTERNET = "Please connect to internet";
     public static String TAP_HERE = "Tap here !!";
