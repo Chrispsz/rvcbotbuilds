@@ -9,7 +9,7 @@ package app.morphe.extension.instagram.constants.translations;
 
 public class StringsKorean extends DefaultStrings {
 	public StringsKorean() {
-        this.PIKO_SETTINGS_TITLE = "Piko 설정";
+        this.PIKO_SETTINGS_TITLE = "Mod 설정";
 
         this.CATEGORY_ADS = "광고";
         this.DISABLE_ADS = "광고 비활성화";
@@ -145,8 +145,8 @@ public class StringsKorean extends DefaultStrings {
         this.HIDE_NAVIGATION_CREATE = "만들기 버튼 숨기기";
 
         this.PATCH_INFO_TITLE = "패치 정보";
-        this.EXPORT_PIKO_PREF = "Piko 설정 내보내기";
-        this.IMPORT_PIKO_PREF = "Piko 설정 가져오기";
+        this.EXPORT_PIKO_PREF = "Mod 설정 내보내기";
+        this.IMPORT_PIKO_PREF = "Mod 설정 가져오기";
         this.APP_VERSION = "앱 버전: %s";
         this.PATCH_VERSION = "패치 버전: %s";
 
@@ -159,7 +159,7 @@ public class StringsKorean extends DefaultStrings {
         this.RESTART_APP = "변경 사항을 적용하려면 앱을 다시 시작해야 합니다";
         this.OK = "확인";
         this.DELETED = "삭제하였습니다";
-        this.PIKO_DEBUG = "Piko 디버그";
+        this.PIKO_DEBUG = "Mod 디버그";
         this.PIKO_DEBUG_DESC = "일부 구성요소에 테스트용 디버그 옵션을 추가합니다";
         this.PIKO_EXPORT_EXPERIMENT_LIST = "실험 목록 내보내기";
         this.PIKO_EXPORT_EXPERIMENT_MAPPINGS = "실험 매핑 내보내기";
@@ -177,40 +177,39 @@ public class StringsKorean extends DefaultStrings {
         this.ARR_DETAILED_TIMESTAMP = "상세 시간";
         this.ARR_TIME_LEFT = "남은 시간";
         
-        this.WELCOME_TITLE = "Piko에 오신 것을 환영합니다";
-        this.WELCOME_MESSAGE = "Piko 사용 경험을 개선하려면 Piko 설정으로 이동하여 원하는 대로 설정해 주세요";
-        this.GOTO_PIKO_SETTINGS = "Piko 설정으로 이동";
+        this.WELCOME_TITLE = "Mod에 오신 것을 환영합니다";
+        this.WELCOME_MESSAGE = "Mod 사용 경험을 개선하려면 Mod 설정으로 이동하여 원하는 대로 설정해 주세요";
+        this.GOTO_PIKO_SETTINGS = "Mod 설정으로 이동";
         this.NO_INTERNET = "인터넷에 연결해 주세요";
         this.TAP_HERE = "여기를 탭하세요 !!"; 
     }
+
+        // ===== RVCArise OTA + Debug strings =====
+this.CATEGORY_OTA = "OTA Updater";
+        this.OTA_CHECK_UPDATE = "Check for updates";
+        this.OTA_CHECK_UPDATE_DESC = "Automatically checks for mod updates every 48 hours";
+        this.OTA_NO_CONNECTION = "No internet connection";
+        this.OTA_UP_TO_DATE = "Mod is up to date";
+        this.OTA_CHECK_FAILED = "Update check failed";
+        this.OTA_INSTALLED = "Installed version";
+        this.OTA_AVAILABLE = "New version available";
+        this.OTA_DOWNLOADING = "Downloading update...";
+        this.OTA_DOWNLOAD_FAILED = "Download failed";
+        this.OTA_APK_LOCATION = "APK saved to Downloads";
+        this.OTA_SIGNATURE_MISMATCH = "Signature mismatch";
+        this.OTA_SIGNATURE_TITLE = "Signature verification failed";
+        this.OTA_UPDATE_AVAILABLE = "Update available";
+        this.OTA_BTN_DOWNLOAD = "Download";
+        this.OTA_BTN_LATER = "Later";
+        this.OTA_BTN_GITHUB = "View on GitHub";
+        this.OTA_TITLE = "OTA Updater";
+        this.OTA_UPDATE_LABEL = "Mod Update";
+
+        this.DEBUG_DUMP_FLAGS = "Dump patch flags";
+        this.DEBUG_DUMP_FLAGS_DESC = "Log all HookFlags overrides to logcat";
+        this.DEBUG_EXPORT_DIAG = "Export diagnostics";
+        this.DEBUG_EXPORT_DIAG_DESC = "Export mod info for bug reports";
+        this.DEBUG_ADB_HELP = "ADB debug commands";
+        this.DEBUG_ADB_HELP_DESC = "Show available ADB broadcast commands for debugging";
+
 }
-
-    // ===== RVCArise OTA updater strings =====
-    public static String CATEGORY_OTA = "OTA Updater";
-    public static String OTA_CHECK_UPDATE = "Check for updates";
-    public static String OTA_CHECK_UPDATE_DESC = "Automatically checks for mod updates every 48 hours";
-    public static String OTA_NO_CONNECTION = "No internet connection";
-    public static String OTA_UP_TO_DATE = "Mod is up to date";
-    public static String OTA_CHECK_FAILED = "Update check failed";
-    public static String OTA_INSTALLED = "Installed version";
-    public static String OTA_AVAILABLE = "New version available";
-    public static String OTA_DOWNLOADING = "Downloading update...";
-    public static String OTA_DOWNLOAD_FAILED = "Download failed";
-    public static String OTA_APK_LOCATION = "APK saved to Downloads";
-    public static String OTA_SIGNATURE_MISMATCH = "Signature mismatch";
-    public static String OTA_SIGNATURE_TITLE = "Signature verification failed";
-    public static String OTA_UPDATE_AVAILABLE = "Update available";
-    public static String OTA_BTN_DOWNLOAD = "Download";
-    public static String OTA_BTN_LATER = "Later";
-    public static String OTA_BTN_GITHUB = "View on GitHub";
-    public static String OTA_TITLE = "OTA Updater";
-    public static String OTA_UPDATE_LABEL = "Mod Update";
-
-    // ===== RVCArise debug strings =====
-    public static String DEBUG_DUMP_FLAGS = "Dump patch flags";
-    public static String DEBUG_DUMP_FLAGS_DESC = "Log all HookFlags overrides to logcat";
-    public static String DEBUG_EXPORT_DIAG = "Export diagnostics";
-    public static String DEBUG_EXPORT_DIAG_DESC = "Export mod info for bug reports";
-    public static String DEBUG_ADB_HELP = "ADB debug commands";
-    public static String DEBUG_ADB_HELP_DESC = "Show available ADB broadcast commands for debugging";
-
