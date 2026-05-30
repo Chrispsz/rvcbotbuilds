@@ -1,6 +1,6 @@
 # ============================================
 # RVCBotBuilds — Instagram Mod
-# arm64-v8a | Original crimera/piko patches (dev)
+# arm64-v8a | Chrispsz/piko fork (dev branch)
 # ============================================
 
 enable-module-update = true
@@ -48,12 +48,12 @@ uptodown-dlurl = "https://youtube-music.en.uptodown.com/android"
 apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"
 
 # ============================================
-# Instagram Mod — ORIGINAL crimera/piko (dev branch) + ALL 11 patches
+# Instagram Mod — Chrispsz/piko fork (dev branch) + ALL 11 patches
 # ============================================
 [Instagram-Piko]
 enabled = true
 app-name = "Instagram"
-patches-source = "crimera/piko"
+patches-source = "Chrispsz/piko"
 patches-version = "dev"
 cli-source = "MorpheApp/morphe-cli"
 rv-brand = "Morphe"
