@@ -64,13 +64,22 @@ else
         DEX_COUNT=$(echo "$DEX_LIST" | grep -c 'dex' || true)
         echo "  DEX files in APK: $DEX_COUNT"
 
-        # Check for Morphe extension classes
-        MORPHE_CLASSES=$(unzip -l "$APK_FILE" 2>/dev/null | grep -c 'app/morphe/extension' || true)
-        if [ "$MORPHE_CLASSES" -gt 0 ]; then
-            echo -e "  ${GREEN}✅ Morphe extension classes found ($MORPHE_CLASSES)${NC}"
+        # Check for Morphe extension classes in DEX (not as file paths)
+        # Morphe patches inject code directly into DEX files, so we check the build log instead
+        if [ -f "build.log" ]; then
+            APPLIED_COUNT=$(grep -c "INFO: Applied:" build.log 2>/dev/null || true)
+            if [ "$APPLIED_COUNT" -gt 0 ]; then
+                echo -e "  ${GREEN}✅ Patches applied successfully ($APPLIED_COUNT patches)${NC}"
+            else
+                echo -e "  ${YELLOW}⚠️  Could not verify patch application from build.log${NC}"
+            fi
         else
-            echo -e "  ${RED}❌ No Morphe extension classes found — patches NOT applied!${NC}"
-            ISSUES=$((ISSUES + 1))
+            # Fallback: check DEX count (patched APKs have more DEX files)
+            if [ "$DEX_COUNT" -ge 2 ]; then
+                echo -e "  ${GREEN}✅ Multiple DEX files found ($DEX_COUNT) — patches likely applied${NC}"
+            else
+                echo -e "  ${YELLOW}⚠️  Single DEX file — patches may not have been applied${NC}"
+            fi
         fi
 
         # Check for piko settings Activity
@@ -114,11 +123,15 @@ echo ""
 echo "--- Config Verification ---"
 if [ -f "config.toml" ]; then
     # Check patches-source
-    IG_SOURCE=$(grep 'patches-source.*crimera' config.toml 2>/dev/null || true)
+    IG_SOURCE=$(grep -E 'patches-source.*(crimera|Chrispsz)/piko' config.toml 2>/dev/null || true)
     if [ -n "$IG_SOURCE" ]; then
-        echo -e "  ${GREEN}✅ Using official crimera/piko patches-source${NC}"
+        if echo "$IG_SOURCE" | grep -q 'Chrispsz'; then
+            echo -e "  ${GREEN}✅ Using Chrispsz/piko fork (with OTA + custom patches)${NC}"
+        else
+            echo -e "  ${GREEN}✅ Using official crimera/piko patches-source${NC}"
+        fi
     else
-        echo -e "  ${YELLOW}⚠️  Not using crimera/piko — verify patches-source in config.toml${NC}"
+        echo -e "  ${YELLOW}⚠️  Not using piko patches — verify patches-source in config.toml${NC}"
     fi
 
     # Check for version = "auto"

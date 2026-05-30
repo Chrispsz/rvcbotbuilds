@@ -231,7 +231,7 @@ jobs:
       - name: Add upstream remote
         run: |
           git remote add upstream https://github.com/j-hc/revanced-magisk-module.git 2>/dev/null || true
-          git fetch upstream master --depth=100
+          git fetch upstream main --depth=100 2>/dev/null || git fetch upstream master --depth=100
 
       - name: Merge upstream (keeping our changes)
         run: |
@@ -499,7 +499,7 @@ jobs:
             echo "---"
             echo ""
             echo "📸 Instagram"
-            echo "Official crimera/piko · 11 patches · AMOLED · Download · Privacy"
+            echo "Chrispsz/piko fork · 15 patches · AMOLED · Download · Privacy · OTA"
             echo ""
             echo "📺 YouTube"
             echo "AMOLED · Clean player · APK + Magisk"
