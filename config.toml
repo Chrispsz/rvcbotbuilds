@@ -70,7 +70,6 @@ included-patches = """\
   'Hide suggested content' \
   'Improve image viewing' \
   'More options on post' \
-  'More options on profile' \
   'OTA update checker' \
   'Open links externally' \
   'Remove build expired popup' \
