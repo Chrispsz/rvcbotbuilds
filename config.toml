@@ -48,20 +48,18 @@ uptodown-dlurl = "https://youtube-music.en.uptodown.com/android"
 apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"
 
 # ============================================
-# Instagram Mod — Chrispsz/piko fork (dev branch)
+# Instagram Mod — ORIGINAL crimera/piko (dev branch)
 #
-# BUILD B (diag): 4 "suspicious" patches — likely to touch profile rendering
-#   Download media, Hide suggested content,
-#   Improve image viewing, More options on post
+# DIAGNOSTIC: Build with ORIGINAL crimera/piko .mpp to test
+# if X.06O4.bindView crash is an upstream bug or fork-specific.
+# Using only 1 minimal patch ("Remove build expired popup").
 #
-# Based on crimera/piko dev branch with:
-#   🔄 OTA: in-app APK updater (48h auto-check)
-#   ⚙️ Mod settings button on profile
-#   🇧🇷 PT-BR translation complete
+# If this ALSO crashes → upstream bug in crimera/piko
+# If this works → bug is in Chrispsz/piko fork's larger .mpe
 # ============================================
 [Instagram-Piko]
 app-name = "Instagram"
-patches-source = "Chrispsz/piko"
+patches-source = "crimera/piko"
 patches-version = "dev"
 cli-source = "MorpheApp/morphe-cli"
 rv-brand = "Morphe"
