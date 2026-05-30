@@ -92,18 +92,11 @@ jobs:
             echo "✅ Upstream j-hc up to date"
           fi
 
-          # ---- Check Piko patches (Instagram) ----
+          # ---- Check Piko patches (Instagram) — official upstream only ----
           echo ""
-          echo "=== Checking piko patches ==="
-
-          # Check BOTH upstream and our fork — any new release triggers build
-          UPSTREAM_PIKO=$(curl -sL "https://api.github.com/repos/crimera/piko/releases?per_page=1" | jq -r '.[0].tag_name // empty' 2>/dev/null || echo "")
-          FORK_PIKO=$(curl -sL "https://api.github.com/repos/Chrispsz/piko/releases?per_page=1" | jq -r '.[0].tag_name // empty' 2>/dev/null || echo "")
-          echo "Latest upstream piko: $UPSTREAM_PIKO"
-          echo "Latest fork piko: $FORK_PIKO"
-
-          # Use the fork version as the primary (our .mpp comes from there)
-          PIKO_VERSION="$FORK_PIKO"
+          echo "=== Checking piko patches (crimera/piko) ==="
+          PIKO_VERSION=$(curl -sL "https://api.github.com/repos/crimera/piko/releases?per_page=1" | jq -r '.[0].tag_name // empty' 2>/dev/null || echo "")
+          echo "Latest upstream piko: $PIKO_VERSION"
 
           LAST_PIKO=""
           if git fetch origin update --depth=1 2>/dev/null; then
@@ -114,18 +107,14 @@ jobs:
           if [ -z "$LAST_PIKO" ] && [ "$IG_ENABLED" = "true" ]; then
             echo "🆕 First build — Instagram will be built"
             BUILD_INSTAGRAM=1
-          elif [ -n "$FORK_PIKO" ] && [ "$FORK_PIKO" != "$LAST_PIKO" ] && [ "$IG_ENABLED" = "true" ]; then
-            echo "⚠️  Fork piko update: $LAST_PIKO → $FORK_PIKO"
-            BUILD_INSTAGRAM=1
-          elif [ -n "$UPSTREAM_PIKO" ] && [ "$UPSTREAM_PIKO" != "$LAST_PIKO" ] && [ "$UPSTREAM_PIKO" != "$FORK_PIKO" ] && [ "$IG_ENABLED" = "true" ]; then
-            echo "⚠️  Upstream piko has new release: $UPSTREAM_PIKO (fork not yet updated)"
+          elif [ -n "$PIKO_VERSION" ] && [ "$PIKO_VERSION" != "$LAST_PIKO" ] && [ "$IG_ENABLED" = "true" ]; then
+            echo "⚠️  Piko update: $LAST_PIKO → $PIKO_VERSION"
             BUILD_INSTAGRAM=1
           else
             echo "✅ Piko up to date"
           fi
 
           # If upstream j-hc changed, also rebuild YouTube
-          # (build system updates might affect YouTube patching)
           if [ "$SYNC_UPSTREAM" -eq 1 ] && [ "$YT_ENABLED" = "true" ]; then
             echo "🔄 Upstream sync needed — YouTube will be rebuilt with updated build system"
             BUILD_YOUTUBE=1
@@ -212,10 +201,10 @@ jobs:
 
   # ===========================================
   # Step 2: Sync upstream j-hc/revanced-magisk-module
-  # Always runs — keeps build system (build.sh, utils.sh,
-  # module/, bin/) up to date automatically.
-  # Our custom files (overlay/, config.toml, workflows)
-  # are preserved with -X ours merge strategy.
+  # Keeps build system (build.sh, utils.sh, module/, bin/)
+  # up to date automatically.
+  # Our custom files (config.toml, workflows) are
+  # preserved with -X ours merge strategy.
   # ===========================================
   sync-upstream:
     needs: check-updates
@@ -243,7 +232,6 @@ jobs:
           # Save our custom files before merge
           echo "📦 Backing up our custom files..."
           mkdir -p /tmp/our-backup
-          cp -r overlay/ /tmp/our-backup/overlay/ 2>/dev/null || true
           cp config.toml /tmp/our-backup/config.toml 2>/dev/null || true
           cp -r .github/workflows/ /tmp/our-backup/workflows/ 2>/dev/null || true
           cp diagnose-build.sh /tmp/our-backup/diagnose-build.sh 2>/dev/null || true
@@ -260,14 +248,8 @@ jobs:
             git commit --no-edit || true
           }
 
-          # Restore our protected files (always overwrite, even if
-          # upstream didn't conflict — ensures our customizations persist)
+          # Restore our protected files
           echo "📦 Restoring our custom files..."
-          if [ -d /tmp/our-backup/overlay ]; then
-            rm -rf overlay/
-            cp -r /tmp/our-backup/overlay/ overlay/
-            echo "  ✅ overlay/ restored"
-          fi
           if [ -f /tmp/our-backup/config.toml ]; then
             cp /tmp/our-backup/config.toml config.toml
             echo "  ✅ config.toml restored"
@@ -290,7 +272,7 @@ jobs:
 
           # Commit our protected file restores
           git add -A
-          git diff --cached --quiet || git commit -m "chore: restore custom overlay, config and workflows after j-hc sync"
+          git diff --cached --quiet || git commit -m "chore: restore custom config and workflows after j-hc sync"
 
           # Show what changed
           echo ""
@@ -305,203 +287,11 @@ jobs:
           git push
 
   # ===========================================
-  # Step 3: Sync piko fork (if Instagram updated)
-  # ===========================================
-  sync-piko:
-    needs: [check-updates, sync-upstream]
-    if: always() && needs.check-updates.outputs.BUILD_INSTAGRAM == '1'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout rvcbotbuilds
-        uses: actions/checkout@v4
-
-      - name: Checkout piko fork
-        uses: actions/checkout@v4
-        with:
-          repository: Chrispsz/piko
-          ref: main
-          path: piko-fork
-          fetch-depth: 0
-          token: ${{ secrets.PAT_TOKEN }}
-
-      - name: Add upstream remote
-        working-directory: piko-fork
-        run: |
-          git remote add upstream https://github.com/crimera/piko.git
-          git fetch upstream main --depth=50
-
-      - name: Merge upstream (keeping our changes)
-        working-directory: piko-fork
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          git merge upstream/main --no-edit -X ours || {
-            echo "⚠️  Merge conflicts — resolving with ours strategy"
-            git diff --name-only --diff-filter=U | while read file; do
-              echo "  Keeping ours: $file"
-              git checkout --ours "$file"
-              git add "$file"
-            done
-            git commit --no-edit || true
-          }
-
-      - name: Apply immutable overlay
-        run: |
-          chmod +x overlay/apply-overlay.sh
-          bash overlay/apply-overlay.sh piko-fork
-
-          cd piko-fork
-          git diff --stat
-          git add -A
-          git diff --cached --quiet || git commit -m "chore: reapply immutable overlay after upstream sync"
-          git push
-
-      - name: Update piko version
-        working-directory: piko-fork
-        run: |
-          # Get latest upstream version tag
-          UPSTREAM_VER=$(curl -sL "https://api.github.com/repos/crimera/piko/releases?per_page=1" | jq -r '.[0].tag_name // "v3.5.0-dev.2"' | sed 's/^v//')
-          echo "Setting piko version to: $UPSTREAM_VER"
-          sed -i "s/^version = .*/version = $UPSTREAM_VER/" gradle.properties
-          cat gradle.properties
-
-      - name: Setup Java 17
-        uses: actions/setup-java@v5
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Build piko patches (.mpp)
-        working-directory: piko-fork
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_ACTOR: ${{ github.actor }}
-        run: |
-          chmod +x gradlew
-          # Build everything — the .mpp is generated by the Morphe Gradle plugin
-          ./gradlew :patches:build :patches:buildAndroid :patches:generatePatchesList --no-daemon
-          # generatePatchesList is included above — running it separately would
-          # re-trigger jar and overwrite .mpp (removing classes.dex)
-
-          # List ALL build artifacts to find the correct .mpp
-          echo "=== All .mpp files ==="
-          find . -name "*.mpp" -type f -ls
-          echo "=== All .jar files in patches/build/libs ==="
-          ls -la patches/build/libs/
-          echo "=== All build outputs ==="
-          find patches/build -name "patches-*" -type f -ls 2>/dev/null || true
-
-      - name: Update piko release with new .mpp
-        working-directory: piko-fork
-        env:
-          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
-        run: |
-          # Find the built .mpp file (exclude javadoc/sources)
-          # The real .mpp is 4-6MB, javadoc is ~425KB
-          MPP_FILE=$(find . -name "patches-*.mpp" -type f ! -name "*-javadoc*" ! -name "*-sources*" | head -1)
-
-          # If no non-javadoc .mpp found, check by size (real .mpp > 1MB)
-          if [ -z "$MPP_FILE" ]; then
-            echo "⚠️  No standard .mpp found, checking by size..."
-            for f in $(find . -name "patches-*.mpp" -type f); do
-              SIZE=$(stat -c%s "$f" 2>/dev/null || echo "0")
-              if [ "$SIZE" -gt 1048576 ]; then
-                MPP_FILE="$f"
-                echo "  Found large .mpp: $f ($(( SIZE / 1024 / 1024 )) MB)"
-                break
-              else
-                echo "  Skipping small .mpp: $f ($(( SIZE / 1024 )) KB — likely javadoc)"
-              fi
-            done
-          fi
-
-          # Fall back to .jar if no .mpp
-          if [ -z "$MPP_FILE" ]; then
-            MPP_FILE=$(find patches/build/libs -name "*.jar" -type f ! -name "*-sources*" ! -name "*-javadoc*" | head -1)
-          fi
-          echo "Built .mpp: $MPP_FILE"
-          ls -la patches/build/libs/
-
-          if [ -z "$MPP_FILE" ]; then
-            echo "ERROR: No .mpp or .jar file found!"
-            echo "Available .mpp files:"
-            find . -name "*.mpp" -type f -ls 2>/dev/null || echo "None"
-            exit 1
-          fi
-
-          # Verify the .mpp is large enough (real patches are 4MB+)
-          MPP_SIZE=$(stat -c%s "$MPP_FILE" 2>/dev/null || echo "0")
-          if [ "$MPP_SIZE" -lt 1048576 ]; then
-            echo "ERROR: .mpp file is too small ($(( MPP_SIZE / 1024 )) KB). Expected 4MB+."
-            echo "This is likely a javadoc.mpp, not the actual patches."
-            echo "Available files:"
-            find . -name "*.mpp" -type f -ls 2>/dev/null
-            exit 1
-          fi
-
-          # Get version from gradle
-          VER=$(cd patches && grep -oP 'version\s*=\s*"\K[^"]+' build.gradle.kts 2>/dev/null || echo "3.5.0")
-
-          # Incremental tag: find highest fork.N and increment
-          BASE_TAG="v${VER}-fork"
-          LAST_N=$(gh release list --repo Chrispsz/piko --limit 50 2>/dev/null | \
-            grep -oP "${BASE_TAG}\.\K[0-9]+" | sort -n | tail -1 || echo "0")
-          NEW_N=$((LAST_N + 1))
-          TAG="${BASE_TAG}.${NEW_N}"
-          echo "Version: $VER, Tag: $TAG (incremental from fork.${LAST_N})"
-
-          # Generate patches list files
-          LIST_JSON="patches-list.json"
-          BUNDLE_JSON="patches-bundle.json"
-          if [ -f "patches/build/patches-list.json" ]; then
-            cp "patches/build/patches-list.json" "$LIST_JSON"
-          fi
-          if [ -f "patches/build/patches-bundle.json" ]; then
-            cp "patches/build/patches-bundle.json" "$BUNDLE_JSON"
-          fi
-
-          # Create new release with the compiled .mpp
-          RELEASE_FILES="$MPP_FILE"
-          [ -f "$LIST_JSON" ] && RELEASE_FILES="$RELEASE_FILES $LIST_JSON"
-          [ -f "$BUNDLE_JSON" ] && RELEASE_FILES="$RELEASE_FILES $BUNDLE_JSON"
-
-          # Get upstream version for release notes
-          UPSTREAM_VER=$(curl -sL "https://api.github.com/repos/crimera/piko/releases?per_page=1" | jq -r '.[0].tag_name // "unknown"' 2>/dev/null)
-
-          # Write release notes to file to avoid YAML parsing issues with multi-line strings
-          cat > /tmp/piko-release-notes.md <<EOF
-          ## Auto-built from source with overlay
-
-          Based on upstream crimera/piko ${UPSTREAM_VER}.
-
-          Our modifications:
-          - **15 verified MetaConfig patch flags** (only flags required by piko patches)
-          - **No JSON loading** — Instagram has built-in importer for extra flags
-          - **ADB DebugReceiver** — always-on debug via ADB, no toggle needed
-          - **OTA mod updater** — checks GitHub releases, installs APK updates
-          - **Mod rebrand** — Piko → Mod in all UI strings
-          - **PT-BR** complete translation
-
-          Users who need extra flags: Mod Settings → Developer options → Import
-          EOF
-
-          gh release create "$TAG" $RELEASE_FILES \
-            --repo Chrispsz/piko \
-            --title "Piko patches $TAG (Chrispsz fork)" \
-            --notes-file /tmp/piko-release-notes.md \
-            --prerelease
-
-  # ===========================================
-  # Step 4: Build Instagram (conditional)
+  # Step 3: Build Instagram (conditional)
+  # Uses official crimera/piko .mpp directly — no fork, no overlay
   # ===========================================
   build-instagram:
-    needs: [check-updates, sync-piko]
+    needs: [check-updates, sync-upstream]
     if: always() && needs.check-updates.outputs.BUILD_INSTAGRAM == '1'
     uses: ./.github/workflows/build-instagram.yml
     secrets:
@@ -511,7 +301,7 @@ jobs:
       KS_PASSWORD: ${{ secrets.KS_PASSWORD }}
 
   # ===========================================
-  # Step 5: Build YouTube + Music (conditional)
+  # Step 4: Build YouTube + Music (conditional)
   # ===========================================
   build-youtube:
     needs: [check-updates, sync-upstream]
@@ -523,7 +313,7 @@ jobs:
       KS_PASSWORD: ${{ secrets.KS_PASSWORD }}
 
   # ===========================================
-  # Step 6: Create unified release
+  # Step 5: Create unified release
   # ===========================================
   release:
     needs: [check-updates, build-instagram, build-youtube]
@@ -700,7 +490,7 @@ jobs:
             echo "---"
             echo ""
             echo "📸 Instagram"
-            echo "AMOLED · Download · Privacy · 15 patch flags · OTA · Debug ADB · PT-BR"
+            echo "Official crimera/piko · 11 patches · AMOLED · Download · Privacy"
             echo ""
             echo "📺 YouTube"
             echo "AMOLED · Clean player · APK + Magisk"
@@ -715,7 +505,6 @@ jobs:
             echo "• Only changed apps are rebuilt"
             echo "• YouTube Magisk included"
             echo "• Previous assets carried forward"
-
           } > release-notes.md
 
           cat release-notes.md
@@ -778,7 +567,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ===========================================
-  # Step 7: Update build metadata
+  # Step 6: Update build metadata
   # ===========================================
   update-meta:
     needs: [check-updates, release]
@@ -823,7 +612,7 @@ jobs:
           git push
 
   # ===========================================
-  # Step 8: Cleanup old workflow runs
+  # Step 7: Cleanup old workflow runs
   # ===========================================
   cleanup:
     needs: release

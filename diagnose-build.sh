@@ -11,7 +11,7 @@
 #   2. Which piko classes are present in the APK
 #   3. Whether the mod menu Activity is registered
 #   4. APK size sanity check
-#   5. Overlay verification
+#   5. Config verification
 # ============================================
 set -euo pipefail
 
@@ -73,30 +73,13 @@ else
             ISSUES=$((ISSUES + 1))
         fi
 
-        # Check for HookFlags
-        HOOK_FLAGS=$(unzip -l "$APK_FILE" 2>/dev/null | grep -c 'HookFlags' || true)
-        if [ "$HOOK_FLAGS" -gt 0 ]; then
-            echo -e "  ${GREEN}✅ HookFlags class found${NC}"
-        else
-            echo -e "  ${RED}❌ HookFlags class NOT found${NC}"
-            ISSUES=$((ISSUES + 1))
-        fi
-
-        # Check for SettingsActivity
+        # Check for piko settings Activity
         SETTINGS_ACT=$(unzip -l "$APK_FILE" 2>/dev/null | grep -c 'SettingsActivity' || true)
         if [ "$SETTINGS_ACT" -gt 0 ]; then
             echo -e "  ${GREEN}✅ SettingsActivity class found (mod menu should work)${NC}"
         else
             echo -e "  ${RED}❌ SettingsActivity NOT found (mod menu won't appear)${NC}"
             ISSUES=$((ISSUES + 1))
-        fi
-
-        # Check for OtaUpdater
-        OTA_UPDATER=$(unzip -l "$APK_FILE" 2>/dev/null | grep -c 'OtaUpdater' || true)
-        if [ "$OTA_UPDATER" -gt 0 ]; then
-            echo -e "  ${GREEN}✅ OtaUpdater class found${NC}"
-        else
-            echo -e "  ${YELLOW}⚠️  OtaUpdater NOT found (OTA won't work)${NC}"
         fi
     else
         echo -e "  ${YELLOW}⚠️  unzip not available, skipping DEX analysis${NC}"
@@ -126,31 +109,18 @@ else
     echo -e "  ${YELLOW}⚠️  build.md not found${NC}"
 fi
 
-# 4. Check overlay application
-echo ""
-echo "--- Overlay Verification ---"
-OVERLAY_DIR="overlay/piko-patches"
-if [ -d "$OVERLAY_DIR" ]; then
-    OVERLAY_FILES=$(find "$OVERLAY_DIR" -name "*.java" -o -name "*.kt" | wc -l)
-    echo "  Overlay source files: $OVERLAY_FILES"
-
-    # Check HookFlags for fabricated flags
-    if [ -f "$OVERLAY_DIR/HookFlags.java" ]; then
-        if grep -q 'presetFlags()' "$OVERLAY_DIR/HookFlags.java" 2>/dev/null; then
-            echo -e "  ${RED}❌ HookFlags.java still has presetFlags() — fabricated flags!${NC}"
-            ISSUES=$((ISSUES + 1))
-        else
-            echo -e "  ${GREEN}✅ HookFlags.java: no fabricated presetFlags()${NC}"
-        fi
-    fi
-else
-    echo -e "  ${YELLOW}⚠️  Overlay directory not found${NC}"
-fi
-
-# 5. Check config.toml
+# 4. Check config.toml
 echo ""
 echo "--- Config Verification ---"
 if [ -f "config.toml" ]; then
+    # Check patches-source
+    IG_SOURCE=$(grep 'patches-source.*crimera' config.toml 2>/dev/null || true)
+    if [ -n "$IG_SOURCE" ]; then
+        echo -e "  ${GREEN}✅ Using official crimera/piko patches-source${NC}"
+    else
+        echo -e "  ${YELLOW}⚠️  Not using crimera/piko — verify patches-source in config.toml${NC}"
+    fi
+
     # Check for version = "auto"
     IG_VERSION=$(grep '^version = ' config.toml 2>/dev/null | head -1 || true)
     echo "  Instagram version setting: $IG_VERSION"
@@ -159,16 +129,6 @@ if [ -f "config.toml" ]; then
     if grep -q '\-\-continue-on-error' config.toml 2>/dev/null; then
         echo -e "  ${YELLOW}⚠️  --continue-on-error is set — patch failures will be hidden${NC}"
         ISSUES=$((ISSUES + 1))
-    fi
-
-    # Check for non-existent patches
-    if grep -q "'Preset flags'" config.toml 2>/dev/null; then
-        echo -e "  ${RED}❌ 'Preset flags' in included-patches — this patch doesn't exist in piko!${NC}"
-        ISSUES=$((ISSUES + 1))
-    fi
-
-    if grep -q "'Download voice message'" config.toml 2>/dev/null; then
-        echo -e "  ${YELLOW}⚠️  'Download voice message' may not exist in piko v3.4.0${NC}"
     fi
 fi
 
@@ -179,39 +139,29 @@ if [ "$ISSUES" -gt 0 ]; then
     echo -e "${RED}❌ Found $ISSUES issue(s) that need attention${NC}"
     echo ""
     echo "Common fixes:"
-    echo "  1. version = \"auto\" — lets CLI pick the right Instagram version"
-    echo "  2. Remove 'Preset flags' from included-patches"
-    echo "  3. Remove --continue-on-error from patcher-args"
-    echo "  4. Update fork to piko v3.5.0-dev.2+ for Instagram 430 support"
-    echo "  5. Ensure overlay is compiled INTO the .mpp, not just applied to source"
+    echo "  1. Check patches-source = 'crimera/piko' in config.toml"
+    echo "  2. Remove --continue-on-error from patcher-args"
+    echo "  3. Verify Instagram version is compatible with piko patches"
 else
     echo -e "${GREEN}✅ All checks passed! Build looks healthy.${NC}"
 fi
 echo "============================================"
 
-# 6. How to get runtime logs
+# 5. How to get runtime logs
 echo ""
 echo "--- How to Get Runtime Logs ---"
 echo ""
 echo "On-device (ADB):"
-echo "  adb logcat -s ModDebug PikoUtils | grep -i 'mod\|hook\|ota'"
+echo "  adb logcat -s PikoUtils | grep -i 'hook\|piko'"
 echo ""
-echo "ADB Debug Commands (DebugReceiver):"
-echo "  adb shell am broadcast -a app.morphe.extension.instagram.DEBUG --es command status"
-echo "  adb shell am broadcast -a app.morphe.extension.instagram.DEBUG --es command dump_flags"
-echo "  adb shell am broadcast -a app.morphe.extension.instagram.DEBUG --es command toggle_debug"
-echo "  adb shell am broadcast -a app.morphe.extension.instagram.DEBUG --es command export_log"
-echo "  adb shell am broadcast -a app.morphe.extension.instagram.DEBUG --es command version"
-echo ""
-echo "In-app (Mod debug):"
+echo "In-app (Mod settings):"
 echo "  1. Open Instagram → Profile → ⋮ → Mod Settings"
-echo "  2. Enable 'Mod debug' at the bottom"
+echo "  2. Enable developer options"
 echo "  3. Reproduce the issue"
-echo "  4. Check logcat with: adb logcat -s ModDebug"
+echo "  4. Check logcat with: adb logcat -s PikoUtils"
 echo ""
 echo "View settings via ADB (no root):"
 echo "  adb shell run-as com.instagram.android cat shared_prefs/piko_settings.xml"
-echo "  adb shell run-as com.instagram.android cat shared_prefs/piko_ota.xml"
 echo ""
 echo "Build logs (CI):"
 echo "  1. Go to GitHub Actions → select the workflow run"

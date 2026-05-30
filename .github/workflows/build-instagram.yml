@@ -40,11 +40,10 @@ jobs:
       - name: Cache prebuilts
         uses: actions/cache@v4
         with:
-          path: temp/chrispsz-rv
-          # Include piko version in key to invalidate on new .mpp
-          key: piko-prebuilts-v3-${{ hashFiles('config.toml') }}
+          path: temp/crimera-rv
+          key: piko-prebuilts-v1-${{ hashFiles('config.toml') }}
           restore-keys: |
-            piko-prebuilts-v3-
+            piko-prebuilts-v1-
 
       - name: Install deps
         run: sudo apt-get install -y jq zip python3
@@ -71,10 +70,9 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           KS_PASSWORD: ${{ secrets.KS_PASSWORD }}
         run: |
-          # Always force fresh .mpp download (patches-version = "dev" gets latest)
-          # Delete cached piko prebuilts to prevent stale .mpp
-          rm -rf temp/chrispsz-rv/patches-*.mpp temp/chrispsz-rv/patches-*.jar 2>/dev/null || true
-          echo "Cleared cached .mpp files — will download fresh from Chrispsz/piko"
+          # Clear cached piko prebuilts to prevent stale .mpp
+          rm -rf temp/crimera-rv/patches-*.mpp temp/crimera-rv/patches-*.jar 2>/dev/null || true
+          echo "Cleared cached .mpp files — will download fresh from crimera/piko"
 
           chmod +x build.sh utils.sh
           bash build.sh config.toml 2>&1 | tee build.log
@@ -89,11 +87,9 @@ jobs:
           echo ""
           echo "=== CI Build Summary ==="
           if [ -f "build.log" ]; then
-            # Show which patches were applied
             echo "--- Applied patches ---"
             grep -i "patch" build.log 2>/dev/null | grep -v "^$" | tail -20 || echo "No patch info in log"
             echo ""
-            # Check for specific failures
             echo "--- Key events ---"
             grep -E "(Getting prebuilts|Choosing version|Building|Failed|Error|succeeded)" build.log 2>/dev/null | tail -15 || true
           fi
