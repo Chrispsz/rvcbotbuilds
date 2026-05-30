@@ -51,6 +51,7 @@ apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"
 # Instagram Mod — ORIGINAL crimera/piko (dev branch) + ALL 11 patches
 # ============================================
 [Instagram-Piko]
+enabled = true
 app-name = "Instagram"
 patches-source = "crimera/piko"
 patches-version = "dev"
