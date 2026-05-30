@@ -47,7 +47,7 @@ uptodown-dlurl = "https://youtube-music.en.uptodown.com/android"
 apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"
 
 # ============================================
-# Instagram Mod — Official crimera/piko patches
+# Instagram Mod — Chrispsz/piko fork (official + OTA)
 # ============================================
 [Instagram-Piko]
 enabled = true
@@ -66,9 +66,12 @@ included-patches = """\
   'Disable analytics' \
   'Disable ads' \
   'Download media' \
+  'Follow back indicator' \
   'Hide suggested content' \
   'Improve image viewing' \
   'More options on post' \
+  'More options on profile' \
+  'OTA update checker' \
   'Open links externally' \
   'Remove build expired popup' \
   'Unlock developer options' \
