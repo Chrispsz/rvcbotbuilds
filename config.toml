@@ -71,7 +71,6 @@ included-patches = """\
   'Improve image viewing' \
   'More options on post' \
   'Copy comment' \
-  'Disable double tap like' \
   'Make ephemeral media permanent' \
   'OTA update checker' \
   'Open links externally' \
