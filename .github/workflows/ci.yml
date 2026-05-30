@@ -52,16 +52,22 @@ jobs:
           BUILD_YOUTUBE=0
           SYNC_UPSTREAM=0
 
-          # Force build handling
+          # ---- Read enabled flags from config.toml ----
+          YT_ENABLED=$(grep -A1 '\[YouTube-Morphe\]' config.toml | grep -oP 'enabled\s*=\s*\K(true|false)' || echo "true")
+          MUSIC_ENABLED=$(grep -A1 '\[Music-Morphe\]' config.toml | grep -oP 'enabled\s*=\s*\K(true|false)' || echo "true")
+          IG_ENABLED=$(grep -A1 '\[Instagram-Piko\]' config.toml | grep -oP 'enabled\s*=\s*\K(true|false)' || echo "true")
+          echo "Config enabled: YouTube=$YT_ENABLED, Music=$MUSIC_ENABLED, Instagram=$IG_ENABLED"
+
+          # Force build handling (respect config.toml enabled flags)
           if [ "${{ inputs.force_build }}" = "true" ]; then
-            echo "⚡ Force build requested — building everything"
-            BUILD_INSTAGRAM=1
-            BUILD_YOUTUBE=1
+            echo "⚡ Force build requested — respecting config.toml enabled flags"
+            [ "$IG_ENABLED" = "true" ] && BUILD_INSTAGRAM=1
+            [ "$YT_ENABLED" = "true" ] && BUILD_YOUTUBE=1
           fi
 
-          if [ "${{ inputs.force_target }}" = "instagram" ]; then
+          if [ "${{ inputs.force_target }}" = "instagram" ] && [ "$IG_ENABLED" = "true" ]; then
             BUILD_INSTAGRAM=1
-          elif [ "${{ inputs.force_target }}" = "youtube" ]; then
+          elif [ "${{ inputs.force_target }}" = "youtube" ] && [ "$YT_ENABLED" = "true" ]; then
             BUILD_YOUTUBE=1
           fi
 
@@ -105,13 +111,13 @@ jobs:
           fi
           echo "Last built piko: $LAST_PIKO"
 
-          if [ -z "$LAST_PIKO" ]; then
+          if [ -z "$LAST_PIKO" ] && [ "$IG_ENABLED" = "true" ]; then
             echo "🆕 First build — Instagram will be built"
             BUILD_INSTAGRAM=1
-          elif [ -n "$FORK_PIKO" ] && [ "$FORK_PIKO" != "$LAST_PIKO" ]; then
+          elif [ -n "$FORK_PIKO" ] && [ "$FORK_PIKO" != "$LAST_PIKO" ] && [ "$IG_ENABLED" = "true" ]; then
             echo "⚠️  Fork piko update: $LAST_PIKO → $FORK_PIKO"
             BUILD_INSTAGRAM=1
-          elif [ -n "$UPSTREAM_PIKO" ] && [ "$UPSTREAM_PIKO" != "$LAST_PIKO" ] && [ "$UPSTREAM_PIKO" != "$FORK_PIKO" ]; then
+          elif [ -n "$UPSTREAM_PIKO" ] && [ "$UPSTREAM_PIKO" != "$LAST_PIKO" ] && [ "$UPSTREAM_PIKO" != "$FORK_PIKO" ] && [ "$IG_ENABLED" = "true" ]; then
             echo "⚠️  Upstream piko has new release: $UPSTREAM_PIKO (fork not yet updated)"
             BUILD_INSTAGRAM=1
           else
@@ -120,7 +126,7 @@ jobs:
 
           # If upstream j-hc changed, also rebuild YouTube
           # (build system updates might affect YouTube patching)
-          if [ "$SYNC_UPSTREAM" -eq 1 ]; then
+          if [ "$SYNC_UPSTREAM" -eq 1 ] && [ "$YT_ENABLED" = "true" ]; then
             echo "🔄 Upstream sync needed — YouTube will be rebuilt with updated build system"
             BUILD_YOUTUBE=1
           fi
@@ -136,10 +142,10 @@ jobs:
           if git fetch origin update --depth=1 2>/dev/null; then
             LAST_IG=$(git show origin/update:build-meta/ig-base-version.txt 2>/dev/null || echo "")
           fi
-          if [ -z "$LAST_IG" ] && [ -n "$IG_VERSION" ]; then
+          if [ -z "$LAST_IG" ] && [ -n "$IG_VERSION" ] && [ "$IG_ENABLED" = "true" ]; then
             echo "🆕 First IG base check — Instagram will be built"
             BUILD_INSTAGRAM=1
-          elif [ -n "$IG_VERSION" ] && [ "$IG_VERSION" != "$LAST_IG" ]; then
+          elif [ -n "$IG_VERSION" ] && [ "$IG_VERSION" != "$LAST_IG" ] && [ "$IG_ENABLED" = "true" ]; then
             echo "⚠️  IG base update: $LAST_IG → $IG_VERSION"
             BUILD_INSTAGRAM=1
           fi
@@ -156,10 +162,10 @@ jobs:
           fi
           echo "Last built Morphe: $LAST_MORPHE"
 
-          if [ -z "$LAST_MORPHE" ]; then
+          if [ -z "$LAST_MORPHE" ] && [ "$YT_ENABLED" = "true" ]; then
             echo "🆕 First build — YouTube/Music will be built"
             BUILD_YOUTUBE=1
-          elif [ -n "$MORPHE_VERSION" ] && [ "$MORPHE_VERSION" != "$LAST_MORPHE" ]; then
+          elif [ -n "$MORPHE_VERSION" ] && [ "$MORPHE_VERSION" != "$LAST_MORPHE" ] && [ "$YT_ENABLED" = "true" ]; then
             echo "⚠️  Morphe update: $LAST_MORPHE → $MORPHE_VERSION"
             BUILD_YOUTUBE=1
           else
@@ -177,10 +183,10 @@ jobs:
           if git fetch origin update --depth=1 2>/dev/null; then
             LAST_YT=$(git show origin/update:build-meta/yt-base-version.txt 2>/dev/null || echo "")
           fi
-          if [ -z "$LAST_YT" ] && [ -n "$YT_VERSION" ]; then
+          if [ -z "$LAST_YT" ] && [ -n "$YT_VERSION" ] && [ "$YT_ENABLED" = "true" ]; then
             echo "🆕 First YT base check — YouTube will be built"
             BUILD_YOUTUBE=1
-          elif [ -n "$YT_VERSION" ] && [ "$YT_VERSION" != "$LAST_YT" ]; then
+          elif [ -n "$YT_VERSION" ] && [ "$YT_VERSION" != "$LAST_YT" ] && [ "$YT_ENABLED" = "true" ]; then
             echo "⚠️  YT base update: $LAST_YT → $YT_VERSION"
             BUILD_YOUTUBE=1
           fi
@@ -547,6 +553,7 @@ jobs:
         with:
           name: youtube-mod-apk
           path: release-assets/
+        continue-on-error: true
 
       - name: Download YouTube Magisk Module
         if: needs.build-youtube.result == 'success'
@@ -554,6 +561,7 @@ jobs:
         with:
           name: youtube-magisk-module
           path: release-assets/
+        continue-on-error: true
 
       - name: Download Music APK
         if: needs.build-youtube.result == 'success'
@@ -561,6 +569,7 @@ jobs:
         with:
           name: music-mod-apk
           path: release-assets/
+        continue-on-error: true
 
       # --- Fetch previous release assets for unchanged apps ---
 
