@@ -1,6 +1,6 @@
 # ============================================
 # RVCBotBuilds — Instagram Mod
-# arm64-v8a | Morphe patches | Piko fork (dev)
+# arm64-v8a | Original crimera/piko patches (dev)
 # ============================================
 
 enable-module-update = true
@@ -12,7 +12,7 @@ continue-on-error = false
 default-arch = "arm64-v8a"
 
 # ============================================
-# YouTube Morphe — APK + Magisk Module
+# YouTube Morphe — disabled
 # ============================================
 [YouTube-Morphe]
 enabled = false
@@ -30,7 +30,7 @@ uptodown-dlurl = "https://youtube.en.uptodown.com/android"
 apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"
 
 # ============================================
-# Music Morphe — APK only
+# Music Morphe — disabled
 # ============================================
 [Music-Morphe]
 enabled = false
@@ -48,14 +48,7 @@ uptodown-dlurl = "https://youtube-music.en.uptodown.com/android"
 apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"
 
 # ============================================
-# Instagram Mod — ORIGINAL crimera/piko (dev branch)
-#
-# DIAGNOSTIC: Build with ORIGINAL crimera/piko .mpp to test
-# if X.06O4.bindView crash is an upstream bug or fork-specific.
-# Using only 1 minimal patch ("Remove build expired popup").
-#
-# If this ALSO crashes → upstream bug in crimera/piko
-# If this works → bug is in Chrispsz/piko fork's larger .mpe
+# Instagram Mod — ORIGINAL crimera/piko (dev branch) + ALL 11 patches
 # ============================================
 [Instagram-Piko]
 app-name = "Instagram"
@@ -68,6 +61,16 @@ version = "430.0.0.53.80"
 exclusive-patches = true
 arch = "arm64-v8a"
 included-patches = """\
+  'Add settings' \
+  'Amoled theme' \
+  'Disable analytics' \
+  'Disable ads' \
+  'Download media' \
+  'Hide suggested content' \
+  'Improve image viewing' \
+  'More options on post' \
+  'Open links externally' \
   'Remove build expired popup' \
+  'Unlock developer options' \
   """
 uptodown-dlurl = "https://instagram.en.uptodown.com/android"
