@@ -52,7 +52,7 @@ apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"
 [Instagram-Piko]
 enabled = true
 app-name = "Instagram"
-patches-source = "crimera/piko"
+patches-source = "Chrispsz/piko"
 patches-version = "dev"
 cli-source = "MorpheApp/morphe-cli"
 rv-brand = "Morphe"
