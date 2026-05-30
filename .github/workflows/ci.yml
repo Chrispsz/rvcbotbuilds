@@ -92,11 +92,20 @@ jobs:
             echo "✅ Upstream j-hc up to date"
           fi
 
-          # ---- Check Piko patches (Instagram) — official upstream only ----
+          # ---- Check Piko patches (Instagram) — our fork with OTA ----
           echo ""
-          echo "=== Checking piko patches (crimera/piko) ==="
-          PIKO_VERSION=$(curl -sL "https://api.github.com/repos/crimera/piko/releases?per_page=1" | jq -r '.[0].tag_name // empty' 2>/dev/null || echo "")
-          echo "Latest upstream piko: $PIKO_VERSION"
+          echo "=== Checking piko patches (Chrispsz/piko — our fork) ==="
+          # Check our fork first (where the .mpp actually comes from)
+          FORK_PIKO_VERSION=$(curl -sL "https://api.github.com/repos/Chrispsz/piko/releases?per_page=1" | jq -r '.[0].tag_name // empty' 2>/dev/null || echo "")
+          echo "Latest fork piko: $FORK_PIKO_VERSION"
+
+          # Also check upstream for reference
+          UPSTREAM_PIKO_VERSION=$(curl -sL "https://api.github.com/repos/crimera/piko/releases?per_page=1" | jq -r '.[0].tag_name // empty' 2>/dev/null || echo "")
+          echo "Latest upstream piko: $UPSTREAM_PIKO_VERSION"
+
+          # Use fork version as the primary trigger (that's what we actually download)
+          PIKO_VERSION="${FORK_PIKO_VERSION:-$UPSTREAM_PIKO_VERSION}"
+          echo "Using piko version: $PIKO_VERSION"
 
           LAST_PIKO=""
           if git fetch origin update --depth=1 2>/dev/null; then
