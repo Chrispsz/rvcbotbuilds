@@ -82,14 +82,9 @@ else
             fi
         fi
 
-        # Check for piko settings Activity
-        SETTINGS_ACT=$(unzip -l "$APK_FILE" 2>/dev/null | grep -c 'SettingsActivity' || true)
-        if [ "$SETTINGS_ACT" -gt 0 ]; then
-            echo -e "  ${GREEN}✅ SettingsActivity class found (mod menu should work)${NC}"
-        else
-            echo -e "  ${RED}❌ SettingsActivity NOT found (mod menu won't appear)${NC}"
-            ISSUES=$((ISSUES + 1))
-        fi
+        # Note: SettingsActivity is compiled into DEX by Morphe patches,
+        # so we can't find it by listing zip contents. The patch count check above
+        # already verifies patches were applied successfully.
     else
         echo -e "  ${YELLOW}⚠️  unzip not available, skipping DEX analysis${NC}"
     fi
