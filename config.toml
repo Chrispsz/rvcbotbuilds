@@ -1,0 +1,135 @@
+# ============================================
+# RVCArise — Premium YouTube & Music Mods
+# ============================================
+# MorpheApp/morphe-patches v1.30.0
+# MorpheApp/morphe-cli v1.9.0
+# ============================================
+
+enable-module-update = true
+parallel-jobs = 2
+compression-level = 9
+riplib = true
+remove-rv-integrations-checks = true
+continue-on-error = true
+default-arch = "arm64-v8a"
+
+# ============================================
+# YouTube Morphe — APK + Magisk Module
+# ============================================
+# Only patches a real user will notice and use
+#
+# REMOVED due to bugs/stuttering:
+#   Spoof video streams — causes player stuttering & 5-10s delay
+#   SponsorBlock — undo toast freezes UI (#1555)
+#   Return YouTube Dislike — API timeout freezes app 5-10s (#1451)
+#   Sanitize sharing links — broken in v1.30.0 (#1602)
+#   Open system share sheet — broken in v1.30.0 (#1597)
+# ============================================
+[YouTube-Morphe]
+enabled = true
+app-name = "YouTube"
+patches-source = "MorpheApp/morphe-patches"
+patches-version = "latest"
+cli-source = "MorpheApp/morphe-cli"
+rv-brand = "Morphe"
+build-mode = "both"
+arch = "arm64-v8a"
+version = "auto"
+
+patcher-args = """\
+  -OdarkThemeBackgroundColor=@android:color/black \
+  """
+
+included-patches = """\
+  'Downloads' \
+  'Hide Shorts components' \
+  'Hide layout components' \
+  'Navigation bar' \
+  'Change start page' \
+  'Playback speed' \
+  'Remove background playback restrictions' \
+  'Swipe controls' \
+  """
+
+excluded-patches = """\
+  'Custom branding' \
+  'Disable QUIC protocol' \
+  'Disable double tap actions' \
+  'Disable haptic feedback' \
+  'Disable layout updates' \
+  'Disable player popup panels' \
+  'Disable rolling number animations' \
+  'Disable sign in to TV popup' \
+  'Disable video codecs' \
+  'Enable debugging' \
+  'Hide timestamp' \
+  'Spoof app version' \
+  'Check watch history domain name resolution' \
+  'Override YouTube Music buttons' \
+  'Return YouTube Dislike' \
+  'SponsorBlock' \
+  'Sanitize sharing links' \
+  'Open system share sheet' \
+  'Alternative thumbnails' \
+  'Bypass URL redirects' \
+  'Copy video URL' \
+  'Hide player flyout menu components' \
+  'Hide video action buttons' \
+  'Loop video' \
+  'Miniplayer' \
+  'Open Shorts in regular player' \
+  'Spoof device dimensions' \
+  'Spoof video streams' \
+  """
+
+uptodown-dlurl = "https://youtube.en.uptodown.com/android"
+apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"
+
+# ============================================
+# Music Morphe — APK + Magisk Module
+# ============================================
+# Only patches a real user will notice and use
+#
+# REMOVED due to bugs/stuttering:
+#   Spoof video streams — causes audio stuttering & delay
+#   Sanitize sharing links — broken in v1.30.0 (#1602)
+#   Track crossfade — breaks casting, lock screen (#1549)
+# ============================================
+[Music-Morphe]
+enabled = true
+app-name = "Music"
+patches-source = "MorpheApp/morphe-patches"
+patches-version = "latest"
+cli-source = "MorpheApp/morphe-cli"
+rv-brand = "Morphe"
+build-mode = "both"
+arch = "arm64-v8a"
+version = "auto"
+
+patcher-args = """\
+  -OdarkThemeBackgroundColor=@android:color/black \
+  """
+
+included-patches = """\
+  'Enable exclusive audio playback' \
+  'Miniplayer previous and next buttons' \
+  'Permanent repeat' \
+  """
+
+excluded-patches = """\
+  'Custom branding' \
+  'Disable QUIC protocol' \
+  'Enable debugging' \
+  'Track crossfade' \
+  'Bypass certificate checks' \
+  'Check watch history domain name resolution' \
+  'Sanitize sharing links' \
+  'Change miniplayer color' \
+  'Hide buttons' \
+  'Hide category bar' \
+  'Navigation bar' \
+  'Spoof video streams' \
+  """
+
+uptodown-dlurl = "https://youtube-music.en.uptodown.com/android"
+apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"

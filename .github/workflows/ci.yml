@@ -1,0 +1,311 @@
+name: CI Build and Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      force_build:
+        description: "Force rebuild all apps?"
+        required: false
+        default: "false"
+  schedule:
+    - cron: "0 16 * * *"
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  check-updates:
+    name: Check Updates
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    outputs:
+      SHOULD_BUILD: ${{ steps.decide.outputs.SHOULD_BUILD }}
+      SYNC_UPSTREAM: ${{ steps.decide.outputs.SYNC_UPSTREAM }}
+      MORPHE_VERSION: ${{ steps.decide.outputs.MORPHE_VERSION }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+      - name: Install deps
+        run: sudo apt-get install -y jq
+      - name: Detect updates
+        id: decide
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          SHOULD_BUILD=0
+          SYNC_UPSTREAM=0
+          UPSTREAM_SHA=$(curl -sL "https://api.github.com/repos/j-hc/revanced-magisk-module/commits/main" | jq -r '.sha // empty' 2>/dev/null || echo "")
+          LAST_SHA=$(cat build-meta/jhc-upstream-sha.txt 2>/dev/null || echo "")
+          if [ -n "$UPSTREAM_SHA" ] && [ "$UPSTREAM_SHA" != "$LAST_SHA" ]; then
+            SYNC_UPSTREAM=1
+            SHOULD_BUILD=1
+          fi
+          MORPHE_VERSION=$(curl -sL "https://api.github.com/repos/MorpheApp/morphe-patches/releases" | jq '[.[] | select(.prerelease == false)] | .[0].tag_name // empty' 2>/dev/null || echo "")
+          LAST_MORPHE=$(cat build-meta/morphe-version.txt 2>/dev/null || echo "")
+          if [ -z "$LAST_MORPHE" ] || [ -n "$MORPHE_VERSION" ] && [ "$MORPHE_VERSION" != "$LAST_MORPHE" ]; then
+            SHOULD_BUILD=1
+          fi
+          if [ "${{ inputs.force_build }}" = "true" ]; then
+            SHOULD_BUILD=1
+          fi
+          echo "SHOULD_BUILD=$SHOULD_BUILD" >> $GITHUB_OUTPUT
+          echo "SYNC_UPSTREAM=$SYNC_UPSTREAM" >> $GITHUB_OUTPUT
+          echo "MORPHE_VERSION=$MORPHE_VERSION" >> $GITHUB_OUTPUT
+
+  sync-upstream:
+    name: Sync Upstream
+    needs: check-updates
+    if: needs.check-updates.outputs.SYNC_UPSTREAM == '1'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
+          lfs: true
+      - name: Merge upstream
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/j-hc/revanced-magisk-module.git 2>/dev/null || true
+          git fetch upstream main --depth=100
+          mkdir -p /tmp/backup
+          cp config.toml /tmp/backup/
+          cp -r .github/workflows/ /tmp/backup/workflows/
+          cp -r build-meta/ /tmp/backup/build-meta/
+          git merge upstream/main --no-edit -X ours || {
+            git diff --name-only --diff-filter=U | while read f; do git checkout --ours "$f" && git add "$f"; done
+            git commit --no-edit || true
+          }
+          cp /tmp/backup/config.toml .
+          rm -rf .github/workflows/ && cp -r /tmp/backup/workflows/ .github/workflows/
+          cp -r /tmp/backup/build-meta/ .
+          git add -A
+          git diff --cached --quiet || git commit -m "chore: restore custom config after j-hc sync"
+          git push
+
+  build:
+    name: Build
+    needs: [check-updates, sync-upstream]
+    if: always() && needs.check-updates.outputs.SHOULD_BUILD == '1'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Restore keystores
+        run: |
+          echo "${{ secrets.KS_KEYSTORE_B64 }}" | base64 -d > ks.keystore
+          echo "${{ secrets.KS_P12_KEYSTORE_B64 }}" | base64 -d > ks-p12.keystore
+          chmod 644 ks.keystore ks-p12.keystore
+      - uses: actions/cache@v4
+        with:
+          path: temp/morpheapp-rv
+          key: morphe-v7-${{ github.run_id }}
+          restore-keys: morphe-v7-
+      - name: Install deps
+        run: sudo apt-get install -y jq zip python3
+      - name: Build
+        id: buildstep
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          KS_PASSWORD: ${{ secrets.KS_PASSWORD }}
+        run: |
+          rm -rf temp/morpheapp-rv/patches-*.mpe temp/morpheapp-rv/patches-*.jar 2>/dev/null || true
+          rm -rf temp/morpheapp-rv/cli-*.jar 2>/dev/null || true
+          chmod +x build.sh utils.sh
+          bash build.sh config.toml 2>&1 | tee build.log
+      - name: Verify outputs
+        id: verify
+        run: |
+          FOUND=0
+          for f in build/youtube-morphe-*.apk build/youtube-morphe-*.zip build/music-morphe-*.apk build/music-morphe-*.zip; do
+            if [ -f "$f" ]; then
+              SIZE=$(stat -c%s "$f" 2>/dev/null || echo "0")
+              echo "  Found: $(basename "$f") ($(( SIZE / 1024 / 1024 ))MB)"
+              FOUND=1
+            fi
+          done
+          if [ "$FOUND" -eq 0 ]; then
+            echo "No outputs found!"
+            tail -30 build.log 2>/dev/null
+            exit 1
+          fi
+      - name: Upload YouTube APK
+        if: always() && steps.verify.outcome != 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: youtube-mod-apk
+          path: build/youtube-*.apk
+          retention-days: 5
+          if-no-files-found: warn
+      - name: Upload YouTube Module
+        if: always() && steps.verify.outcome != 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: youtube-magisk-module
+          path: build/youtube-*.zip
+          retention-days: 5
+          if-no-files-found: warn
+      - name: Upload Music APK
+        if: always() && steps.verify.outcome != 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: music-mod-apk
+          path: build/music-*.apk
+          retention-days: 5
+          if-no-files-found: warn
+      - name: Upload Music Module
+        if: always() && steps.verify.outcome != 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: music-magisk-module
+          path: build/music-*.zip
+          retention-days: 5
+          if-no-files-found: warn
+      - name: Cleanup
+        if: always()
+        run: rm -f ks.keystore ks-p12.keystore
+
+  release:
+    name: Release
+    needs: [check-updates, build]
+    if: always() && needs.build.result != 'cancelled' && needs.build.result != 'failure'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        run: sudo apt-get install -y jq
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets/
+        continue-on-error: true
+      - name: Organize assets
+        run: |
+          mkdir -p assets
+          find release-assets/ -type f \( -name "*.apk" -o -name "*.zip" \) -exec mv {} assets/ \; 2>/dev/null || true
+          ls -lh assets/
+      - name: Generate release
+        id: meta
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BASE="v$(date +'%Y.%m.%d')"
+          NUM=1
+          EXISTING=$(curl -sL -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/releases" | \
+            jq -r ".[].tag_name | select(startswith(\"$BASE\"))" 2>/dev/null || echo "")
+          if [ -n "$EXISTING" ]; then
+            HIGHEST=0
+            while IFS= read -r t; do
+              N=$(echo "$t" | sed "s/${BASE}-//" 2>/dev/null || echo "0")
+              [ "$N" -gt "$HIGHEST" ] 2>/dev/null && HIGHEST=$N
+            done <<< "$EXISTING"
+            NUM=$((HIGHEST + 1))
+          fi
+          TAG="${BASE}-${NUM}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+          MORPHE_VER="${{ needs.check-updates.outputs.MORPHE_VERSION }}"
+
+          # Fetch Morphe changelog safely with Python
+          python3 generate-changelog.py "$TAG" "$MORPHE_VER" > release-notes.md
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: "RVCArise ${{ steps.meta.outputs.tag }}"
+          body_path: release-notes.md
+          files: |
+            assets/*.apk
+            assets/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  update-meta:
+    name: Update Metadata
+    needs: [check-updates, release]
+    if: always() && needs.release.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+      - name: Update tracking files
+        run: |
+          mkdir -p build-meta
+          MORPHE="${{ needs.check-updates.outputs.MORPHE_VERSION }}"
+          [ -n "$MORPHE" ] && echo "$MORPHE" > build-meta/morphe-version.txt
+          UPSTREAM_SHA=$(curl -sL "https://api.github.com/repos/j-hc/revanced-magisk-module/commits/main" | jq -r '.sha // empty' 2>/dev/null || echo "")
+          [ -n "$UPSTREAM_SHA" ] && echo "$UPSTREAM_SHA" > build-meta/jhc-upstream-sha.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || git commit -m "chore: update build metadata [skip ci]"
+          git push
+
+  cleanup:
+    name: Cleanup
+    needs: release
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - name: Remove old releases (>7 days)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CUTOFF=$(date -d '7 days ago' +'%Y-%m-%d' 2>/dev/null || exit 0)
+          curl -s -H "Authorization: token $GH_TOKEN" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/releases?per_page=100" | \
+            jq -c ".[] | {id, tag: .tag_name}" 2>/dev/null | while read -r rel; do
+            REL_ID=$(echo "$rel" | jq -r '.id')
+            REL_TAG=$(echo "$rel" | jq -r '.tag')
+            REL_DATE=$(echo "$REL_TAG" | sed 's/v//; s/-[0-9]*$//' | tr '.' '-')
+            if [ "$REL_DATE" "<" "$CUTOFF" ] 2>/dev/null; then
+              curl -s -X DELETE -H "Authorization: token $GH_TOKEN" \
+                "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/$REL_ID" > /dev/null
+              curl -s -X DELETE -H "Authorization: token $GH_TOKEN" \
+                "https://api.github.com/repos/$GITHUB_REPOSITORY/git/refs/tags/$REL_TAG" > /dev/null || true
+            fi
+          done
+      - name: Keep only last 3 workflow runs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for wf_id in $(curl -s -H "Authorization: token $GH_TOKEN" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows" | \
+            jq -r '.workflows[].id'); do
+            runs=$(curl -s -H "Authorization: token $GH_TOKEN" \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/$wf_id/runs?per_page=100" | \
+              jq -r '[.workflow_runs[] | select(.conclusion != "in_progress")] | sort_by(.created_at) | reverse | .[3:] | .[].id')
+            for run_id in $runs; do
+              curl -s -X DELETE -H "Authorization: token $GH_TOKEN" \
+                "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$run_id" || true
+            done
+          done
