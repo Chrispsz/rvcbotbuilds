@@ -41,20 +41,54 @@ jobs:
         run: |
           SHOULD_BUILD=0
           SYNC_UPSTREAM=0
-          UPSTREAM_SHA=$(curl -sL "https://api.github.com/repos/j-hc/revanced-magisk-module/commits/main" | jq -r '.sha // empty' 2>/dev/null || echo "")
-          LAST_SHA=$(cat build-meta/jhc-upstream-sha.txt 2>/dev/null || echo "")
+
+          # === Check j-hc upstream ===
+          UPSTREAM_SHA=$(curl -sL -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/j-hc/revanced-magisk-module/commits/main" \
+            | jq -r '.sha // empty' 2>/dev/null || echo "")
+          LAST_SHA=$(cat build-meta/jhc-upstream-sha.txt 2>/dev/null | tr -d '[:space:]' || echo "")
+          echo "::debug::UPSTREAM_SHA='$UPSTREAM_SHA' LAST_SHA='$LAST_SHA'"
           if [ -n "$UPSTREAM_SHA" ] && [ "$UPSTREAM_SHA" != "$LAST_SHA" ]; then
             SYNC_UPSTREAM=1
             SHOULD_BUILD=1
+            echo "::notice::Upstream j-hc changed: $LAST_SHA → $UPSTREAM_SHA"
           fi
-          MORPHE_VERSION=$(curl -sL "https://api.github.com/repos/MorpheApp/morphe-patches/releases" | jq '[.[] | select(.prerelease == false)] | .[0].tag_name // empty' 2>/dev/null || echo "")
-          LAST_MORPHE=$(cat build-meta/morphe-version.txt 2>/dev/null || echo "")
-          if [ -z "$LAST_MORPHE" ] || [ -n "$MORPHE_VERSION" ] && [ "$MORPHE_VERSION" != "$LAST_MORPHE" ]; then
+
+          # === Check Morphe version ===
+          MORPHE_VERSION=$(curl -sL -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/MorpheApp/morphe-patches/releases" \
+            | jq '[.[] | select(.prerelease == false)] | .[0].tag_name // empty' 2>/dev/null || echo "")
+          LAST_MORPHE=$(cat build-meta/morphe-version.txt 2>/dev/null | tr -d '[:space:]' || echo "")
+          echo "::debug::MORPHE_VERSION='$MORPHE_VERSION' LAST_MORPHE='$LAST_MORPHE'"
+
+          # Explicit grouping to avoid bash ||/&& precedence issues
+          if { [ -z "$LAST_MORPHE" ] && [ -n "$MORPHE_VERSION" ]; } || { [ -n "$MORPHE_VERSION" ] && [ "$MORPHE_VERSION" != "$LAST_MORPHE" ]; }; then
             SHOULD_BUILD=1
+            echo "::notice::Morphe changed: $LAST_MORPHE → $MORPHE_VERSION"
           fi
+
+          # === Check if latest release already has this Morphe version ===
+          # Prevent redundant builds when nothing actually changed
+          if [ "$SHOULD_BUILD" = "1" ]; then
+            LATEST_RELEASE=$(curl -sL -H "Authorization: token $GITHUB_TOKEN" \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/releases?per_page=1" 2>/dev/null || echo "[]")
+            REL_MORPHE=$(echo "$LATEST_RELEASE" | jq -r '.[0].body // empty' | grep -oP 'Morphe Patches v\K[^\s]+' | head -1 || echo "")
+            echo "::debug::LATEST_RELEASE_MORPHE='$REL_MORPHE'"
+            if [ -n "$REL_MORPHE" ] && [ -n "$MORPHE_VERSION" ] && [ "$REL_MORPHE" = "$MORPHE_VERSION" ]; then
+              if [ "$SYNC_UPSTREAM" = "0" ]; then
+                SHOULD_BUILD=0
+                echo "::notice::Skipping build — latest release already has Morphe $MORPHE_VERSION and no upstream change"
+              fi
+            fi
+          fi
+
+          # === Force build ===
           if [ "${{ inputs.force_build }}" = "true" ]; then
             SHOULD_BUILD=1
+            echo "::notice::Force build requested"
           fi
+
+          echo "::notice::SHOULD_BUILD=$SHOULD_BUILD SYNC_UPSTREAM=$SYNC_UPSTREAM MORPHE_VERSION=$MORPHE_VERSION"
           echo "SHOULD_BUILD=$SHOULD_BUILD" >> $GITHUB_OUTPUT
           echo "SYNC_UPSTREAM=$SYNC_UPSTREAM" >> $GITHUB_OUTPUT
           echo "MORPHE_VERSION=$MORPHE_VERSION" >> $GITHUB_OUTPUT
@@ -255,11 +289,15 @@ jobs:
           fetch-depth: 0
           lfs: true
       - name: Update tracking files
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p build-meta
           MORPHE="${{ needs.check-updates.outputs.MORPHE_VERSION }}"
           [ -n "$MORPHE" ] && echo "$MORPHE" > build-meta/morphe-version.txt
-          UPSTREAM_SHA=$(curl -sL "https://api.github.com/repos/j-hc/revanced-magisk-module/commits/main" | jq -r '.sha // empty' 2>/dev/null || echo "")
+          UPSTREAM_SHA=$(curl -sL -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/j-hc/revanced-magisk-module/commits/main" \
+            | jq -r '.sha // empty' 2>/dev/null || echo "")
           [ -n "$UPSTREAM_SHA" ] && echo "$UPSTREAM_SHA" > build-meta/jhc-upstream-sha.txt
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
