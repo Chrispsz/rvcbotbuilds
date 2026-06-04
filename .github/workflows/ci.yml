@@ -57,7 +57,7 @@ jobs:
           # === Check Morphe version ===
           MORPHE_VERSION=$(curl -sL -H "Authorization: token $GITHUB_TOKEN" \
             "https://api.github.com/repos/MorpheApp/morphe-patches/releases" \
-            | jq '[.[] | select(.prerelease == false)] | .[0].tag_name // empty' 2>/dev/null || echo "")
+            | jq -r '[.[] | select(.prerelease == false)] | .[0].tag_name // empty' 2>/dev/null || echo "")
           LAST_MORPHE=$(cat build-meta/morphe-version.txt 2>/dev/null | tr -d '[:space:]' || echo "")
           echo "::debug::MORPHE_VERSION='$MORPHE_VERSION' LAST_MORPHE='$LAST_MORPHE'"
 
