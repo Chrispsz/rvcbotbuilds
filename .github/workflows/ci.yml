@@ -220,7 +220,7 @@ jobs:
   release:
     name: Release
     needs: [check-updates, build]
-    if: always() && needs.build.result != 'cancelled' && needs.build.result != 'failure'
+    if: always() && needs.build.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
