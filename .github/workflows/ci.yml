@@ -34,6 +34,20 @@ jobs:
           token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
       - name: Install deps
         run: sudo apt-get install -y jq unzip
+      - name: Validate token (warn early if expired)
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
+          HAS_PAT_TOKEN: ${{ secrets.PAT_TOKEN != '' }}
+        run: |
+          source scripts/utilities/gh-api.sh
+          # PAT_TOKEN is what enables triggering downstream workflows via push.
+          # If it's expired/missing, we fall back to GITHUB_TOKEN which CANNOT
+          # trigger workflows — detect this and warn loudly.
+          if [ "$HAS_PAT_TOKEN" != "true" ]; then
+            echo "::warning::PAT_TOKEN secret is not set. Push commits will NOT trigger downstream CI. Daily cron keeps the loop alive, but sync-upstream changes won't build until the next scheduled run."
+          fi
+          # Validate whatever token we have (non-fatal — just warn)
+          gh_api_check_token || echo "::warning::Token validation failed. Push operations may fail."
       - name: Run updater
         id: update
         env:
@@ -51,14 +65,16 @@ jobs:
           echo "DETACH_VERSION=$DETACH_VER" >> $GITHUB_OUTPUT
       - name: Commit if changed
         if: steps.update.outputs.DETACH_UPDATED == '1'
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          source scripts/utilities/gh-api.sh
+          source scripts/utilities/ci-helpers.sh
+          ci_git_setup_bot
           git add module/bin/ module/zygisk/ build-meta/zygisk-detach-version.txt
-          git diff --cached --quiet || {
-            git commit -m "chore: update zygisk-detach binaries [skip ci]"
-            git push
-          }
+          if ci_commit_if_changed "chore: update zygisk-detach binaries [skip ci]"; then
+            gh_push "https://github.com/${{ github.repository }}.git" main
+          fi
 
   check-updates:
     name: Check Updates
@@ -70,6 +86,7 @@ jobs:
       SHOULD_BUILD: ${{ steps.decide.outputs.SHOULD_BUILD }}
       SYNC_UPSTREAM: ${{ steps.decide.outputs.SYNC_UPSTREAM }}
       MORPHE_VERSION: ${{ steps.decide.outputs.MORPHE_VERSION }}
+      UPSTREAM_SHA: ${{ steps.decide.outputs.UPSTREAM_SHA }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -82,45 +99,55 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          source scripts/utilities/gh-api.sh
+          source scripts/utilities/ci-helpers.sh
+
           SHOULD_BUILD=0
           SYNC_UPSTREAM=0
 
           # === Check j-hc upstream ===
-          UPSTREAM_SHA=$(curl -sL -H "Authorization: token $GITHUB_TOKEN" \
-            "https://api.github.com/repos/j-hc/revanced-magisk-module/commits/main" \
-            | jq -r '.sha // empty' 2>/dev/null || echo "")
+          UPSTREAM_SHA=""
+          if gh_api_get "https://api.github.com/repos/j-hc/revanced-magisk-module/commits/main" -; then
+            UPSTREAM_SHA=$(echo "$GH_API_LAST_BODY" | jq -r '.sha // empty')
+          else
+            ci_warn "could not fetch upstream SHA (HTTP $GH_API_LAST_CODE) — skipping upstream check"
+          fi
           LAST_SHA=$(cat build-meta/jhc-upstream-sha.txt 2>/dev/null | tr -d '[:space:]' || echo "")
           echo "::debug::UPSTREAM_SHA='$UPSTREAM_SHA' LAST_SHA='$LAST_SHA'"
           if [ -n "$UPSTREAM_SHA" ] && [ "$UPSTREAM_SHA" != "$LAST_SHA" ]; then
             SYNC_UPSTREAM=1
             SHOULD_BUILD=1
-            echo "::notice::Upstream j-hc changed: $LAST_SHA → $UPSTREAM_SHA"
+            ci_log "Upstream j-hc changed: $LAST_SHA → $UPSTREAM_SHA"
           fi
 
           # === Check Morphe version ===
-          MORPHE_VERSION=$(curl -sL -H "Authorization: token $GITHUB_TOKEN" \
-            "https://api.github.com/repos/MorpheApp/morphe-patches/releases" \
-            | jq -r '[.[] | select(.prerelease == false)] | .[0].tag_name // empty' 2>/dev/null || echo "")
+          MORPHE_VERSION=""
+          if gh_api_get "https://api.github.com/repos/MorpheApp/morphe-patches/releases" -; then
+            MORPHE_VERSION=$(echo "$GH_API_LAST_BODY" | jq -r '[.[] | select(.prerelease == false)] | .[0].tag_name // empty')
+          else
+            ci_warn "could not fetch Morphe releases (HTTP $GH_API_LAST_CODE)"
+          fi
           LAST_MORPHE=$(cat build-meta/morphe-version.txt 2>/dev/null | tr -d '[:space:]' || echo "")
           echo "::debug::MORPHE_VERSION='$MORPHE_VERSION' LAST_MORPHE='$LAST_MORPHE'"
 
           # Explicit grouping to avoid bash ||/&& precedence issues
           if { [ -z "$LAST_MORPHE" ] && [ -n "$MORPHE_VERSION" ]; } || { [ -n "$MORPHE_VERSION" ] && [ "$MORPHE_VERSION" != "$LAST_MORPHE" ]; }; then
             SHOULD_BUILD=1
-            echo "::notice::Morphe changed: $LAST_MORPHE → $MORPHE_VERSION"
+            ci_log "Morphe changed: $LAST_MORPHE → $MORPHE_VERSION"
           fi
 
           # === Check if latest release already has this Morphe version ===
           # Prevent redundant builds when nothing actually changed
           if [ "$SHOULD_BUILD" = "1" ]; then
-            LATEST_RELEASE=$(curl -sL -H "Authorization: token $GITHUB_TOKEN" \
-              "https://api.github.com/repos/$GITHUB_REPOSITORY/releases?per_page=1" 2>/dev/null || echo "[]")
-            REL_MORPHE=$(echo "$LATEST_RELEASE" | jq -r '.[0].body // empty' | grep -oP 'Morphe Patches v\K[^\s]+' | head -1 || echo "")
+            REL_MORPHE=""
+            if gh_api_get "https://api.github.com/repos/$GITHUB_REPOSITORY/releases?per_page=1" -; then
+              REL_MORPHE=$(echo "$GH_API_LAST_BODY" | jq -r '.[0].body // empty' | grep -oP 'Morphe Patches v\K[^\s]+' | head -1 || echo "")
+            fi
             echo "::debug::LATEST_RELEASE_MORPHE='$REL_MORPHE'"
             if [ -n "$REL_MORPHE" ] && [ -n "$MORPHE_VERSION" ] && [ "$REL_MORPHE" = "$MORPHE_VERSION" ]; then
               if [ "$SYNC_UPSTREAM" = "0" ]; then
                 SHOULD_BUILD=0
-                echo "::notice::Skipping build — latest release already has Morphe $MORPHE_VERSION and no upstream change"
+                ci_log "Skipping build — latest release already has Morphe $MORPHE_VERSION and no upstream change"
               fi
             fi
           fi
@@ -128,19 +155,20 @@ jobs:
           # === Force build ===
           if [ "${{ inputs.force_build }}" = "true" ]; then
             SHOULD_BUILD=1
-            echo "::notice::Force build requested"
+            ci_log "Force build requested"
           fi
 
           # === Force build if zygisk-detach was just updated ===
           if [ "${{ needs.update-zygisk-detach.outputs.DETACH_UPDATED }}" = "1" ]; then
             SHOULD_BUILD=1
-            echo "::notice::zygisk-detach updated — forcing rebuild"
+            ci_log "zygisk-detach updated — forcing rebuild"
           fi
 
-          echo "::notice::SHOULD_BUILD=$SHOULD_BUILD SYNC_UPSTREAM=$SYNC_UPSTREAM MORPHE_VERSION=$MORPHE_VERSION"
+          ci_log "SHOULD_BUILD=$SHOULD_BUILD SYNC_UPSTREAM=$SYNC_UPSTREAM MORPHE_VERSION=$MORPHE_VERSION"
           echo "SHOULD_BUILD=$SHOULD_BUILD" >> $GITHUB_OUTPUT
           echo "SYNC_UPSTREAM=$SYNC_UPSTREAM" >> $GITHUB_OUTPUT
           echo "MORPHE_VERSION=$MORPHE_VERSION" >> $GITHUB_OUTPUT
+          echo "UPSTREAM_SHA=$UPSTREAM_SHA" >> $GITHUB_OUTPUT
 
   sync-upstream:
     name: Sync Upstream
@@ -155,26 +183,87 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
           lfs: true
-      - name: Merge upstream
+      - name: Merge upstream (protected files preserved)
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          source scripts/utilities/gh-api.sh
+          source scripts/utilities/ci-helpers.sh
+          ci_git_setup_bot
+
+          # Files/dirs that MUST survive upstream sync (our customizations)
+          PROTECTED_FILES=(
+            "config.toml"
+            ".github/workflows/ci.yml"
+            "build-meta/"
+            "scripts/utilities/gh-api.sh"
+            "scripts/utilities/ci-helpers.sh"
+            "scripts/utilities/update-zygisk-detach.sh"
+            "scripts/utilities/combine-modules.sh"
+            "module/post-fs-data.sh"
+            "module/service.sh"
+            "module/uninstall.sh"
+            "generate-changelog.py"
+            "README.md"
+            "CONFIG.md"
+          )
+
+          # Pre-flight: ensure all protected files exist BEFORE we touch anything
+          echo "=== Pre-sync verification ==="
+          ci_verify_preserved "${PROTECTED_FILES[@]}" || {
+            ci_err "Pre-sync check failed — protected files missing before sync. Aborting to avoid data loss."
+            exit 1
+          }
+
+          # Backup protected files to temp
+          BACKUP_DIR=$(mktemp -d)
+          trap 'rm -rf "$BACKUP_DIR"' EXIT
+          echo "=== Backing up protected files ==="
+          ci_backup_tree "$BACKUP_DIR" "${PROTECTED_FILES[@]}"
+
+          # Add upstream remote and fetch
           git remote add upstream https://github.com/j-hc/revanced-magisk-module.git 2>/dev/null || true
           git fetch upstream main --depth=100
-          mkdir -p /tmp/backup
-          cp config.toml /tmp/backup/
-          cp -r .github/workflows/ /tmp/backup/workflows/
-          cp -r build-meta/ /tmp/backup/build-meta/
-          git merge upstream/main --no-edit -X ours || {
-            git diff --name-only --diff-filter=U | while read f; do git checkout --ours "$f" && git add "$f"; done
-            git commit --no-edit || true
+
+          # Attempt merge with our-strategy (our changes win conflicts)
+          echo "=== Merging upstream/main ==="
+          MERGE_CONFLICTS=""
+          if ! git merge upstream/main --no-edit -X ours; then
+            MERGE_CONFLICTS=$(git diff --name-only --diff-filter=U)
+            if [ -n "$MERGE_CONFLICTS" ]; then
+              echo "::warning::Merge conflicts in these files (resolving with --ours):"
+              echo "$MERGE_CONFLICTS" | sed 's/^/  - /'
+              echo "$MERGE_CONFLICTS" | while IFS= read -r f; do
+                [ -n "$f" ] && git checkout --ours "$f" && git add "$f"
+              done
+              git commit --no-edit || true
+            fi
+          fi
+
+          # Restore protected files from backup (overwrites any upstream changes)
+          echo "=== Restoring protected files ==="
+          ci_restore_tree "$BACKUP_DIR"
+
+          # Post-sync verification: ensure protected files still exist
+          echo "=== Post-sync verification ==="
+          ci_verify_preserved "${PROTECTED_FILES[@]}" || {
+            ci_err "Post-sync check failed — protected files lost during sync! Manual intervention required."
+            ci_err "Backup is at: $BACKUP_DIR (preserved for debugging)"
+            trap - EXIT  # don't clean up backup
+            exit 1
           }
-          cp /tmp/backup/config.toml .
-          rm -rf .github/workflows/ && cp -r /tmp/backup/workflows/ .github/workflows/
-          cp -r /tmp/backup/build-meta/ .
+
+          # Commit restored customizations
           git add -A
-          git diff --cached --quiet || git commit -m "chore: restore custom config after j-hc sync"
-          git push
+          if git diff --cached --quiet; then
+            ci_log "Sync complete — no custom files needed restoration"
+          else
+            git commit -m "chore: restore custom config after j-hc sync" >/dev/null
+            ci_log "Sync complete — restored custom files"
+          fi
+
+          # Push with retry (uses PAT_TOKEN for auth)
+          gh_push "https://github.com/${{ github.repository }}.git" main
 
   build:
     name: Build
@@ -214,22 +303,43 @@ jobs:
           rm -rf temp/morpheapp-rv/cli-*.jar 2>/dev/null || true
           chmod +x build.sh utils.sh
           bash build.sh config.toml 2>&1 | tee build.log
-      - name: Verify outputs
+      - name: Verify outputs (existence + minimum size)
         id: verify
         run: |
+          source scripts/utilities/ci-helpers.sh
           FOUND=0
-          for f in build/youtube-morphe-*.apk build/youtube-morphe-*.zip build/music-morphe-*.apk build/music-morphe-*.zip; do
-            if [ -f "$f" ]; then
-              SIZE=$(stat -c%s "$f" 2>/dev/null || echo "0")
-              echo "  Found: $(basename "$f") ($(( SIZE / 1024 / 1024 ))MB)"
-              FOUND=1
-            fi
+          FAILED=0
+
+          # Min sizes: APKs >= 30MB (YouTube is ~130MB, Music ~50MB)
+          #            modules >= 1MB (zip with apk + scripts)
+          for f in build/youtube-morphe-*.apk; do
+            [ -f "$f" ] && { ci_validate_file "$f" 30 "YouTube APK" && FOUND=$((FOUND+1)) || FAILED=1; }
           done
+          for f in build/youtube-morphe-*.zip; do
+            [ -f "$f" ] && { ci_validate_file "$f" 1 "YouTube Module" && FOUND=$((FOUND+1)) || FAILED=1; }
+          done
+          for f in build/music-morphe-*.apk; do
+            [ -f "$f" ] && { ci_validate_file "$f" 20 "Music APK" && FOUND=$((FOUND+1)) || FAILED=1; }
+          done
+          for f in build/music-morphe-*.zip; do
+            [ -f "$f" ] && { ci_validate_file "$f" 1 "Music Module" && FOUND=$((FOUND+1)) || FAILED=1; }
+          done
+
+          echo "found_count=$FOUND" >> $GITHUB_OUTPUT
+
           if [ "$FOUND" -eq 0 ]; then
-            echo "No outputs found!"
-            tail -30 build.log 2>/dev/null
+            ci_err "No build outputs found!"
+            echo "=== Last 30 lines of build.log ==="
+            tail -30 build.log 2>/dev/null || true
             exit 1
           fi
+
+          if [ "$FAILED" -eq 1 ]; then
+            ci_err "Some build outputs failed size validation — aborting release"
+            exit 1
+          fi
+
+          ci_log "All $FOUND outputs validated successfully"
       - name: Upload YouTube APK
         if: always() && steps.verify.outcome != 'failure'
         uses: actions/upload-artifact@v4
@@ -286,17 +396,27 @@ jobs:
         run: |
           mkdir -p assets
           find release-assets/ -type f \( -name "*.apk" -o -name "*.zip" \) -exec mv {} assets/ \; 2>/dev/null || true
+          echo "=== Assets to release ==="
           ls -lh assets/
+          if [ -z "$(ls -A assets/ 2>/dev/null)" ]; then
+            echo "::error::No assets found — refusing to create empty release"
+            exit 1
+          fi
       - name: Generate release
         id: meta
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          source scripts/utilities/gh-api.sh
+          source scripts/utilities/ci-helpers.sh
+
           BASE="v$(date +'%Y.%m.%d')"
           NUM=1
-          EXISTING=$(curl -sL -H "Authorization: token $GITHUB_TOKEN" \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/releases" | \
-            jq -r ".[].tag_name | select(startswith(\"$BASE\"))" 2>/dev/null || echo "")
+          # Fetch existing releases for today with retry
+          EXISTING=""
+          if gh_api_get "https://api.github.com/repos/$GITHUB_REPOSITORY/releases" -; then
+            EXISTING=$(echo "$GH_API_LAST_BODY" | jq -r ".[].tag_name | select(startswith(\"$BASE\"))" 2>/dev/null || echo "")
+          fi
           if [ -n "$EXISTING" ]; then
             HIGHEST=0
             while IFS= read -r t; do
@@ -307,6 +427,7 @@ jobs:
           fi
           TAG="${BASE}-${NUM}"
           echo "tag=$TAG" >> $GITHUB_OUTPUT
+          ci_log "Release tag: $TAG"
 
           MORPHE_VER="${{ needs.check-updates.outputs.MORPHE_VERSION }}"
           DETACH_VER="${{ needs.update-zygisk-detach.outputs.DETACH_VERSION }}"
@@ -340,20 +461,23 @@ jobs:
           lfs: true
       - name: Update tracking files
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
+          source scripts/utilities/gh-api.sh
+          source scripts/utilities/ci-helpers.sh
+
           mkdir -p build-meta
           MORPHE="${{ needs.check-updates.outputs.MORPHE_VERSION }}"
           [ -n "$MORPHE" ] && echo "$MORPHE" > build-meta/morphe-version.txt
-          UPSTREAM_SHA=$(curl -sL -H "Authorization: token $GITHUB_TOKEN" \
-            "https://api.github.com/repos/j-hc/revanced-magisk-module/commits/main" \
-            | jq -r '.sha // empty' 2>/dev/null || echo "")
+
+          # Use the upstream SHA captured in check-updates (avoid re-fetch)
+          UPSTREAM_SHA="${{ needs.check-updates.outputs.UPSTREAM_SHA }}"
           [ -n "$UPSTREAM_SHA" ] && echo "$UPSTREAM_SHA" > build-meta/jhc-upstream-sha.txt
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git diff --cached --quiet || git commit -m "chore: update build metadata [skip ci]"
-          git push
+
+          ci_git_setup_bot
+          if ci_commit_if_changed "chore: update build metadata [skip ci]"; then
+            gh_push "https://github.com/${{ github.repository }}.git" main
+          fi
 
   cleanup:
     name: Cleanup
@@ -368,32 +492,40 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          source scripts/utilities/gh-api.sh
           CUTOFF=$(date -d '7 days ago' +'%Y-%m-%d' 2>/dev/null || exit 0)
-          curl -s -H "Authorization: token $GH_TOKEN" \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/releases?per_page=100" | \
-            jq -c ".[] | {id, tag: .tag_name}" 2>/dev/null | while read -r rel; do
+          # Fetch all releases (paginate up to 100)
+          if ! gh_api_get "https://api.github.com/repos/$GITHUB_REPOSITORY/releases?per_page=100" -; then
+            echo "::warning::could not list releases for cleanup (HTTP $GH_API_LAST_CODE)"
+            exit 0
+          fi
+          echo "$GH_API_LAST_BODY" | jq -c ".[] | {id, tag: .tag_name}" 2>/dev/null | while read -r rel; do
             REL_ID=$(echo "$rel" | jq -r '.id')
             REL_TAG=$(echo "$rel" | jq -r '.tag')
             REL_DATE=$(echo "$REL_TAG" | sed 's/v//; s/-[0-9]*$//' | tr '.' '-')
             if [ "$REL_DATE" "<" "$CUTOFF" ] 2>/dev/null; then
-              curl -s -X DELETE -H "Authorization: token $GH_TOKEN" \
-                "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/$REL_ID" > /dev/null
-              curl -s -X DELETE -H "Authorization: token $GH_TOKEN" \
-                "https://api.github.com/repos/$GITHUB_REPOSITORY/git/refs/tags/$REL_TAG" > /dev/null || true
+              echo "  deleting release $REL_TAG (older than $CUTOFF)"
+              gh_api_call DELETE "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/$REL_ID" /dev/null >/dev/null 2>&1 || true
+              # Also delete the tag ref
+              gh_api_call DELETE "https://api.github.com/repos/$GITHUB_REPOSITORY/git/refs/tags/$REL_TAG" /dev/null >/dev/null 2>&1 || true
             fi
           done
       - name: Keep only last 3 workflow runs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          for wf_id in $(curl -s -H "Authorization: token $GH_TOKEN" \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows" | \
-            jq -r '.workflows[].id'); do
-            runs=$(curl -s -H "Authorization: token $GH_TOKEN" \
-              "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/$wf_id/runs?per_page=100" | \
-              jq -r '[.workflow_runs[] | select(.conclusion != "in_progress")] | sort_by(.created_at) | reverse | .[3:] | .[].id')
+          source scripts/utilities/gh-api.sh
+          # List workflows
+          if ! gh_api_get "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows" -; then
+            echo "::warning::could not list workflows (HTTP $GH_API_LAST_CODE)"
+            exit 0
+          fi
+          for wf_id in $(echo "$GH_API_LAST_BODY" | jq -r '.workflows[].id'); do
+            if ! gh_api_get "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/$wf_id/runs?per_page=100" -; then
+              continue
+            fi
+            runs=$(echo "$GH_API_LAST_BODY" | jq -r '[.workflow_runs[] | select(.conclusion != "in_progress")] | sort_by(.created_at) | reverse | .[3:] | .[].id')
             for run_id in $runs; do
-              curl -s -X DELETE -H "Authorization: token $GH_TOKEN" \
-                "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$run_id" || true
+              gh_api_call DELETE "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$run_id" /dev/null >/dev/null 2>&1 || true
             done
           done
