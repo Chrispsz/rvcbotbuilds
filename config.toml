@@ -1,8 +1,9 @@
 # ============================================
 # RVCArise — Premium YouTube & Music Mods
 # ============================================
-# MorpheApp/morphe-patches v1.30.0
-# MorpheApp/morphe-cli v1.9.0
+# MorpheApp/morphe-patches (latest stable)
+# MorpheApp/morphe-cli (latest stable)
+# zygisk-detach (auto-updated by CI)
 # ============================================
 
 enable-module-update = true
@@ -19,7 +20,7 @@ default-arch = "arm64-v8a"
 # Only patches a real user will notice and use
 #
 # REMOVED due to bugs/stuttering:
-#   Spoof video streams — causes player stuttering & 5-10s delay
+#   Spoof video streams — causes player stuttering & 5-10s delay (v1.30+)
 #   SponsorBlock — undo toast freezes UI (#1555)
 #   Return YouTube Dislike — API timeout freezes app 5-10s (#1451)
 #   Sanitize sharing links — broken in v1.30.0 (#1602)

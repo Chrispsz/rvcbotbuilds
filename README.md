@@ -37,7 +37,6 @@
 | GmsCore support | Funciona sem root |
 | Hide ads | Remove anúncios |
 | Video ads | Remove ads no player |
-| Spoof video streams | Corrige playback |
 | Theme | AMOLED preto puro |
 
 ### Ativados por nós (só o que importa)
@@ -62,7 +61,6 @@
 | GmsCore support | Funciona sem root |
 | Hide ads | Remove popup Premium |
 | Hide music video ads | Remove ads no playback |
-| Spoof video streams | Corrige playback |
 | Theme | AMOLED preto puro |
 | Remove background playback restrictions | Background play sem Premium |
 
@@ -80,6 +78,7 @@
 ### Bugados (v1.30.0)
 | Patch | Problema |
 |-------|----------|
+| Spoof video streams | Causa stuttering & 5-10s delay no player |
 | SponsorBlock | Toast congela a UI ([#1555](https://github.com/MorpheApp/morphe-patches/issues/1555)) |
 | Return YouTube Dislike | Congela app 5-10s ao abrir vídeo ([#1451](https://github.com/MorpheApp/morphe-patches/issues/1451)) |
 | Sanitize sharing links | Quebrado ([#1602](https://github.com/MorpheApp/morphe-patches/issues/1602)) |

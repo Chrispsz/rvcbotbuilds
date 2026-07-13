@@ -176,10 +176,7 @@ fi
 log "\nInstale o [GmsCore](https://github.com/ReVanced/GmsCore/releases) para os APKs do YouTube e YT Music (não-root)"
 log "✅ Detach automático da Play Store já incluído via Zygisk no módulo Magisk"
 log "🖤 Tema AMOLED (preto puro) ativado para YouTube e Music"
-log "📸 Instagram com Piko patches + custom RVCBotBuilds patches"
-log "🚫 Ads removidos (Disable ads + Hide suggested content)"
-log "📸 Screenshot em DMs liberado (FLAG_SECURE removido)"
-log "🔍 Qualidade de imagem 2048px + MobileConfig quality override"
+log "📦 Patches essenciais e estáveis apenas (sem Spoof video streams, SponsorBlock, RYD)"
 if [ "$COMBINE_MODULES" = true ]; then
         log "📦 RevPack: um unico flash instala todos os apps"
 fi

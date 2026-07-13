@@ -188,35 +188,51 @@ if [ "$KSU" ]; then
 fi
 
 # ============================================
-# METACONFIG OVERRIDE INJECTION
-# Inject mc_overrides.json into Instagram's
-# data directory during module install.
-# Also re-applied on every boot via service.sh
-#
-# No detach needed — patched Instagram APK
-# isn't recognized by Play Store anyway.
+# AUTO-DETACH (zygisk-detach by j-hc)
+# Blocks Play Store updates for patched apps
+# Works with Magisk + KernelSU (via zygisk module)
 # ============================================
 
-if [ "$PKG_NAME" = "com.instagram.instagram" ] && [ -f "$MODPATH/mc_overrides.json" ]; then
-        ui_print "* Injecting MetaConfig overrides"
-        IG_DATA="/data/data/com.instagram.instagram/files/mobileconfig"
+# KernelSU: also detach Play Store so it can't update patched apps
+if [ -n "$KSU" ]; then
+        ui_print "- KernelSU detected. Make sure you are using a Zygisk module!"
 
-        if [ -d "/data/data/com.instagram.instagram" ]; then
-                mkdir -p "$IG_DATA"
-                cp -f "$MODPATH/mc_overrides.json" "$IG_DATA/mc_overrides.json"
-
-                # Fix ownership to Instagram's UID/GID
-                IG_UID=$(stat -c '%u' /data/data/com.instagram.instagram)
-                IG_GID=$(stat -c '%g' /data/data/com.instagram.instagram)
-                chown $IG_UID:$IG_GID "$IG_DATA/mc_overrides.json"
-                chmod 660 "$IG_DATA/mc_overrides.json"
-                chcon u:object_r:app_data_file:s0 "$IG_DATA/mc_overrides.json"
-
-                ui_print "✅ MetaConfig overrides injected (257 curated flags)"
-        else
-                ui_print "⚠️  Instagram data dir not found yet"
-                ui_print "   Config will be injected on next boot"
+        uid=$(dumpsys package "com.android.vending" 2>&1 | grep -m1 "uid")
+        uid=${uid#*=} uid=${uid%% *}
+        if [ -z "$uid" ]; then
+                uid=$(dumpsys package "com.android.vending" 2>&1 | grep -m1 "userId")
+                uid=${uid#*=} uid=${uid%% *}
         fi
+        if [ -z "$uid" ]; then
+                ui_print "* UID could not be found for com.android.vending"
+        else
+                if ! OP=$("$MODPATH/bin/$ARCH/ksu_profile" "$uid" "com.android.vending" 2>&1); then
+                        ui_print "ERROR ksu_profile: $OP"
+                fi
+        fi
+fi
+
+# Move detach binary to module root (standard zygisk-detach layout)
+mv -f "$MODPATH/bin/$ARCH/detach" "$MODPATH/detach"
+mkdir -p /data/adb/zygisk-detach/
+
+DBIN="/data/adb/zygisk-detach/detach.bin"
+
+# Preserve existing detach.bin if present (accumulate packages)
+if [ -f "/data/adb/modules/zygisk-detach/detach.bin" ]; then
+        cp -f "/data/adb/modules/zygisk-detach/detach.bin" "$DBIN"
+fi
+
+# Create detach.txt with package name and generate detach.bin
+echo "$PKG_NAME" > "$MODPATH/detach.txt"
+ui_print "- Adding $PKG_NAME to detach list"
+OP=$("$MODPATH/detach" serialize "$MODPATH/detach.txt" "$DBIN" 2>&1)
+ui_print "$OP"
+
+if [ -f "$DBIN" ]; then
+        ui_print "✅ Auto-Detach enabled for $PKG_NAME"
+else
+        ui_print "⚠️  Failed to create detach.bin"
 fi
 
 # ============================================
@@ -225,5 +241,5 @@ rm -rf "${MODPATH:?}/bin" "$MODPATH/stock/"
 
 ui_print "* Done"
 ui_print "  by Chrispsz (github.com/Chrispsz)"
-ui_print "  MetaConfig OTA + 257 Curated Flags by RVCBotBuilds"
+ui_print "  zygisk-detach by j-hc"
 ui_print " "

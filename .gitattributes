@@ -7,3 +7,8 @@ bin/**/htmlq-* filter=lfs diff=lfs merge=lfs -text
 bin/**/aapt2-* filter=lfs diff=lfs merge=lfs -text
 bin/**/detach filter=lfs diff=lfs merge=lfs -text
 bin/**/ksu_profile filter=lfs diff=lfs merge=lfs -text
+
+# Module binaries (zygisk-detach)
+module/bin/**/detach filter=lfs diff=lfs merge=lfs -text
+module/bin/**/ksu_profile filter=lfs diff=lfs merge=lfs -text
+module/zygisk/*.so filter=lfs diff=lfs merge=lfs -text

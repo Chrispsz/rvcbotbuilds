@@ -35,3 +35,4 @@ cmpr
 
 # Piko checkout (CI uses this)
 /piko-fork
+__pycache__/

@@ -18,8 +18,51 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  update-zygisk-detach:
+    name: Update zygisk-detach
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    outputs:
+      DETACH_UPDATED: ${{ steps.update.outputs.DETACH_UPDATED }}
+      DETACH_VERSION: ${{ steps.update.outputs.DETACH_VERSION }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+          token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
+      - name: Install deps
+        run: sudo apt-get install -y jq unzip
+      - name: Run updater
+        id: update
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          chmod +x scripts/utilities/update-zygisk-detach.sh
+          if bash scripts/utilities/update-zygisk-detach.sh; then
+            echo "DETACH_UPDATED=1" >> $GITHUB_OUTPUT
+            echo "::notice::zygisk-detach binaries updated"
+          else
+            echo "DETACH_UPDATED=0" >> $GITHUB_OUTPUT
+            echo "::notice::zygisk-detach up-to-date or no changes"
+          fi
+          DETACH_VER=$(cat build-meta/zygisk-detach-version.txt 2>/dev/null || echo "")
+          echo "DETACH_VERSION=$DETACH_VER" >> $GITHUB_OUTPUT
+      - name: Commit if changed
+        if: steps.update.outputs.DETACH_UPDATED == '1'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add module/bin/ module/zygisk/ build-meta/zygisk-detach-version.txt
+          git diff --cached --quiet || {
+            git commit -m "chore: update zygisk-detach binaries [skip ci]"
+            git push
+          }
+
   check-updates:
     name: Check Updates
+    needs: update-zygisk-detach
     permissions:
       contents: read
     runs-on: ubuntu-latest
@@ -86,6 +129,12 @@ jobs:
           if [ "${{ inputs.force_build }}" = "true" ]; then
             SHOULD_BUILD=1
             echo "::notice::Force build requested"
+          fi
+
+          # === Force build if zygisk-detach was just updated ===
+          if [ "${{ needs.update-zygisk-detach.outputs.DETACH_UPDATED }}" = "1" ]; then
+            SHOULD_BUILD=1
+            echo "::notice::zygisk-detach updated — forcing rebuild"
           fi
 
           echo "::notice::SHOULD_BUILD=$SHOULD_BUILD SYNC_UPSTREAM=$SYNC_UPSTREAM MORPHE_VERSION=$MORPHE_VERSION"
@@ -219,7 +268,7 @@ jobs:
 
   release:
     name: Release
-    needs: [check-updates, build]
+    needs: [check-updates, build, update-zygisk-detach]
     if: always() && needs.build.result == 'success'
     runs-on: ubuntu-latest
     permissions:
@@ -260,9 +309,10 @@ jobs:
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
           MORPHE_VER="${{ needs.check-updates.outputs.MORPHE_VERSION }}"
+          DETACH_VER="${{ needs.update-zygisk-detach.outputs.DETACH_VERSION }}"
 
           # Fetch Morphe changelog safely with Python
-          python3 generate-changelog.py "$TAG" "$MORPHE_VER" > release-notes.md
+          python3 generate-changelog.py "$TAG" "$MORPHE_VER" "$DETACH_VER" > release-notes.md
 
       - name: Create release
         uses: softprops/action-gh-release@v2
