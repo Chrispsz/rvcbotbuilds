@@ -488,6 +488,9 @@ jobs:
       contents: write
       actions: write
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
       - name: Remove old releases (>7 days)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
