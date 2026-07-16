@@ -1,0 +1,25 @@
+# These files are owned by the repo maintainer.
+# PRs touching them will request review from @Chrispsz.
+
+# CI pipeline
+/.github/workflows/              @Chrispsz
+/.github/dependabot.yml          @Chrispsz
+
+# Build configuration
+/config.toml                    @Chrispsz
+/build.sh                       @Chrispsz
+/utils.sh                       @Chrispsz
+
+# CI utilities
+/scripts/utilities/             @Chrispsz
+
+# Module lifecycle scripts
+/module/customize.sh            @Chrispsz
+/module/service.sh              @Chrispsz
+/module/post-fs-data.sh         @Chrispsz
+/module/uninstall.sh            @Chrispsz
+
+# Documentation
+/README.md                      @Chrispsz
+/CONFIG.md                      @Chrispsz
+/CONTRIBUTING.md                @Chrispsz

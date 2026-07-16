@@ -21,6 +21,9 @@ ks-p12.keystore
 # IDE
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 
 # OS
 .DS_Store
@@ -36,3 +39,6 @@ cmpr
 # Piko checkout (CI uses this)
 /piko-fork
 __pycache__/
+
+# Release notes (generated at release time)
+release-notes.md

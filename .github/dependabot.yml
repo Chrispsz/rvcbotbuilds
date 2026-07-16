@@ -1,0 +1,19 @@
+# Keep GitHub Actions versions up to date.
+# Dependabot checks weekly and opens a PR when a new version is available.
+version: 2
+updates:
+  # Workflow files
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
