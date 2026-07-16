@@ -320,7 +320,7 @@ jobs:
           echo "${{ secrets.KS_P12_KEYSTORE_B64 }}" | base64 -d > ks-p12.keystore
           chmod 644 ks.keystore ks-p12.keystore
       - name: Restore build cache (content-based key)
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: temp/morpheapp-rv
           # Content-based key: only invalidates when config.toml changes
