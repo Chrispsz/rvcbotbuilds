@@ -31,6 +31,9 @@ default-arch = "arm64-v8a"
 #                    in Settings > Morphe > Video. YouTube native has 0.25x-2x.
 #   Hide Shorts components — only hides launcher shortcut/widget, NOT Shorts
 #                            in the feed. Hide layout components covers the feed.
+#   Swipe controls — patch is applied but feature ships OFF in-app; you must
+#                    manually toggle Settings > Morphe > Video > Swipe controls.
+#                    Removed to avoid dead code in the APK.
 # ============================================
 [YouTube-Morphe]
 enabled = true
@@ -53,7 +56,6 @@ included-patches = """\
   'Navigation bar' \
   'Change start page' \
   'Remove background playback restrictions' \
-  'Swipe controls' \
   """
 
 excluded-patches = """\
@@ -61,6 +63,7 @@ excluded-patches = """\
   'Disable QUIC protocol' \
   'Hide Shorts components' \
   'Playback speed' \
+  'Swipe controls' \
   'Disable double tap actions' \
   'Disable haptic feedback' \
   'Disable layout updates' \
