@@ -114,7 +114,7 @@ patcher-args = """\
 included-patches = """\
   'Enable exclusive audio playback' \
   'Miniplayer previous and next buttons' \
-  'Permanent repeat' \
+  'Remember repeat state' \
   """
 
 excluded-patches = """\
