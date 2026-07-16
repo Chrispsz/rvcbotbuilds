@@ -25,6 +25,12 @@ default-arch = "arm64-v8a"
 #   Return YouTube Dislike — API timeout freezes app 5-10s (#1451)
 #   Sanitize sharing links — broken in v1.30.0 (#1602)
 #   Open system share sheet — broken in v1.30.0 (#1597)
+#
+# REMOVED as low-value (not buggy, just not useful without manual config):
+#   Playback speed — only adds a button unless you configure custom speeds
+#                    in Settings > Morphe > Video. YouTube native has 0.25x-2x.
+#   Hide Shorts components — only hides launcher shortcut/widget, NOT Shorts
+#                            in the feed. Hide layout components covers the feed.
 # ============================================
 [YouTube-Morphe]
 enabled = true
@@ -43,11 +49,9 @@ patcher-args = """\
 
 included-patches = """\
   'Downloads' \
-  'Hide Shorts components' \
   'Hide layout components' \
   'Navigation bar' \
   'Change start page' \
-  'Playback speed' \
   'Remove background playback restrictions' \
   'Swipe controls' \
   """
@@ -55,6 +59,8 @@ included-patches = """\
 excluded-patches = """\
   'Custom branding' \
   'Disable QUIC protocol' \
+  'Hide Shorts components' \
+  'Playback speed' \
   'Disable double tap actions' \
   'Disable haptic feedback' \
   'Disable layout updates' \
