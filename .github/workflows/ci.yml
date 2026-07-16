@@ -51,7 +51,7 @@ jobs:
       DETACH_UPDATED: ${{ steps.detach.outputs.DETACH_UPDATED }}
       DETACH_VERSION: ${{ steps.detach.outputs.DETACH_VERSION }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 1
           # NO lfs: true here — we pull LFS objects explicitly in the next step.
@@ -221,7 +221,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           lfs: true
@@ -319,7 +319,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           lfs: true
       - uses: actions/setup-java@v5
@@ -439,7 +439,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install deps (cached)
         uses: awalsh128/cache-apt-pkgs-action@v1
         with:
@@ -514,7 +514,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 1
           # NO lfs: true — we only touch build-meta/*.txt
@@ -551,7 +551,7 @@ jobs:
       contents: write
       actions: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 1
           # NO lfs: true — cleanup only calls the API
@@ -623,7 +623,7 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 1
       - name: Send Telegram notification
