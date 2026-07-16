@@ -173,16 +173,25 @@ jobs:
           fi
 
           # === Layer 3: already released? ===
+          # Compares the Morphe version in the latest release body against the
+          # upstream Morphe version. Normalizes the leading 'v' on both sides,
+          # because the release-body regex strips it while tag_name keeps it.
+          # (Previous bug: "1.35.0" never equalled "v1.35.0" — skip never fired.)
           if [ "$SHOULD_BUILD" = "1" ]; then
             REL_MORPHE=""
             if gh_api_get "https://api.github.com/repos/$GITHUB_REPOSITORY/releases?per_page=1" -; then
-              REL_MORPHE=$(echo "$GH_API_LAST_BODY" | jq -r '.[0].body // empty' | grep -oP 'Morphe Patches v\K[^\s]+' | head -1 || echo "")
+              REL_MORPHE=$(echo "$GH_API_LAST_BODY" | jq -r '.[0].body // empty' | grep -oP 'Morphe Patches v?\K[^\s]+' | head -1 || echo "")
             fi
-            echo "::debug::LATEST_RELEASE_MORPHE='$REL_MORPHE'"
-            if [ -n "$REL_MORPHE" ] && [ -n "$MORPHE_VERSION" ] && [ "$REL_MORPHE" = "$MORPHE_VERSION" ]; then
+            # Strip leading 'v' so both sides are comparable (1.35.0 == 1.35.0)
+            REL_MORPHE_NORM="${REL_MORPHE#v}"
+            MORPHE_VERSION_NORM="${MORPHE_VERSION#v}"
+            echo "::debug::LATEST_RELEASE_MORPHE='$REL_MORPHE' (norm='$REL_MORPHE_NORM') vs MORPHE='$MORPHE_VERSION' (norm='$MORPHE_VERSION_NORM')"
+            if [ -n "$REL_MORPHE_NORM" ] && [ -n "$MORPHE_VERSION_NORM" ] && [ "$REL_MORPHE_NORM" = "$MORPHE_VERSION_NORM" ]; then
               if [ "$SYNC_UPSTREAM" = "0" ]; then
                 SHOULD_BUILD=0
-                ci_log "Skipping build — latest release already has Morphe $MORPHE_VERSION and no upstream change"
+                ci_log "Skipping build — latest release already has Morphe $MORPHE_VERSION_NORM and no upstream change"
+              else
+                ci_log "Morphe unchanged but upstream changed (build-affecting) — will build, release dedup will skip release if APKs identical"
               fi
             fi
           fi
@@ -460,8 +469,69 @@ jobs:
             echo "::error::No assets found — refusing to create empty release"
             exit 1
           fi
+      - name: Check for duplicate release (content-based dedup)
+        id: dedup
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          source scripts/utilities/gh-api.sh
+          source scripts/utilities/ci-helpers.sh
+
+          # Extract version strings from built asset filenames.
+          # Pattern: {app}-morphe[-module]-v{VERSION}-{arch}.{ext}
+          YT_VER=""
+          MUSIC_VER=""
+          for f in assets/youtube-morphe-*.apk; do
+            [ -f "$f" ] || continue
+            YT_VER=$(basename "$f" | grep -oP 'youtube-morphe-v\K[0-9.]+(?=-arm)' | head -1 || echo "")
+            break
+          done
+          for f in assets/music-morphe-*.apk; do
+            [ -f "$f" ] || continue
+            MUSIC_VER=$(basename "$f" | grep -oP 'music-morphe-v\K[0-9.]+(?=-arm)' | head -1 || echo "")
+            break
+          done
+
+          ci_log "Built versions — YouTube: ${YT_VER:-unknown}, Music: ${MUSIC_VER:-unknown}"
+
+          # If we can't extract versions, don't risk skipping a needed release
+          if [ -z "$YT_VER" ] || [ -z "$MUSIC_VER" ]; then
+            ci_warn "Could not extract versions from asset filenames — proceeding with release (no dedup)"
+            echo "skip_release=0" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Fetch the latest release's asset names to compare against
+          if ! gh_api_get "https://api.github.com/repos/$GITHUB_REPOSITORY/releases?per_page=1" -; then
+            ci_warn "Could not fetch latest release for dedup — proceeding with release"
+            echo "skip_release=0" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          LATEST_ASSETS=$(echo "$GH_API_LAST_BODY" | jq -r '.[0].assets[].name // empty' 2>/dev/null || echo "")
+          if [ -z "$LATEST_ASSETS" ]; then
+            ci_log "No previous release/assets found — first release, no dedup"
+            echo "skip_release=0" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Check if the latest release already contains assets with these exact versions
+          YT_MATCH=$(printf '%s\n' "$LATEST_ASSETS" | grep -c "youtube-morphe.*-v${YT_VER}-" || true)
+          MUSIC_MATCH=$(printf '%s\n' "$LATEST_ASSETS" | grep -c "music-morphe.*-v${MUSIC_VER}-" || true)
+          [ -z "$YT_MATCH" ] && YT_MATCH=0
+          [ -z "$MUSIC_MATCH" ] && MUSIC_MATCH=0
+
+          if [ "$YT_MATCH" -gt 0 ] && [ "$MUSIC_MATCH" -gt 0 ]; then
+            echo "skip_release=1" >> $GITHUB_OUTPUT
+            ci_log "SKIP RELEASE — latest release already has YouTube v$YT_VER + Music v$MUSIC_VER (identical output)"
+            ci_log "Build artifacts are retained as workflow artifacts (5-day retention) in case manual release is needed"
+          else
+            echo "skip_release=0" >> $GITHUB_OUTPUT
+            ci_log "Will create new release — versions differ from latest release (YT:$YT_MATCH MUSIC:$MUSIC_MATCH matches in prev release)"
+          fi
       - name: Generate release
         id: meta
+        if: steps.dedup.outputs.skip_release != '1'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -492,6 +562,7 @@ jobs:
           python3 generate-changelog.py "$TAG" "$MORPHE_VER" "$DETACH_VER" > release-notes.md
 
       - name: Create release
+        if: steps.dedup.outputs.skip_release != '1'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
@@ -502,6 +573,11 @@ jobs:
             assets/*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release skipped (dedup)
+        if: steps.dedup.outputs.skip_release == '1'
+        run: |
+          echo "::notice::Release skipped — built APKs are identical to the latest release. Artifacts retained as workflow artifacts."
 
   # ============================================================
   # UPDATE META — record what we built, so next run can skip
