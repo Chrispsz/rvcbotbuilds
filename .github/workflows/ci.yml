@@ -533,10 +533,20 @@ jobs:
           LATEST_CONFIG_HASH=$(echo "$LATEST_BODY" | grep -oP 'Config hash: \K[a-f0-9]+' | head -1 || echo "")
           ci_log "Latest release config hash: ${LATEST_CONFIG_HASH:-none} | current: ${CONFIG_HASH_SHORT:-none}"
 
+          # If the latest release has NO config hash in its body (generated
+          # before this dedup feature existed), we can't prove the config is
+          # identical — be conservative and force a release. This also serves
+          # as a one-time migration: the new release will have the hash, and
+          # future runs can dedup properly.
           CONFIG_CHANGED=0
-          if [ -n "$CONFIG_HASH_SHORT" ] && [ -n "$LATEST_CONFIG_HASH" ] && [ "$CONFIG_HASH_SHORT" != "$LATEST_CONFIG_HASH" ]; then
-            CONFIG_CHANGED=1
-            ci_log "Config changed since last release ($LATEST_CONFIG_HASH → $CONFIG_HASH_SHORT) — must release even if APK versions match"
+          if [ -n "$CONFIG_HASH_SHORT" ]; then
+            if [ -z "$LATEST_CONFIG_HASH" ]; then
+              CONFIG_CHANGED=1
+              ci_log "Latest release has no config hash (pre-dedup-feature) — must release to establish baseline"
+            elif [ "$CONFIG_HASH_SHORT" != "$LATEST_CONFIG_HASH" ]; then
+              CONFIG_CHANGED=1
+              ci_log "Config changed since last release ($LATEST_CONFIG_HASH → $CONFIG_HASH_SHORT) — must release even if APK versions match"
+            fi
           fi
 
           if [ "$YT_MATCH" -gt 0 ] && [ "$MUSIC_MATCH" -gt 0 ] && [ "$CONFIG_CHANGED" = "0" ]; then
