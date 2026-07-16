@@ -492,7 +492,13 @@ jobs:
             break
           done
 
-          ci_log "Built versions — YouTube: ${YT_VER:-unknown}, Music: ${MUSIC_VER:-unknown}"
+          # Compute config.toml hash — this is the KEY signal for whether
+          # a release is needed even when APK base versions are unchanged.
+          # If patches were added/removed, the APK output differs even with
+          # the same base version, so we MUST release.
+          CONFIG_HASH=$(sha256sum config.toml 2>/dev/null | awk '{print $1}')
+          CONFIG_HASH_SHORT="${CONFIG_HASH:0:12}"
+          ci_log "Built versions — YouTube: ${YT_VER:-unknown}, Music: ${MUSIC_VER:-unknown} | config.toml hash: ${CONFIG_HASH_SHORT:-none}"
 
           # If we can't extract versions, don't risk skipping a needed release
           if [ -z "$YT_VER" ] || [ -z "$MUSIC_VER" ]; then
@@ -501,7 +507,7 @@ jobs:
             exit 0
           fi
 
-          # Fetch the latest release's asset names to compare against
+          # Fetch the latest release's asset names + body to compare against
           if ! gh_api_get "https://api.github.com/repos/$GITHUB_REPOSITORY/releases?per_page=1" -; then
             ci_warn "Could not fetch latest release for dedup — proceeding with release"
             echo "skip_release=0" >> $GITHUB_OUTPUT
@@ -509,6 +515,7 @@ jobs:
           fi
 
           LATEST_ASSETS=$(echo "$GH_API_LAST_BODY" | jq -r '.[0].assets[].name // empty' 2>/dev/null || echo "")
+          LATEST_BODY=$(echo "$GH_API_LAST_BODY" | jq -r '.[0].body // empty' 2>/dev/null || echo "")
           if [ -z "$LATEST_ASSETS" ]; then
             ci_log "No previous release/assets found — first release, no dedup"
             echo "skip_release=0" >> $GITHUB_OUTPUT
@@ -521,13 +528,28 @@ jobs:
           [ -z "$YT_MATCH" ] && YT_MATCH=0
           [ -z "$MUSIC_MATCH" ] && MUSIC_MATCH=0
 
-          if [ "$YT_MATCH" -gt 0 ] && [ "$MUSIC_MATCH" -gt 0 ]; then
+          # Check if config.toml hash matches the one recorded in the latest release body.
+          # generate-changelog.py writes a line like: "Config hash: <short_hash>"
+          LATEST_CONFIG_HASH=$(echo "$LATEST_BODY" | grep -oP 'Config hash: \K[a-f0-9]+' | head -1 || echo "")
+          ci_log "Latest release config hash: ${LATEST_CONFIG_HASH:-none} | current: ${CONFIG_HASH_SHORT:-none}"
+
+          CONFIG_CHANGED=0
+          if [ -n "$CONFIG_HASH_SHORT" ] && [ -n "$LATEST_CONFIG_HASH" ] && [ "$CONFIG_HASH_SHORT" != "$LATEST_CONFIG_HASH" ]; then
+            CONFIG_CHANGED=1
+            ci_log "Config changed since last release ($LATEST_CONFIG_HASH → $CONFIG_HASH_SHORT) — must release even if APK versions match"
+          fi
+
+          if [ "$YT_MATCH" -gt 0 ] && [ "$MUSIC_MATCH" -gt 0 ] && [ "$CONFIG_CHANGED" = "0" ]; then
             echo "skip_release=1" >> $GITHUB_OUTPUT
-            ci_log "SKIP RELEASE — latest release already has YouTube v$YT_VER + Music v$MUSIC_VER (identical output)"
+            ci_log "SKIP RELEASE — latest release already has YouTube v$YT_VER + Music v$MUSIC_VER with identical config (identical output)"
             ci_log "Build artifacts are retained as workflow artifacts (5-day retention) in case manual release is needed"
           else
             echo "skip_release=0" >> $GITHUB_OUTPUT
-            ci_log "Will create new release — versions differ from latest release (YT:$YT_MATCH MUSIC:$MUSIC_MATCH matches in prev release)"
+            if [ "$CONFIG_CHANGED" = "1" ]; then
+              ci_log "Will create new release — config.toml changed since last release (YT:$YT_MATCH MUSIC:$MUSIC_MATCH version matches, but config differs)"
+            else
+              ci_log "Will create new release — versions differ from latest release (YT:$YT_MATCH MUSIC:$MUSIC_MATCH matches in prev release)"
+            fi
           fi
       - name: Generate release
         id: meta
@@ -559,7 +581,13 @@ jobs:
           MORPHE_VER="${{ needs.preflight.outputs.MORPHE_VERSION }}"
           DETACH_VER="${{ needs.preflight.outputs.DETACH_VERSION }}"
 
-          python3 generate-changelog.py "$TAG" "$MORPHE_VER" "$DETACH_VER" > release-notes.md
+          # Compute short config.toml hash to embed in release body.
+          # The dedup step reads this back to detect config-only changes
+          # that still warrant a new release (e.g. patch added/removed).
+          CONFIG_HASH=$(sha256sum config.toml 2>/dev/null | awk '{print $1}')
+          CONFIG_HASH_SHORT="${CONFIG_HASH:0:12}"
+
+          python3 generate-changelog.py "$TAG" "$MORPHE_VER" "$DETACH_VER" "$CONFIG_HASH_SHORT" > release-notes.md
 
       - name: Create release
         if: steps.dedup.outputs.skip_release != '1'

@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
 """Generate release notes for RVCArise releases.
 
-Usage: generate-changelog.py <tag> [morphe_version] [detach_version]
+Usage: generate-changelog.py <tag> [morphe_version] [detach_version] [config_hash]
+
+The config_hash (short sha256 of config.toml) is written into the release body
+as a "Config hash: <hash>" footer. The CI dedup step reads this to decide
+whether a new release is needed when APK base versions are unchanged but the
+patch set changed.
 """
+import hashlib
 import json
 import sys
 import urllib.request
@@ -10,6 +16,7 @@ import urllib.request
 tag = sys.argv[1] if len(sys.argv) > 1 else "unknown"
 morphe_ver = sys.argv[2] if len(sys.argv) > 2 else ""
 detach_ver = sys.argv[3] if len(sys.argv) > 3 else ""
+config_hash = sys.argv[4] if len(sys.argv) > 4 else ""
 
 changelog = ""
 if morphe_ver:
@@ -26,22 +33,20 @@ detach_line = f"\n- Detach: zygisk-detach {detach_ver} (auto-update)" if detach_
 notes = f"""## RVCArise {tag}
 
 ### YouTube
-AMOLED | Ad-free | Downloads | Swipe controls | Background play
+AMOLED | Ad-free | Downloads | Background play
 - Theme: Pure black AMOLED
 - Ads: Fully blocked (general + video)
 - Downloads: External downloader integration
-- Swipe: Volume & brightness gestures
-- Speed: Custom playback speed
 - Background: Unrestricted playback
-- Clean feed: No Shorts, no suggested channels
+- Clean feed: No Shorts, no suggested channels (via Hide layout components)
 - Module: Includes zygisk-detach
 
 ### Music
-AMOLED | Ad-free | Exclusive audio | Permanent repeat
+AMOLED | Ad-free | Exclusive audio | Remember repeat state
 - Theme: Pure black AMOLED
 - Ads: Fully blocked
 - Audio: Exclusive audio-only mode
-- Repeat: Always repeat tracks
+- Repeat: Remembers repeat state between tracks
 - Miniplayer: Previous & next buttons
 - Background: Unrestricted playback
 - Module: Includes zygisk-detach
@@ -64,5 +69,10 @@ AMOLED | Ad-free | Exclusive audio | Permanent repeat
 
 if changelog:
     notes += f"\n---\n\n### Morphe Patches {morphe_ver}\n\n{changelog}\n"
+
+# Footer with config hash — read by the dedup step in ci.yml.
+# MUST stay in the exact format "Config hash: <hash>" (12-char short sha256).
+if config_hash:
+    notes += f"\n---\n\nConfig hash: {config_hash}\n"
 
 print(notes)
