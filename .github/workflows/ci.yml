@@ -53,9 +53,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          lfs: true
+          fetch-depth: 1
+          # NO lfs: true here — we pull LFS objects explicitly in the next step.
+          # This avoids the "could not read Username" fetch error that occurs
+          # when actions/checkout tries to fetch LFS during the main git fetch.
           token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Pull LFS objects (explicit, more reliable than lfs: true)
+        run: |
+          git lfs install --local
+          git lfs pull
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Install deps (cached)
         uses: awalsh128/cache-apt-pkgs-action@v1
@@ -129,18 +138,23 @@ jobs:
           fi
 
           # === Layer 1.5: build-affecting diff (NEW — skip cosmetic changes) ===
+          # Use GitHub compare API instead of git diff — no need for fetch-depth: 0
           if [ "$SYNC_UPSTREAM" = "1" ] && [ -n "$LAST_SHA" ]; then
-            git remote add upstream https://github.com/j-hc/revanced-magisk-module.git 2>/dev/null || true
-            git fetch upstream main --depth=100 --quiet
-            BUILD_AFFECTING=$(git diff --name-only "$LAST_SHA..upstream/main" -- \
-              build.sh utils.sh build-termux.sh config.toml \
-              module/ bin/ scripts/ ksu_profile/ 2>/dev/null || echo "")
-            if [ -z "$BUILD_AFFECTING" ]; then
-              ci_log "Upstream changed but ONLY non-build files (README/.github/docs) — no rebuild needed"
-              SYNC_UPSTREAM=0
+            COMPARE_URL="https://api.github.com/repos/j-hc/revanced-magisk-module/compare/$LAST_SHA...$UPSTREAM_SHA"
+            if gh_api_get "$COMPARE_URL" -; then
+              # Extract filenames from the compare response, filter to build-affecting paths
+              ALL_FILES=$(echo "$GH_API_LAST_BODY" | jq -r '.files[].filename // empty')
+              BUILD_AFFECTING=$(echo "$ALL_FILES" | grep -E '^(build\.sh|utils\.sh|build-termux\.sh|config\.toml|module/|bin/|scripts/|ksu_profile/)' || echo "")
+              if [ -z "$BUILD_AFFECTING" ]; then
+                ci_log "Upstream changed but ONLY non-build files (README/.github/docs) — no rebuild needed"
+                ci_log "Changed files: $(echo "$ALL_FILES" | tr '\n' ' ' | head -c 200)"
+                SYNC_UPSTREAM=0
+              else
+                ci_log "Build-affecting files changed upstream:"
+                echo "$BUILD_AFFECTING" | sed 's/^/  - /'
+              fi
             else
-              ci_log "Build-affecting files changed upstream:"
-              echo "$BUILD_AFFECTING" | sed 's/^/  - /'
+              ci_warn "could not fetch compare (HTTP $GH_API_LAST_CODE) — assuming build-affecting (conservative)"
             fi
           fi
 
