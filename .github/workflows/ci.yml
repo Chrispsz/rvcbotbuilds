@@ -59,7 +59,7 @@ jobs:
           # when actions/checkout tries to fetch LFS during the main git fetch.
           token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
 
-      - name: Pull LFS objects (explicit, more reliable than lfs: true)
+      - name: "Pull LFS objects (explicit, more reliable than lfs pull)"
         run: |
           git lfs install --local
           git lfs pull
