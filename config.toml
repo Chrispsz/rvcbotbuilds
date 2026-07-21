@@ -19,8 +19,14 @@ default-arch = "arm64-v8a"
 # ============================================
 # Only patches a real user will notice and use
 #
+# RE-ENABLED (was removed in v1.30 due to stuttering; fully fixed in v1.35):
+#   Spoof video streams — REQUIRED. Without it, Google's server-side throttling
+#   causes playback to freeze at exactly the 1-minute mark on most clients.
+#   v1.35 ships a rewritten patch with new client types (ANDROID_REEL_AUTH as
+#   default, with TV / ANDROID_VR fallback) and automatic client fall-over.
+#   See: MorpheApp/morphe-patches#115, PR #116, commits cafec9c and ce3f496.
+#
 # REMOVED due to bugs/stuttering:
-#   Spoof video streams — causes player stuttering & 5-10s delay (v1.30+)
 #   SponsorBlock — undo toast freezes UI (#1555)
 #   Return YouTube Dislike — API timeout freezes app 5-10s (#1451)
 #   Sanitize sharing links — broken in v1.30.0 (#1602)
@@ -56,6 +62,7 @@ included-patches = """\
   'Navigation bar' \
   'Change start page' \
   'Remove background playback restrictions' \
+  'Spoof video streams' \
   """
 
 excluded-patches = """\
@@ -89,7 +96,6 @@ excluded-patches = """\
   'Miniplayer' \
   'Open Shorts in regular player' \
   'Spoof device dimensions' \
-  'Spoof video streams' \
   """
 
 uptodown-dlurl = "https://youtube.en.uptodown.com/android"
@@ -100,8 +106,13 @@ apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"
 # ============================================
 # Only patches a real user will notice and use
 #
+# RE-ENABLED (was removed in v1.30 due to audio stuttering; fixed in v1.35):
+#   Spoof video streams — REQUIRED. Without it, Google's server-side throttling
+#   causes playback to freeze at the 1-minute mark. v1.35 ships a rewritten
+#   patch with new client types and automatic client fall-over.
+#   See: MorpheApp/morphe-patches#115, PR #116.
+#
 # REMOVED due to bugs/stuttering:
-#   Spoof video streams — causes audio stuttering & delay
 #   Sanitize sharing links — broken in v1.30.0 (#1602)
 #   Track crossfade — breaks casting, lock screen (#1549)
 # ============================================
@@ -124,6 +135,7 @@ included-patches = """\
   'Enable exclusive audio playback' \
   'Miniplayer previous and next buttons' \
   'Remember repeat state' \
+  'Spoof video streams' \
   """
 
 excluded-patches = """\
@@ -138,7 +150,6 @@ excluded-patches = """\
   'Hide buttons' \
   'Hide category bar' \
   'Navigation bar' \
-  'Spoof video streams' \
   """
 
 uptodown-dlurl = "https://youtube-music.en.uptodown.com/android"
