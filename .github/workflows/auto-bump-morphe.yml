@@ -1,0 +1,112 @@
+name: Auto-bump Morphe patches
+
+# ============================================
+# Daily check for new stable Morphe patch releases
+# ============================================
+# Runs at 11:00 BRT (14:00 UTC), 2 hours before the main CI build
+# (13:00 BRT / 16:00 UTC). If a new stable Morphe release is found,
+# this workflow bumps patches-version in config.toml and commits to main.
+# The next scheduled CI run then builds with the new version automatically.
+#
+# Only stable (non-prerelease) versions are considered.
+# Pre-releases (v1.36.0-dev.X) are skipped.
+#
+# To test manually: Actions tab → "Auto-bump Morphe patches" → Run workflow
+# ============================================
+
+on:
+  schedule:
+    # 11:00 BRT (America/Sao_Paulo = UTC-3) = 14:00 UTC
+    - cron: "0 14 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: auto-bump-morphe
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    name: Check & bump
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Install jq
+        uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: jq
+          version: v1
+
+      - name: Check for new stable Morphe release and bump
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # Fetch latest stable (non-prerelease) Morphe tag
+          LATEST=$(curl -fsSL \
+            -H "Authorization: token ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/MorpheApp/morphe-patches/releases?per_page=30" \
+            | jq -r '[.[] | select(.prerelease == false)] | .[0].tag_name // empty')
+
+          if [ -z "$LATEST" ]; then
+            echo "::notice::No stable Morphe release found. Skipping."
+            exit 0
+          fi
+
+          # Normalize (strip leading v)
+          LATEST_NORM="${LATEST#v}"
+
+          # Read current pinned version from config.toml
+          CURRENT=$(grep -oE 'patches-version = "v?[0-9]+\.[0-9]+\.[0-9]+"' config.toml \
+            | head -1 | sed -E 's/.*"v?([0-9.]+)"/\1/')
+
+          echo "Current pinned: v${CURRENT:-<none>}"
+          echo "Latest stable:  v${LATEST_NORM}"
+
+          if [ -z "$CURRENT" ]; then
+            echo "::warning::config.toml has no pinned patches-version (maybe 'latest'?). Skipping auto-bump. Manual intervention needed."
+            exit 0
+          fi
+
+          if [ "$CURRENT" = "$LATEST_NORM" ]; then
+            echo "::notice::Already up to date (v${CURRENT}). No bump needed."
+            exit 0
+          fi
+
+          echo "::notice::New stable Morphe release detected: v${CURRENT} -> v${LATEST_NORM}"
+
+          # Bump both occurrences (YouTube-Morphe and Music-Morphe blocks)
+          sed -i -E "s|patches-version = \"v?[0-9]+\.[0-9]+\.[0-9]+\"|patches-version = \"v${LATEST_NORM}\"|g" config.toml
+
+          # Verify the bump took effect
+          NEW=$(grep -oE 'patches-version = "v?[0-9]+\.[0-9]+\.[0-9]+"' config.toml \
+            | head -1 | sed -E 's/.*"v?([0-9.]+)"/\1/')
+          if [ "$NEW" != "$LATEST_NORM" ]; then
+            echo "::error::Bump failed. Expected v${LATEST_NORM} but found v${NEW:-<none>}."
+            exit 1
+          fi
+
+          echo "=== config.toml after bump ==="
+          grep -n 'patches-version' config.toml
+
+          # Commit and push
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add config.toml
+          git commit -m "chore(auto-bump): Morphe patches v${CURRENT} -> v${LATEST_NORM}
+
+          Automatically bumped by the auto-bump-morphe workflow.
+          The next scheduled CI run (16:00 UTC) will build with this version.
+
+          Release notes: https://github.com/MorpheApp/morphe-patches/releases/tag/v${LATEST_NORM}"
+          git push
+
+          echo "::notice::Successfully bumped to v${LATEST_NORM}. CI will build with it at next schedule."
