@@ -361,7 +361,12 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           KS_PASSWORD: ${{ secrets.KS_PASSWORD }}
         run: |
-          rm -rf temp/morpheapp-rv/patches-*.mpe temp/morpheapp-rv/patches-*.jar 2>/dev/null || true
+          # Purge ALL cached patch bundles (.mpe legacy, .jar legacy, .mpp Morphe,
+          # and any partial .mpp-zip download artifacts) so get_prebuilts() always
+          # re-downloads the version declared in config.toml.
+          # Without this, a stale patches-1.30.0.mpp in the actions cache would
+          # be reused forever and the build would never pick up new patch releases.
+          rm -rf temp/morpheapp-rv/patches-* 2>/dev/null || true
           rm -rf temp/morpheapp-rv/cli-*.jar 2>/dev/null || true
           chmod +x build.sh utils.sh
           bash build.sh config.toml 2>&1 | tee build.log
