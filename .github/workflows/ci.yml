@@ -606,7 +606,7 @@ jobs:
 
       - name: Create release
         if: steps.dedup.outputs.skip_release != '1'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
           name: "RVCArise ${{ steps.meta.outputs.tag }}"
