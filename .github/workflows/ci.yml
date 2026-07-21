@@ -408,7 +408,7 @@ jobs:
           ci_log "All $FOUND outputs validated successfully"
       - name: Upload YouTube APK
         if: always() && steps.verify.outcome != 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: youtube-mod-apk
           path: build/youtube-*.apk
@@ -416,7 +416,7 @@ jobs:
           if-no-files-found: warn
       - name: Upload YouTube Module
         if: always() && steps.verify.outcome != 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: youtube-magisk-module
           path: build/youtube-*.zip
@@ -424,7 +424,7 @@ jobs:
           if-no-files-found: warn
       - name: Upload Music APK
         if: always() && steps.verify.outcome != 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: music-mod-apk
           path: build/music-*.apk
@@ -432,7 +432,7 @@ jobs:
           if-no-files-found: warn
       - name: Upload Music Module
         if: always() && steps.verify.outcome != 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: music-magisk-module
           path: build/music-*.zip
