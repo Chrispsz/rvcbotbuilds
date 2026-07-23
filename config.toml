@@ -49,7 +49,7 @@ patches-source = "MorpheApp/morphe-patches"
 # Spoof video streams patch (default client = ANDROID_REEL_AUTH with TV /
 # ANDROID_VR fallback). Older versions have the 1-min playback freeze bug
 # (MorpheApp/morphe-patches#115). Bump this when a new stable is released.
-patches-version = "v1.35.0"
+patches-version = "v1.36.0"
 cli-source = "MorpheApp/morphe-cli"
 rv-brand = "Morphe"
 build-mode = "both"
@@ -125,7 +125,7 @@ enabled = true
 app-name = "Music"
 patches-source = "MorpheApp/morphe-patches"
 # Pinned to v1.35.0 — see YouTube-Morphe above for rationale.
-patches-version = "v1.35.0"
+patches-version = "v1.36.0"
 cli-source = "MorpheApp/morphe-cli"
 rv-brand = "Morphe"
 build-mode = "both"
